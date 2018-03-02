@@ -1,0 +1,185 @@
+
+<all>
+
+<liffe_fin>
+ <stirs>
+   <!-- GILT -->
+  <gilt>
+   <product type="F" market="202" commodity="R" name="LIFFELR" description="Long Gilt Future" currency="GBP" last_trading_time="10:30:00"/>
+   <product type="O" market="202" commodity="R" name="LIFFELR" description="Long Gilt Option" currency="GBP" last_trading_time="10:30:00" point_size="1000"/>
+   <product type="S" market="202" commodity="R" name="LIFFELR" description="Long Gilt Option" currency="GBP" last_trading_time="10:30:00" point_size="1000"/>
+  </gilt>
+   <sterling>
+     <!-- STERLING -->
+     <product type="F" market="200" commodity="L" name="LIFFELL" description="Sterling 3mth Future" currency="GBP" last_trading_time="11:00:00" cash_settled="true"/>
+     <product type="O" market="200" commodity="L" name="LIFFELL" description="Sterling 3mth Option" currency="GBP" last_trading_time="16:15:00" point_size="1250"/>
+     <product type="S" market="200" commodity="L" name="LIFFELL" description="Sterling 3mth Option" currency="GBP" last_trading_time="16:15:00" point_size="1250"/>
+
+     <product type="O" market="200" commodity="M" name="LIFFELM" description="Sterling 1yr Option" currency="GBP" last_trading_time="16:15:00" point_size="1250"/>
+     <product type="S" market="200" commodity="M" name="LIFFELM" description="Sterling 1yr Option" currency="GBP" last_trading_time="16:15:00" point_size="1250"/>
+
+     <product type="O" market="200" commodity="M2" name="LIFFELM2" description="Sterling 2yr Option" currency="GBP" last_trading_time="16:15:00" point_size="1250"/>
+     <product type="S" market="200" commodity="M2" name="LIFFELM2" description="Sterling 2yr Option" currency="GBP" last_trading_time="16:15:00" point_size="1250"/>
+
+     <product type="O" market="200" commodity="M3" name="LIFFELM3" description="Sterling 3yr Option" currency="GBP" last_trading_time="16:15:00" point_size="1250"/>
+     <product type="S" market="200" commodity="M3" name="LIFFELM3" description="Sterling 3yr Option" currency="GBP" last_trading_time="16:15:00" point_size="1250"/>
+
+     <product type="O" market="200" commodity="M4" name="LIFFELM4" description="Sterling 4yr Option" currency="GBP" last_trading_time="16:15:00" point_size="1250"/>
+     <product type="S" market="200" commodity="M4" name="LIFFELM4" description="Sterling 4yr Option" currency="GBP" last_trading_time="16:15:00" point_size="1250"/>
+   </sterling>
+
+   <euribor>
+     <!-- Euribor -->
+     <product type="F" market="209" commodity="I" name="LIFFELI" description="Euribor 3mth Future" currency="EUR" last_trading_time="10:00:00" cash_settled="true"/>
+     <product type="O" market="209" commodity="I" name="LIFFELI" description="Euribor 3mth Option" currency="EUR" last_trading_time="16:15:00" point_size="2500"/>
+     <product type="S" market="209" commodity="I" name="LIFFELI" description="Euribor 3mth Option" currency="EUR" last_trading_time="16:15:00" point_size="2500"/>
+
+     <product type="O" market="209" commodity="K" name="LIFFELK" description="Euribor 1yr Option" currency="EUR" last_trading_time="16:15:00" point_size="2500"/>
+     <product type="S" market="209" commodity="K" name="LIFFELK" description="Euribor 1yr Option" currency="EUR" last_trading_time="16:15:00" point_size="2500"/>
+
+     <product type="O" market="209" commodity="K2" name="LIFFELK2" description="Euribor 2yr Option" currency="EUR" last_trading_time="16:15:00" point_size="2500"/>
+     <product type="S" market="209" commodity="K2" name="LIFFELK2" description="Euribor 2yr Option" currency="EUR" last_trading_time="16:15:00" point_size="2500"/>
+
+     <product type="O" market="209" commodity="K3" name="LIFFELK3" description="Euribor 3yr Option" currency="EUR" last_trading_time="16:15:00" point_size="2500"/>
+     <product type="S" market="209" commodity="K3" name="LIFFELK3" description="Euribor 3yr Option" currency="EUR" last_trading_time="16:15:00" point_size="2500"/>
+
+     <product type="O" market="209" commodity="K4" name="LIFFELK4" description="Euribor 4yr Option" currency="EUR" last_trading_time="16:15:00" point_size="2500"/>
+     <product type="S" market="209" commodity="K4" name="LIFFELK4" description="Euribor 4yr Option" currency="EUR" last_trading_time="16:15:00" point_size="2500"/>
+   </euribor>
+ </stirs>
+
+ <ftse>
+   <ftse_future>
+     <product type="F" market="215" commodity="Z" name="FTSE" description="FTSE Future on ICE" currency="GBP" last_trading_time="10:30:00" cash_settled="true" subscribe_price="${subscribe_futures:-Y}" subscribe_depth="${subscribe_futures_depth:-N}" exchange_time_zone="Europe/London"/>
+   </ftse_future>
+   <product type="O" market="213" commodity="ESX" name="FTSE" description="FTSE Option on ICE" currency="GBP" last_trading_time="10:30:00" point_size="10" cash_settled="true" exchange_time_zone="Europe/London"/>
+   <product type="S" market="213" commodity="ESX" name="FTSE" description="FTSE Option on ICE" currency="GBP" last_trading_time="10:30:00" point_size="10" cash_settled="true" exchange_time_zone="Europe/London"/>
+
+   <!-- FTSE div futures -->
+   <product type="F" market="214" commodity="XZ" name="XZ" description="FTSE Dividend Future (RDSA withholding)" currency="GBP" last_trading_time="16:30:00" cash_settled="true" subscribe_price="${subscribe_futures:-Y}" subscribe_depth="${subscribe_futures_depth:-N}" exchange_time_zone="Europe/London"/>
+   <product type="F" market="214" commodity="YZ" name="YZ" description="FTSE Dividend Future" currency="GBP" last_trading_time="16:30:00" cash_settled="true" subscribe_price="${subscribe_futures:-Y}" subscribe_depth="${subscribe_futures_depth:-N}" exchange_time_zone="Europe/London"/>
+ </ftse>
+</liffe_fin>
+
+ <stirs2>
+   <!-- GILT -->
+   <product type="F" market="202" commodity="R" name="R" description="Long Gilt Future" currency="GBP" last_trading_time="11:00:00"/>
+   <product type="O" market="202" commodity="R" name="R" description="Long Gilt Option" currency="GBP" last_trading_time="10:00:00" point_size="1000"/>
+   <product type="S" market="202" commodity="R" name="R" description="Long Gilt Option" currency="GBP" last_trading_time="10:00:00" point_size="1000"/>
+
+   <!-- STERLING -->
+   <product type="F" market="200" commodity="L" name="L" description="Sterling 3mth Future" currency="GBP" last_trading_time="11:00:00" cash_settled="true"/>
+   <product type="O" market="200" commodity="L" name="L" description="Sterling 3mth Option" currency="GBP" last_trading_time="16:15:00" point_size="1250"/>
+   <product type="S" market="200" commodity="L" name="L" description="Sterling 3mth Option" currency="GBP" last_trading_time="16:15:00" point_size="1250"/>
+
+   <product type="O" market="200" commodity="M" name="M" description="Sterling 1yr Option" currency="GBP" last_trading_time="16:15:00" point_size="1250"/>
+   <product type="S" market="200" commodity="M" name="M" description="Sterling 1yr Option" currency="GBP" last_trading_time="16:15:00" point_size="1250"/>
+
+   <product type="O" market="200" commodity="M2" name="M2" description="Sterling 2yr Option" currency="GBP" last_trading_time="16:15:00" point_size="1250"/>
+   <product type="S" market="200" commodity="M2" name="M2" description="Sterling 2yr Option" currency="GBP" last_trading_time="16:15:00" point_size="1250"/>
+
+   <product type="O" market="200" commodity="M3" name="M3" description="Sterling 3yr Option" currency="GBP" last_trading_time="16:15:00" point_size="1250"/>
+   <product type="S" market="200" commodity="M3" name="M3" description="Sterling 3yr Option" currency="GBP" last_trading_time="16:15:00" point_size="1250"/>
+
+   <product type="O" market="200" commodity="M4" name="M4" description="Sterling 4yr Option" currency="GBP" last_trading_time="16:15:00" point_size="1250"/>
+   <product type="S" market="200" commodity="M4" name="M4" description="Sterling 4yr Option" currency="GBP" last_trading_time="16:15:00" point_size="1250"/>
+
+   <!-- Euribor -->
+   <product type="F" market="209" commodity="I" name="I" description="Euribor 3mth Future" currency="EUR" last_trading_time="10:00:00" cash_settled="true"/>
+   <product type="O" market="209" commodity="I" name="I" description="Euribor 3mth Option" currency="EUR" last_trading_time="16:15:00" point_size="2500"/>
+   <product type="S" market="209" commodity="I" name="I" description="Euribor 3mth Option" currency="EUR" last_trading_time="16:15:00" point_size="2500"/>
+
+   <product type="O" market="209" commodity="K" name="K" description="Euribor 1yr Option" currency="EUR" last_trading_time="16:15:00" point_size="2500"/>
+   <product type="S" market="209" commodity="K" name="K" description="Euribor 1yr Option" currency="EUR" last_trading_time="16:15:00" point_size="2500"/>
+
+   <product type="O" market="209" commodity="K2" name="K2" description="Euribor 2yr Option" currency="EUR" last_trading_time="16:15:00" point_size="2500"/>
+   <product type="S" market="209" commodity="K2" name="K2" description="Euribor 2yr Option" currency="EUR" last_trading_time="16:15:00" point_size="2500"/>
+
+   <product type="O" market="209" commodity="K3" name="K3" description="Euribor 3yr Option" currency="EUR" last_trading_time="16:15:00" point_size="2500"/>
+   <product type="S" market="209" commodity="K3" name="K3" description="Euribor 3yr Option" currency="EUR" last_trading_time="16:15:00" point_size="2500"/>
+
+   <product type="O" market="209" commodity="K4" name="K4" description="Euribor 4yr Option" currency="EUR" last_trading_time="16:15:00" point_size="2500"/>
+   <product type="S" market="209" commodity="K4" name="K4" description="Euribor 4yr Option" currency="EUR" last_trading_time="16:15:00" point_size="2500"/>
+ </stirs2>
+
+<crude>
+  <brent>
+    <brent_future>
+      <product type="F" market="5" commodity="BRN" name="B" description="Brent Future" currency="USD" last_trading_time="13:30:00" point_size="1000" cash_settled="true" exchange_time_zone="America/Chicago"/>
+    </brent_future>
+    <product type="O" market="5" commodity="BRN" name="B" description="Brent Option" currency="USD" last_trading_time="13:30:00" point_size="1000" exchange_time_zone="America/Chicago"/>
+    <product type="S" market="5" commodity="BRN" name="B" description="Brent Option" currency="USD" last_trading_time="13:30:00" point_size="1000" exchange_time_zone="America/Chicago"/>
+  </brent>
+
+  <wti>
+    <product type="F" market="9" commodity="WBS" name="T" description="WTI Future" currency="USD" last_trading_time="13:30:00" point_size="1000" cash_settled="true" exchange_time_zone="America/Chicago"/>
+    <product type="O" market="9" commodity="WBS" name="T" description="WTI Option" currency="USD" last_trading_time="13:30:00" point_size="1000" exchange_time_zone="America/Chicago"/>
+    <product type="S" market="9" commodity="WBS" name="T" description="WTI Option" currency="USD" last_trading_time="13:30:00" point_size="1000" exchange_time_zone="America/Chicago"/>
+  </wti>
+</crude>
+
+<coal>
+  <!-- API2 ROTTERDAM COAL FUTURES -->
+  <product type="F" market="17" commodity="ATW" name="ATW" currency="USD" last_trading_time="17:00:00" point_size="1000" cash_settled="true" exchange_time_zone="Europe/London"/>
+  <!-- API4 RICHARDS BAY COAL FUTURES -->
+  <product type="F" market="18" commodity="AFR" name="AFR" currency="USD" last_trading_time="17:00:00" point_size="1000" cash_settled="true" exchange_time_zone="Europe/London"/>
+</coal>
+
+<gas>
+  <product type="F" market="44" commodity="PHH" name="HH" description="Henry Penultimate Future" currency="USD" last_trading_time="13:30:00" point_size="2500" cash_settled="true" exchange_time_zone="America/Chicago"/>
+  <product type="O" market="44" commodity="PHE" name="HH" description="Henry Penultimate Option" currency="USD" last_trading_time="13:30:00" point_size="2500" cash_settled="true" exchange_time_zone="America/Chicago"/>
+  <product type="S" market="44" commodity="PHE" name="HH" description="Henry Penultimate Option" currency="USD" last_trading_time="13:30:00" point_size="2500" cash_settled="true" exchange_time_zone="America/Chicago"/>
+
+  <!-- Henry LD1 -->
+  <product type="F" market="44" commodity="HNG" name="HNG" cash_settled="true" last_trading_time="13:30:00" exchange_time_zone="America/Chicago"/>
+</gas>
+
+<agri>
+  <!-- sugar no. 11 -->
+  <sugar_future>
+    <product type="F" market="24" commodity="SB" name="SB" currency="USD" last_trading_time="17:00:00" point_size="1120" cash_settled="false" exchange_time_zone="America/New_York"/>
+  </sugar_future>
+  <product type="O" market="24" commodity="SB" name="SB" currency="USD" last_trading_time="17:00:00" point_size="1120" cash_settled="false" exchange_time_zone="America/New_York"/>
+  <product type="S" market="24" commodity="SB" name="SB" currency="USD" last_trading_time="17:00:00" point_size="1120" cash_settled="false" exchange_time_zone="America/New_York"/>
+
+  <!-- Cocoa -->
+  <product type="F" market="20" commodity="CC" name="CC" currency="USD" last_trading_time="17:00:00" point_size="10" cash_settled="false" exchange_time_zone="America/New_York"/>
+  <product type="O" market="20" commodity="CC" name="CC" currency="USD" last_trading_time="17:00:00" point_size="10" cash_settled="false" exchange_time_zone="America/New_York"/>
+  <product type="S" market="20" commodity="CC" name="CC" currency="USD" last_trading_time="17:00:00" point_size="10" cash_settled="false" exchange_time_zone="America/New_York"/>
+  <!-- Coffee C -->
+  <product type="F" market="21" commodity="KC" name="KC" currency="USD" last_trading_time="17:00:00" point_size="375" cash_settled="false" exchange_time_zone="America/New_York"/>
+  <product type="O" market="21" commodity="KC" name="KC" currency="USD" last_trading_time="17:00:00" point_size="375" cash_settled="false" exchange_time_zone="America/New_York"/>
+  <product type="S" market="21" commodity="KC" name="KC" currency="USD" last_trading_time="17:00:00" point_size="375" cash_settled="false" exchange_time_zone="America/New_York"/>
+</agri>
+
+<ukagri>
+  <!-- London Cocoa -->
+  <cco>
+    <cco_future>
+      <product type="F" market="205" commodity="C" name="CCO" last_trading_time="16:55:00" exchange_time_zone="Europe/London" subscribe_price="${subscribe_futures:-Y}" subscribe_depth="${subscribe_futures_depth:-N}" destination_exchange="XMAT"/>
+    </cco_future>
+    <!-- <product type="O" market="205" commodity="C" name="CCO" last_trading_time="16:55:00" exchange_time_zone="Europe/London"/> -->
+    <!-- <product type="S" market="205" commodity="C" name="CCO" last_trading_time="16:55:00" exchange_time_zone="Europe/London"/> -->
+  </cco>
+</ukagri>
+
+<ukgas>
+  <!-- UK Gas -->
+  <ukgas_future>
+    <product type="F" market="3" commodity="GWM" name="GWM" last_trading_time="16:15:00" cash_settled="false" exchange_time_zone="Europe/London"/>
+  </ukgas_future>
+</ukgas>
+
+<dollar_future>
+  <product type="F" market="26" commodity="DX" name="DX" last_trading_time="10:16:00" cash_settled="false" exchange_time_zone="America/New_York"/>
+</dollar_future>
+
+</all>
+
+<test>
+  <product type="F" market="209" commodity="I" name="LIFFELI_TEST" description="Euribor 3mth Future" currency="EUR" last_trading_time="10:00:00" cash_settled="true"/>
+  <product type="O" market="209" commodity="I" name="LIFFELI_TEST" description="Euribor 3mth Option" currency="EUR" last_trading_time="10:00:00" point_size="2500"/>
+  <product type="S" market="209" commodity="I" name="LIFFELI_TEST" description="Euribor 3mth Option" currency="EUR" last_trading_time="10:00:00" point_size="2500"/>
+</test>
+
+

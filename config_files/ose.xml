@@ -1,0 +1,56 @@
+  
+<ose_shim>
+<click>
+<nky>
+  <nk_mq>
+  <nk_fpga>
+  <mn_future>
+    <product type="F" symbol="NK225M" reactor_name="MN" description="MN Futures" subscribe_price="${subscribe_futures:-Y}" subscribe_depth="${subscribe_futures_depth:-N}"/>
+  </mn_future>
+  </nk_fpga>
+  </nk_mq>
+  <product type="S" symbol="NK225M" reactor_name="MN" description="MN Strategies" />
+  <!-- <product type="O" symbol="NK225M" reactor_name="MN" description="MN Options" /> -->
+
+  <nk_mq>
+  <n225_future>
+    <product type="F" symbol="NK225" reactor_name="N225" description="N225 Futures" subscribe_price="${subscribe_futures:-Y}" subscribe_depth="${subscribe_futures_depth:-N}"/>
+  </n225_future>
+  </nk_mq>
+
+  <nk_fpga>
+  <nk_fpga_option>
+    <product type="O" symbol="NK225" reactor_name="N225" description="N225 Options" />
+  </nk_fpga_option>
+  </nk_fpga>
+  <product type="S" symbol="NK225" reactor_name="N225" description="N225 Strategies" />
+</nky>
+<n225w>
+  <product type="O" symbol="NK225W" reactor_name="N225W" description="N225 Weekly Options" />
+  <product type="S" symbol="NK225W" reactor_name="N225W" description="N225 Weekly Options Strategies" />
+</n225w>
+  <n400_future>
+    <product type="F" symbol="JN400" reactor_name="JP400" description="JP400 Futures" subscribe_price="${subscribe_futures:-Y}" subscribe_depth="${subscribe_futures_depth:-N}"/>
+  </n400_future>
+  <product type="O" symbol="JN400" reactor_name="JP400" description="JP400 Options" />
+
+<jgb>
+  <jgb_future>
+    <product type="F" symbol="JGBL" reactor_name="JGB" description="JGB Futures" subscribe_price="${subscribe_futures:-Y}" subscribe_depth="${subscribe_futures_depth:-N}"/>
+  </jgb_future>
+  <!-- <product type="F" symbol="JGBM" reactor_name="JGBMINI" description="JGBMINI Futures" subscribe_price="${subscribe_futures:-Y}" subscribe_depth="${subscribe_futures_depth:-N}"/> -->
+  <product type="O" symbol="JGBL" reactor_name="JGB" description="JGB Options" />
+  <product type="S" symbol="JGBL" reactor_name="JGB" description="JGB Strategies" />
+</jgb>
+
+<topix>
+  <product type="F" symbol="TOPIX" reactor_name="TOPIX" description="TOPIX Futures" subscribe_price="${subscribe_futures:-Y}" subscribe_depth="${subscribe_futures_depth:-N}"/>
+  <product type="F" symbol="TOPIXM" reactor_name="TOPIXMINI" description="TOPIXMINI Futures" subscribe_price="${subscribe_futures:-Y}" subscribe_depth="${subscribe_futures_depth:-N}"/>
+</topix>
+</click>
+</ose_shim>
+
+
+
+
+

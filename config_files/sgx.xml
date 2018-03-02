@@ -1,0 +1,84 @@
+
+<all>
+  <nikkei>
+    <qtg>
+    <nk_future>  
+	   <product symbo="NK" reactor_name="NK" typecode="F"/>
+    </nk_future>
+    </qtg>
+	   <product symbo="NK" reactor_name="NK" typecode="O"/>
+	   <product symbo="NK" reactor_name="NK" typecode="S"/>
+     <product symbo="NS" reactor_name="NS" typecode="F"/>
+  </nikkei>
+  
+  <qtg>
+	 <product symbo="A50" reactor_name="A50" typecode="F"/>
+	 <product symbo="CN" reactor_name="CN" typecode="F"/>
+  </qtg>
+  <commodity>
+  <elec>
+    <product symbo="EF" reactor_name="EF" typecode="F"/>
+  </elec>
+   <product symbo="EE" reactor_name="EE" typecode="F"/>
+   <product symbo="FEF" reactor_name="FEF" typecode="F"/>
+   <product symbo="FEF" reactor_name="FEF" typecode="O"/>
+   <product symbo="FEF" reactor_name="FEF" typecode="S"/>
+   <product symbo="TF" reactor_name="TF" typecode="F"/>
+   <product symbo="RT" reactor_name="RT" typecode="F"/>
+   <product symbo="CVF" reactor_name="CVF" typecode="F"/>
+   <product symbo="CWF" reactor_name="CWF" typecode="F"/>
+   <product symbo="CCF" reactor_name="CCF" typecode="F"/>
+   <product symbo="ACF" reactor_name="ACF" typecode="F"/>
+   <product symbo="CIF" reactor_name="CIF" typecode="F"/>
+   <product symbo="BZF" reactor_name="BZF" typecode="F"/>
+   <product symbo="BZNF" reactor_name="BZNF" typecode="F"/>
+   <product symbo="PXF" reactor_name="PXF" typecode="F"/>
+   <product symbo="PXNF" reactor_name="PXNF" typecode="F"/>
+   <product symbo="PPCF" reactor_name="PPCF" typecode="F"/>
+   <product symbo="PPSF" reactor_name="PPSF" typecode="F"/>
+   <product symbo="PECF" reactor_name="PECF" typecode="F"/>
+   <product symbo="PESF" reactor_name="PESF" typecode="F"/>
+   <product symbo="SMCF" reactor_name="SMCF" typecode="F"/>
+   <product symbo="MEGF" reactor_name="MEGF" typecode="F"/>
+   <product symbo="GD_01" reactor_name="GD_01" typecode="F"/>
+   <product symbo="GD_02" reactor_name="GD_02" typecode="F"/>
+   <product symbo="GD_03" reactor_name="GD_03" typecode="F"/>
+   <product symbo="GD_04" reactor_name="GD_04" typecode="F"/>
+   <product symbo="GD_05" reactor_name="GD_05" typecode="F"/>
+   <product symbo="GD_06" reactor_name="GD_06" typecode="F"/>
+   <product symbo="GD_07" reactor_name="GD_07" typecode="F"/>
+   <product symbo="GD_08" reactor_name="GD_08" typecode="F"/>
+   <product symbo="GD_09" reactor_name="GD_09" typecode="F"/>
+   <product symbo="GD_10" reactor_name="GD_10" typecode="F"/>
+   <product symbo="GD_11" reactor_name="GD_11" typecode="F"/>
+   <product symbo="GD_12" reactor_name="GD_12" typecode="F"/>
+   <product symbo="GD_13" reactor_name="GD_13" typecode="F"/>
+   <product symbo="GD_14" reactor_name="GD_14" typecode="F"/>
+   <product symbo="GD_15" reactor_name="GD_15" typecode="F"/>
+   <product symbo="GD_16" reactor_name="GD_16" typecode="F"/>
+   <product symbo="GD_17" reactor_name="GD_17" typecode="F"/>
+   <product symbo="GD_18" reactor_name="GD_18" typecode="F"/>
+   <product symbo="GD_19" reactor_name="GD_19" typecode="F"/>
+   <product symbo="GD_20" reactor_name="GD_20" typecode="F"/>
+   <product symbo="GD_21" reactor_name="GD_21" typecode="F"/>
+   <product symbo="GD_22" reactor_name="GD_22" typecode="F"/>
+   <product symbo="GD_23" reactor_name="GD_23" typecode="F"/>
+   <product symbo="GD_24" reactor_name="GD_24" typecode="F"/>
+   <product symbo="GD_25" reactor_name="GD_25" typecode="F"/>
+   <product symbo="GD_26" reactor_name="GD_26" typecode="F"/>
+   <product symbo="GD_27" reactor_name="GD_27" typecode="F"/>
+   <product symbo="GD_28" reactor_name="GD_28" typecode="F"/>
+   <product symbo="GD_29" reactor_name="GD_29" typecode="F"/>
+   <product symbo="GD_30" reactor_name="GD_30" typecode="F"/>
+   <product symbo="GD_31" reactor_name="GD_31" typecode="F"/>
+   <product symbo="GOF" reactor_name="GOF" typecode="F"/>
+   <product symbo="NJF" reactor_name="NJF" typecode="F"/>
+   <product symbo="FB" reactor_name="FB" typecode="F"/>
+   <product symbo="1MF" reactor_name="1MF" typecode="F"/>
+   <product symbo="3MF" reactor_name="3MF" typecode="F"/>
+   <product symbo="VCF" reactor_name="VCF" typecode="F"/>
+   <product symbo="DLNF" reactor_name="DLNF" typecode="F"/>
+   <product symbo="NLNF" reactor_name="NLNF" typecode="F"/>
+   <product symbo="LNF" reactor_name="LNF" typecode="F"/>   
+  </commodity>
+</all>

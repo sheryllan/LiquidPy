@@ -1,0 +1,216 @@
+<all>
+
+<metals>
+  <gold>
+    <alpha>
+      <product type="F" class="F" name="GC" commodity_name="GC" reactor_name="GC" point_size="100" exchange_implied_price="Y" trade_restriction_rule="LBDPrevMonth"/>
+    </alpha>
+    <product type="O" class="O" name="OG" commodity_name="OG" reactor_name="GC" point_size="100"/>
+  </gold>
+
+  <alpha>
+    <product type="F" class="F" name="SI" commodity_name="SI" reactor_name="SI" point_size="5000" exchange_implied_price="Y"  trade_restriction_rule="LBDPrevMonth"/>
+  </alpha>
+  <product type="O" class="O" name="SO" commodity_name="SO" reactor_name="SI" point_size="5000"/>
+
+  <!-- copper -->
+  <product type="F" class="F" name="HG" commodity_name="HG" reactor_name="HG" point_size="250" exchange_implied_price="Y"  trade_restriction_rule="LBDPrevMonth"/>
+</metals>
+
+<crypto>
+  <!-- Bitcoin -->
+  <product type="F" class="F" name="BTC" commodity_name="BTC" reactor_name="BTC" point_size="5" exchange_implied_price="Y"  trade_restriction_rule="LBDPrevMonth"/>
+</crypto>
+
+<treasuries>
+  <!-- 2yr -->
+  <alpha>
+    <product type="F" class="F" name="ZT"  commodity_name="ZT"  reactor_name="ZT" point_size="2000" last_trading_time="10:30:00"  trade_restriction_rule="LBDPrevMonth"  exchange_implied_price="Y" />
+  </alpha>
+  <product type="O" class="O" name="OZT" commodity_name="OZT" reactor_name="ZT" point_size="2000" last_trading_time="10:30:00"/>
+
+  <!-- 5yr -->
+  <alpha>
+    <product type="F" class="F" name="ZF"  commodity_name="ZF"  reactor_name="ZF" point_size="1000" last_trading_time="10:30:00" trade_restriction_rule="LBDPrevMonth" exchange_implied_price="Y" />
+  </alpha>
+  <product type="O" class="O" name="OZF" commodity_name="OZF" reactor_name="ZF" point_size="1000" last_trading_time="10:30:00" subscribe_depth="${subscribe_options_depth:-N}"/>
+  
+  <!-- 10yr -->
+  <us-10yr>
+    <alpha>
+    <us-10yr_future>
+      <product type="F" class="F" name="ZN"  commodity_name="ZN"  reactor_name="ZN" point_size="1000" last_trading_time="10:30:00" trade_restriction_rule="LBDPrevMonth" exchange_implied_price="Y" subscribe_price="${subscribe_futures:-Y}" subscribe_depth="${subscribe_futures_depth:-N}" exchange_time_zone="America/Chicago" destination_exchange="XCBT"/>
+    </us-10yr_future>
+    </alpha>
+    <product type="O" class="O" name="OZN" commodity_name="OZN" reactor_name="ZN" point_size="1000" last_trading_time="10:30:00" exchange_time_zone="America/Chicago" settlement_price_replace="0.0001"/>
+    <!-- weeklies -->
+    <product type="O" class="O" name="ZN1" commodity_name="ZN1" reactor_name="ZNW" point_size="1000" last_trading_time="10:30:00" show_day_on_series="Y" expiry_type="weekly" exchange_time_zone="America/Chicago"/>
+    <product type="O" class="O" name="ZN2" commodity_name="ZN2" reactor_name="ZNW" point_size="1000" last_trading_time="10:30:00" show_day_on_series="Y" expiry_type="weekly" exchange_time_zone="America/Chicago"/>
+    <product type="O" class="O" name="ZN3" commodity_name="ZN3" reactor_name="ZNW" point_size="1000" last_trading_time="10:30:00" show_day_on_series="Y" expiry_type="weekly" exchange_time_zone="America/Chicago"/>
+    <product type="O" class="O" name="ZN4" commodity_name="ZN4" reactor_name="ZNW" point_size="1000" last_trading_time="10:30:00" show_day_on_series="Y" expiry_type="weekly" exchange_time_zone="America/Chicago"/>
+    <product type="O" class="O" name="ZN5" commodity_name="ZN5" reactor_name="ZNW" point_size="1000" last_trading_time="10:30:00" show_day_on_series="Y" expiry_type="weekly" exchange_time_zone="America/Chicago"/>
+  </us-10yr>
+
+
+  <!-- 30yr -->
+  <alpha>
+  <us-30yr_future>
+    <product type="F" class="F" name="ZB" commodity_name="ZB" reactor_name="ZB" point_size="1000" last_trading_time="10:30:00" trade_restriction_rule="LBDPrevMonth" exchange_implied_price="Y" />
+  </us-30yr_future>
+  </alpha>
+  <product type="O" class="O" name="OZB" commodity_name="OZB" reactor_name="ZB" point_size="1000" last_trading_time="10:30:00"/>
+
+  <!-- Ultra Bond -->
+  <product type="F" class="F" name="UB"  commodity_name="UB" reactor_name="UB" point_size="1000" last_trading_time="10:30:00" trade_restriction_rule="LBDPrevMonth" exchange_implied_price="Y"  />
+    
+
+</treasuries>
+
+<kospi>
+  <product type="F" class="F" name="K2F" commodity_name="K2F" reactor_name="K2F" point_size="25000" cash_settled="Y" exchange_implied_price="Y"/>
+</kospi>
+
+<crude>
+  <crude_future>  
+  <product type="F" class="F" name="CL"  commodity_name="CL"  reactor_name="CL"  point_size="1000" last_trading_time="10:30:00" exchange_implied_price="Y" expire_in_n_months="13"/>
+  <product type="F" class="F" name="QM"  commodity_name="QM"  reactor_name="QM"  point_size="500" last_trading_time="10:30:00" exchange_implied_price="Y" expire_in_n_months="13"/>
+  </crude_future>
+  <product type="O" class="O" name="LO"  commodity_name="LO"  reactor_name="CL"  point_size="1000" last_trading_time="10:30:00" dynamic_depth="N" expire_in_n_months="13"/>
+</crude>
+
+<energy>
+  <product type="F" class="F" name="HO"  commodity_name="HO"  reactor_name="HO"  point_size="420" exchange_implied_price="Y"/>   <!-- Heating oil -->
+  <product type="F" class="F" name="RB"  commodity_name="RB"  reactor_name="RB"  point_size="420" exchange_implied_price="Y"/>   <!-- RBOB Gasoline -->
+</energy>
+
+<gas>
+  <gas-ng>
+    <gas-ln>
+    <energy>
+      <product type="F" class="F" name="NG"  commodity_name="NG"  reactor_name="NG"  point_size="10000" exchange_implied_price="Y" exchange_time_zone="America/Chicago" copy_name=""/>
+    </energy>
+    </gas-ln>
+    <product type="O" class="O" name="ON"  commodity_name="ON"  reactor_name="NG"  point_size="10000" dynamic_depth="N" exchange_time_zone="America/Chicago" copy_name=""/>
+  </gas-ng>
+
+  <product type="F" class="F" name="NGT" commodity_name="NGT" reactor_name="NGT" point_size="10000" exchange_implied_price="Y" exchange_time_zone="America/Chicago"/>
+  <product type="F" class="F" name="NPG" commodity_name="NPG" reactor_name="NP" point_size="2500"  cash_settled="Y" exchange_implied_price="Y" exchange_time_zone="America/Chicago"/>
+  <gas-ln>
+    <product type="F" class="F" name="HP"  commodity_name="HP"  reactor_name="HP" point_size="10000" cash_settled="Y" exchange_implied_price="Y" exchange_time_zone="America/Chicago"/>
+    <product type="O" class="O" name="LNE" commodity_name="LNE" reactor_name="LN" point_size="10000" cash_settled="Y" dynamic_depth="N" exchange_time_zone="America/Chicago" copy_name="LNQ"/>
+  </gas-ln>
+</gas>
+
+<gas_clones>
+  <!-- nasdaq clones -->
+  <product type="F" class="F" name="NPG" commodity_name="NPG" reactor_name="NPQ" point_size="2500"  cash_settled="Y" last_trading_time="10:30:00" exchange_implied_price="Y" exchange_time_zone="America/Chicago" expiry_type="monthly" destination_exchange="XNAS"/>
+  <product type="F" class="F" name="HP"  commodity_name="HP"  reactor_name="HPQ" point_size="10000" cash_settled="Y" last_trading_time="10:30:00" exchange_implied_price="Y" exchange_time_zone="America/Chicago" expiry_type="monthly" destination_exchange="XNAS"/>
+  <product type="O" class="O" name="LNE" commodity_name="LNE" reactor_name="LNQ" point_size="10000" cash_settled="Y" last_trading_time="10:30:00" dynamic_depth="N" exchange_time_zone="America/Chicago" excercise_type="E" expiry_type="monthly" destination_exchange="XNAS"/>  
+</gas_clones>
+
+<agri>
+  <soy>
+    <!-- soy -->
+    <product type="F" class="F" name="ZS"  commodity_name="ZS"  reactor_name="ZS"  point_size="50"    last_trading_time="10:30:00" trade_restriction_rule="LBDPrevMonth" exchange_implied_price="Y" external_implieds_flag="Y"/>
+    <product type="O" class="O" name="OZS" commodity_name="OZS" reactor_name="ZS"  point_size="50"    last_trading_time="10:30:00" dynamic_depth="N"/>
+  </soy>
+
+  <!-- corn -->
+  <alpha>
+    <product type="F" class="F" name="ZC"  commodity_name="ZC"  reactor_name="ZC"  point_size="50"    last_trading_time="10:30:00" trade_restriction_rule="LBDPrevMonth" exchange_implied_price="Y" external_implieds_flag="Y"/>
+  </alpha>  
+  <!-- <product type="O" class="O" name="OZC" commodity_name="OZC" reactor_name="ZC"  point_size="50"    last_trading_time="10:30:00" dynamic_depth="N"/> -->
+
+  <!-- EU wheat -->
+  <wheat>
+    <product type="F" class="F" name="WEU"  commodity_name="WEU"  reactor_name="WEU"  point_size="50"  last_trading_time="19:00:00" trade_restriction_rule="LBDPrevMonth" exchange_implied_price="Y" external_implieds_flag="Y" exchange_time_zone="America/Chicago"/>
+    <product type="O" class="O" name="WEO"  commodity_name="WEO"  reactor_name="WEO"  point_size="50"  last_trading_time="19:30:00" exchange_implied_price="Y" external_implieds_flag="Y" exchange_time_zone="America/Chicago"/>
+  </wheat>
+  
+  <!-- live cattle -->
+  <le_future>
+    <product type="F" class="F" name="LE"  commodity_name="LE"  reactor_name="LE"  point_size="40000"  last_trading_time="12:00:00" trade_restriction_rule="LBDPrevMonth" exchange_implied_price="Y" external_implieds_flag="Y" exchange_time_zone="America/Chicago"/>
+  </le_future>
+  
+  <!-- bean meal -->
+  <product type="F" class="F" name="ZM"  commodity_name="ZM"  reactor_name="ZM"  point_size="1"     trade_restriction_rule="LBDPrevMonth" exchange_implied_price="Y" external_implieds_flag="Y"/>
+  <!-- bean oil -->
+  <product type="F" class="F" name="ZL"  commodity_name="ZL"  reactor_name="ZL"  point_size="600"   trade_restriction_rule="LBDPrevMonth" exchange_implied_price="Y" external_implieds_flag="Y"/>
+
+  <!-- wheat -->
+  <product type="F" class="F" name="ZW"  commodity_name="ZW"  reactor_name="ZW"  point_size="50"   last_trading_time="10:30:00" dynamic_depth="N" exchange_implied_price="Y"/>
+  <!-- <product type="O" class="O" name="OZW" commodity_name="OZW" reactor_name="ZW"  point_size="50"   last_trading_time="10:30:00" dynamic_depth="N"/> -->
+
+</agri>
+
+<syd>
+  <!-- S&P -->
+  <product type="F" class="F" name="SP"  commodity_name="SP"  reactor_name="SP"  point_size="250" cash_settled="Y" exchange_implied_price="Y" exchange_time_zone="America/Chicago"/>
+  <product type="O" class="O" name="SP"  commodity_name="SP"  reactor_name="SP"  point_size="250"                  exchange_implied_price="Y" exchange_time_zone="America/Chicago"/>
+
+  <!-- E-mini S&P - copy to avoid name clash in syd -->
+  <product type="F" class="F" name="ES"  commodity_name="ES"  reactor_name="ES_US"  point_size="50" cash_settled="Y" exchange_implied_price="Y" exchange_time_zone="America/Chicago"/>
+  <product type="O" class="O" name="ES"  commodity_name="ES"  reactor_name="ES_US"  point_size="50"                  exchange_implied_price="Y" exchange_time_zone="America/Chicago"/>
+</syd>
+
+<index>
+  <alpha>
+    <!-- E-mini S&P -->
+    <product type="F" class="F" name="ES"  commodity_name="ES"  reactor_name="ES"  point_size="50" cash_settled="Y" exchange_implied_price="Y" big_small_equity="S"/>
+    <product type="O" class="O" name="ES"  commodity_name="ES"  reactor_name="ES"  point_size="50"                  exchange_implied_price="Y" big_small_equity="S"/>
+  </alpha>
+  <product type="F" class="F" name="YM"  commodity_name="YM"  reactor_name="YM"  point_size="5"         cash_settled="Y" exchange_implied_price="Y"/> <!-- DJ E-mini -->
+  <product type="F" class="F" name="NQ"  commodity_name="NQ"  reactor_name="NQ"  point_size="20"        cash_settled="Y" exchange_implied_price="Y"/> <!-- Nasdaq E-mini -->
+  <product type="F" class="F" name="NIY" commodity_name="NIY" reactor_name="NIY" point_size="500"       cash_settled="Y" exchange_implied_price="Y"/> <!-- Nikkei Yen -->
+  <product type="F" class="F" name="NKD" commodity_name="NKD" reactor_name="NKD" point_size="5"         cash_settled="Y" exchange_implied_price="Y"/> <!-- Nikkei USD -->
+
+  <fx>
+    <!-- FX -->
+    <!-- EUR -->
+    <product type="F" class="F" name="6E" commodity_name="6E" reactor_name="6E" point_size="125000" cash_settled="Y" exchange_implied_price="Y" exchange_time_zone="America/Chicago"/>
+    <product type="O" class="O" name="EUU" commodity_name="EUU" reactor_name="EUU" point_size="125000" exchange_implied_price="Y" exchange_time_zone="America/Chicago"/>
+
+    <!-- GBP -->
+    <product type="F" class="F" name="6B" commodity_name="6B" reactor_name="6B" point_size="62500" cash_settled="Y" exchange_implied_price="Y" exchange_time_zone="America/Chicago"/>
+    <product type="O" class="O" name="GBU" commodity_name="GBU" reactor_name="GBU" point_size="62500" exchange_implied_price="Y" exchange_time_zone="America/Chicago"/>
+
+    <!-- JPY -->
+    <product type="F" class="F" name="6J" commodity_name="6J" reactor_name="6J" point_size="12500000" cash_settled="Y" exchange_implied_price="Y" exchange_time_zone="America/Chicago"/>
+    <product type="O" class="O" name="JPU" commodity_name="JPU" reactor_name="JPU" point_size="12500000" exchange_implied_price="Y" exchange_time_zone="America/Chicago"/>
+
+    <!-- CHF -->
+    <product type="F" class="F" name="6S" commodity_name="6S" reactor_name="6S" point_size="125000" cash_settled="Y" exchange_implied_price="Y" exchange_time_zone="America/Chicago"/>
+    <product type="O" class="O" name="CHU" commodity_name="CHU" reactor_name="CHU" point_size="125000" exchange_implied_price="Y" exchange_time_zone="America/Chicago"/>
+
+    <!-- AUD -->
+    <product type="F" class="F" name="6A" commodity_name="6A" reactor_name="6A" point_size="100000" cash_settled="Y" exchange_implied_price="Y" exchange_time_zone="America/Chicago"/>
+    <product type="O" class="O" name="ADU" commodity_name="ADU" reactor_name="ADU" point_size="100000" exchange_implied_price="Y" exchange_time_zone="America/Chicago"/>
+
+    <!-- CAD -->
+    <product type="F" class="F" name="6C" commodity_name="6C" reactor_name="6C" point_size="100000" cash_settled="Y" exchange_implied_price="Y" exchange_time_zone="America/Chicago"/>
+    <product type="O" class="O" name="CAU" commodity_name="CAU" reactor_name="CAU" point_size="100000" exchange_implied_price="Y" exchange_time_zone="America/Chicago"/>
+
+    <product type="F" class="F" name="6N" commodity_name="6N" reactor_name="6N" point_size="100000" cash_settled="Y" exchange_implied_price="Y" exchange_time_zone="America/Chicago"/> <!-- NZD -->
+    <product type="F" class="F" name="6M" commodity_name="6M" reactor_name="6M" point_size="500000" cash_settled="Y" exchange_implied_price="Y" exchange_time_zone="America/Chicago"/> <!-- MXN -->
+  <fx>
+</index>
+
+
+<rates>
+  <ed_future>
+    <!-- Eurodollar -->
+    <product type="F" class="F" name="GE"  commodity_name="GE"  reactor_name="ED"  point_size="2500"  last_trading_time="10:30:00" cash_settled="Y" dynamic_depth="N" big_small_equity="S" should_use_underlying_display_factor="Y" exchange_implied_price="Y"/>
+  </ed_future>
+  <product type="O" class="O" name="GE"  commodity_name="GE"  reactor_name="ED"  point_size="2500"  last_trading_time="10:30:00" cash_settled="Y" dynamic_depth="N" big_small_equity="S" should_use_underlying_display_factor="Y"/>
+  <product type="O" class="O" name="GE0" commodity_name="GE0" reactor_name="GE0" point_size="2500"  last_trading_time="10:30:00" cash_settled="Y" dynamic_depth="N" big_small_equity="S" should_use_underlying_display_factor="Y"/>
+  <product type="O" class="O" name="GE2" commodity_name="GE2" reactor_name="GE2" point_size="2500"  last_trading_time="10:30:00" cash_settled="Y" dynamic_depth="N" big_small_equity="S" should_use_underlying_display_factor="Y"/>
+  <product type="O" class="O" name="GE3" commodity_name="GE3" reactor_name="GE3" point_size="2500"  last_trading_time="10:30:00" cash_settled="Y" dynamic_depth="N" big_small_equity="S" should_use_underlying_display_factor="Y"/>
+  <product type="O" class="O" name="GE4" commodity_name="GE4" reactor_name="GE4" point_size="2500"  last_trading_time="10:30:00" cash_settled="Y" dynamic_depth="N" big_small_equity="S" should_use_underlying_display_factor="Y"/>
+</rates>
+
+</all>
+
+<test>
+  <product type="F" class="F" name="ZN"  commodity_name="ZN"  reactor_name="ZN_TEST" point_size="1000" last_trading_time="10:30:00" trade_restriction_rule="LBDPrevMonth" exchange_implied_price="Y" subscribe_price="${subscribe_futures:-Y}" subscribe_depth="${subscribe_futures_depth:-N}" exchange_time_zone="America/Chicago"/>
+  <product type="O" class="O" name="OZN" commodity_name="OZN" reactor_name="ZN_TEST" point_size="1000" last_trading_time="10:30:00" exchange_time_zone="America/Chicago" settlement_price_replace="0.0001"/>
+</test>
