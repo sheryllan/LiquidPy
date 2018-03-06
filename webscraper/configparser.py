@@ -34,7 +34,7 @@ class XmlParser(object):
 
 
 class XlsxWriter(object):
-    
+
     @staticmethod
     def load_xlsx(filepath):
         # if not os.path.isfile(filepath):
