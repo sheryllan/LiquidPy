@@ -1,9 +1,10 @@
 import urllib2
 import os
+import math
 from pdfminer.pdfparser import PDFParser
 from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
-from pdfminer.layout import LAParams, LTRect, LTTextBox, LTTextLine
+from pdfminer.layout import LAParams, LTRect, LTTextBox, LTTextLine, LTTextBoxHorizontal, LTTextLineHorizontal
 from pdfminer.converter import PDFPageAggregator
 from pdfminer.pdfpage import PDFPage
 
@@ -25,9 +26,16 @@ def download(url, filename):
 
 
 class PDFHelper(object):
+    TEXT_ELEMENTS = [
+        LTTextBox,
+        LTTextBoxHorizontal,
+        LTTextLine,
+        LTTextLineHorizontal
+    ]
+
     @staticmethod
     def get_text_from_ltobj(obj):
-        if isinstance(obj, LTTextBox) or isinstance(obj, LTTextLine):
+        if any(isinstance(obj, ele) for ele in PDFHelper.TEXT_ELEMENTS):
             return obj.get_text()
         else:
             raise ValueError('No text found in the given LTObject')
@@ -51,28 +59,34 @@ class PDFHelper(object):
         return PDFPageInterpreter(rsrcmgr, device), device
 
 
-class CME(object):
-    url_adv = 'http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_ADV_Report_CMEG.pdf'
-    pdf_adv = 'CME_Average_Daily_Volume.pdf'
 
-    url_prodslate = 'http://www.cmegroup.com/CmeWS/mvc/ProductSlate/V1/Download.xls'
-    xls_prodslate = 'Product_Slate.xls'
+
+class CME(object):
+    URL_ADV = 'http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_ADV_Report_CMEG.pdf'
+    PDF_ADV = 'CME_Average_Daily_Volume.pdf'
+
+    URL_PRODSLATE = 'http://www.cmegroup.com/CmeWS/mvc/ProductSlate/V1/Download.xls'
+    XLS_PRODSLATE = 'Product_Slate.xls'
 
     # metadata in adv.pdf
     adv_pdf_levels = [3, 4]
     adv_date_no = 1
     adv_headers_no = range(3, 11)
+    adv_figures_no = range(11, 19)
+    adv_products_no = 19
+
+
 
     def __init__(self, download_path):
         self.download_path = download_path
-        self.full_path_adv = os.path.join(self.download_path, self.pdf_adv)
-        self.full_path_prodslate = os.path.join(self.download_path, self.xls_prodslate)
+        self.full_path_adv = os.path.join(self.download_path, self.PDF_ADV)
+        self.full_path_prodslate = os.path.join(self.download_path, self.XLS_PRODSLATE)
 
     def download_adv(self):
-        download(self.url_adv, self.full_path_pdf_adv)
+        download(self.URL_ADV, self.full_path_adv)
 
     def download_prodslate(self):
-        download(self.url_prodslate, self.full_path_prodslate)
+        download(self.URL_PRODSLATE, self.full_path_prodslate)
 
     def parse_pdf_adv(self):
         with open(self.full_path_adv, 'rb') as infile:
@@ -89,12 +103,10 @@ class CME(object):
                     date = self.get_adv_todate(ltobjs)
                     headers = self.get_adv_headers(ltobjs)
 
-                for obj in ltobjs:
+                for obj in [ltobjs[ind] for ind in self.adv_figures_no]:
                     pdftext = PDFHelper.get_text_from_ltobj(obj)
 
-
-
-
+    # returns a dictionary with key: full group name, and value: (asset, instrument)
     def get_product_group(self, sections):
         prev_level = sections[0][0]
         asset = sections[0][1]
@@ -108,16 +120,36 @@ class CME(object):
             prev_level = level
         return result
 
+    # returns a dictionary that has key: name, value: bbox
     def get_adv_headers(self, ltobjs):
-        return [(' '.join(PDFHelper.get_text_from_ltobj(ltobjs[i]).split('\n'))).rstrip()
-                for i in self.adv_headers_no]
+        return {(' '.join(PDFHelper.get_text_from_ltobj(ltobjs[i]).split('\n'))).rstrip(): ltobjs[i]
+                for i in self.adv_headers_no}
 
+    # returns the date string at the top of every page
     def get_adv_todate(self, ltobjs):
         return PDFHelper.get_text_from_ltobj(ltobjs[self.adv_date_no]).rstrip()
 
+    def match_col_by_coordinate(self, headers, coordinate, figures):
+        if len(headers) != len(figures):
+            raise ValueError('Invalid input: counts of columns do not match.')
+        headers_sorted = sorted(headers, key=lambda o: o.bbox[coordinate])
+        figures_sorted = sorted(figures, key=lambda o: o.bbox[coordinate])
+        abs_tol = 1
+
+        for header, figure in zip(headers_sorted, figures_sorted):
+            if abs(header.bbox[coordinate] - figure.bbox[coordinate]) <= abs_tol:
+                pass
 
 
 
-cme = CME('/home/slan/Documents/downloads/')
+
+
+
+
+download_path = '/Users/sheryllan/Downloads/'
+# download_path = '/home/slan/Documents/downloads/'
+cme = CME(download_path)
+# cme.download_adv()
 # cme.download_prodslate()
-tb = cme.parse_pdf_adv()
+#tb = cme.parse_pdf_adv()
+

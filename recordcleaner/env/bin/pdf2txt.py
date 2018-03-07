@@ -1,4 +1,4 @@
-#!/home/slan/Python/recordcleaner/env/bin/python
+#!/Users/sheryllan/LiquidPy/recordcleaner/env/bin/python
 import sys
 from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfparser import PDFParser

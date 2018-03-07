@@ -1,4 +1,4 @@
-#!/home/slan/Python/recordcleaner/env/bin/python
+#!/Users/sheryllan/LiquidPy/recordcleaner/env/bin/python
 
 import sys
 import getopt
