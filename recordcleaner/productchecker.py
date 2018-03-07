@@ -3,7 +3,6 @@ import configparser as cp
 import xlrd
 
 
-
 # Parse the config files
 #cp.parse_save()
 
