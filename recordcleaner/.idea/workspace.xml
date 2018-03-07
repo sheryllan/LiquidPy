@@ -1,57 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="bea167f0-ef8f-4a52-8ee7-f52b99657f28" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" afterPath="$PROJECT_DIR$/.idea/misc.xml" />
-      <change beforePath="$PROJECT_DIR$/.idea/recordcleaner.iml" afterPath="$PROJECT_DIR$/.idea/recordcleaner.iml" />
-      <change beforePath="$PROJECT_DIR$/datascraper.py" afterPath="$PROJECT_DIR$/datascraper.py" />
-      <change beforePath="$PROJECT_DIR$/env/bin/activate" afterPath="$PROJECT_DIR$/env/bin/activate" />
-      <change beforePath="$PROJECT_DIR$/env/bin/activate.csh" afterPath="$PROJECT_DIR$/env/bin/activate.csh" />
-      <change beforePath="$PROJECT_DIR$/env/bin/activate.fish" afterPath="$PROJECT_DIR$/env/bin/activate.fish" />
-      <change beforePath="$PROJECT_DIR$/env/bin/python-config" afterPath="$PROJECT_DIR$/env/bin/python-config" />
-      <change beforePath="$PROJECT_DIR$/env/bin/vba_extract.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/XlsxWriter-1.0.2.dist-info/DESCRIPTION.rst" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/XlsxWriter-1.0.2.dist-info/INSTALLER" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/XlsxWriter-1.0.2.dist-info/METADATA" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/XlsxWriter-1.0.2.dist-info/RECORD" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/XlsxWriter-1.0.2.dist-info/WHEEL" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/XlsxWriter-1.0.2.dist-info/metadata.json" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/XlsxWriter-1.0.2.dist-info/top_level.txt" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/__init__.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/app.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/chart.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/chart_area.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/chart_bar.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/chart_column.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/chart_doughnut.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/chart_line.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/chart_pie.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/chart_radar.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/chart_scatter.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/chart_stock.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/chartsheet.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/comments.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/compat_collections.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/compatibility.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/contenttypes.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/core.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/custom.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/drawing.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/format.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/packager.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/relationships.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/shape.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/sharedstrings.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/styles.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/table.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/theme.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/utility.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/vml.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/workbook.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/worksheet.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/lib/python2.7/site-packages/xlsxwriter/xmlwriter.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/env/pip-selfcheck.json" afterPath="$PROJECT_DIR$/env/pip-selfcheck.json" />
-    </list>
+    <list default="true" id="bea167f0-ef8f-4a52-8ee7-f52b99657f28" name="Default" comment="" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -64,8 +14,8 @@
       <file leaf-file-name="datascraper.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/datascraper.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="446">
-              <caret line="96" column="0" lean-forward="true" selection-start-line="96" selection-start-column="0" selection-end-line="96" selection-end-column="0" />
+            <state relative-caret-position="284">
+              <caret line="93" column="0" lean-forward="true" selection-start-line="93" selection-start-column="0" selection-end-line="93" selection-end-column="0" />
               <folding>
                 <element signature="e#0#14#0" expanded="true" />
               </folding>
@@ -672,8 +622,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/datascraper.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="446">
-          <caret line="96" column="0" lean-forward="true" selection-start-line="96" selection-start-column="0" selection-end-line="96" selection-end-column="0" />
+        <state relative-caret-position="284">
+          <caret line="93" column="0" lean-forward="true" selection-start-line="93" selection-start-column="0" selection-end-line="93" selection-end-column="0" />
           <folding>
             <element signature="e#0#14#0" expanded="true" />
           </folding>
