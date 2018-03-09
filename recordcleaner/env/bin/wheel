@@ -1,4 +1,4 @@
-#!/Users/sheryllan/LiquidPy/recordcleaner/env/bin/python
+#!/home/slan/Python/recordcleaner/env/bin/python2.7
 
 # -*- coding: utf-8 -*-
 import re

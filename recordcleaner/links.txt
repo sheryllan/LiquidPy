@@ -1,0 +1,5 @@
+http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_Volume_Report_CMEG.pdf
+^(((([A-Za-z0-9\(\)-]+)(-*/*\.*\h?)([A-Za-z0-9\(\),-]+))+)\h{2,}).*$
+
+
+^((\h*)([A-Za-z0-9\(\)/\h\.,%-]+)(\h{3,})([A-Za-z0-9\(\)/\h\.,%-]+)).*$

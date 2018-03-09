@@ -1,4 +1,4 @@
-#!/Users/sheryllan/LiquidPy/recordcleaner/env/bin/python
+#!/home/slan/Python/recordcleaner/env/bin/python
 #
 #  latin2ascii.py - converts latin1 characters into ascii.
 #

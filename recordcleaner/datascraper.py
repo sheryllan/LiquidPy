@@ -1,37 +1,67 @@
-import urllib2
+import collections
 import os
-import math
-from pdfminer.pdfparser import PDFParser
-from pdfminer.pdfdocument import PDFDocument
-from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
-from pdfminer.layout import LAParams, LTRect, LTTextBox, LTTextLine, LTTextBoxHorizontal, LTTextLineHorizontal
+import re
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+
+import pandas as pd
+import tabula
+from bs4 import BeautifulSoup
 from pdfminer.converter import PDFPageAggregator
-from pdfminer.pdfpage import PDFPage
+# from pdfminer.layout import LAParams, LTTextBox, LTTextLine, LTTextBoxHorizontal, LTTextLineHorizontal
+# from pdfminer.pdfdocument import PDFDocument
+# from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
+# from pdfminer.pdfpage import PDFPage
+# from pdfminer.pdfparser import PDFParser
 
 user_agent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.0.7; X11; Linux x86_64) ' \
              'Gecko/2009021910 Firefox/3.0.7 Chrome/23.0.1271.64 Safari/537.11'
 
 
+def flatten_list(items):
+    flat_list = list()
+    if isinstance(items, collections.Iterable):
+        for sublist in items:
+            if isinstance(sublist, list):
+                flat_list = flat_list + sublist
+            else:
+                flat_list.append(sublist)
+    else:
+        flat_list = items
+    return flat_list
+
+
+def to_list(x):
+    return [x] if not isinstance(x, collections.Iterable) else list(x)
+
+
 def download(url, filename):
-    request = urllib2.Request(url, headers={'User-Agent': user_agent})
+    request = urllib.request.Request(url, headers={'User-Agent': user_agent})
 
     try:
-        response = urllib2.urlopen(request)
+        response = urllib.request.urlopen(request)
         with open(filename, 'wb') as fh:
-            print('\n[*] Downloading: {}'.format(os.path.basename(filename)))
+            print(('\n[*] Downloading: {}'.format(os.path.basename(filename))))
             fh.write(response.read())
             print ('\n[*] Successful')
-    except urllib2.HTTPError, e:
-        print e.fp.read()
+    except urllib.error.HTTPError as e:
+        print(e.fp.read())
 
+def make_soup(url):
+    request = urllib.request.Request(url, headers={'User-Agent': user_agent})
+    html = urllib.request.urlopen(request)
+    soup = BeautifulSoup(html, 'html.parser')
+    return soup
 
 class PDFHelper(object):
-    TEXT_ELEMENTS = [
-        LTTextBox,
-        LTTextBoxHorizontal,
-        LTTextLine,
-        LTTextLineHorizontal
-    ]
+    # TEXT_ELEMENTS = [
+    #     LTTextBox,
+    #     LTTextBoxHorizontal,
+    #     LTTextLine,
+    #     LTTextLineHorizontal
+    # ]
 
     @staticmethod
     def get_text_from_ltobj(obj):
@@ -41,22 +71,71 @@ class PDFHelper(object):
             raise ValueError('No text found in the given LTObject')
 
     @staticmethod
-    def extract_pdf_sections(doc, levels):
+    def extract_pdf_sections(doc, levels=None):
         return [(level, title) for (level, title, dest, a, structelem) in doc.get_outlines()
-                if level in levels]
+                if level in levels] if levels is not None else [(level, title) for (level, title, dest, a, structelem) in doc.get_outlines()]
+
+    # @staticmethod
+    # def setup_pdfdocument(fh):
+    #     parser = PDFParser(fh)
+    #     doc = PDFDocument(parser)
+    #     return doc
+    #
+    # @staticmethod
+    # def setup_interpreter():
+    #     rsrcmgr = PDFResourceManager()
+    #     laparams = LAParams()
+    #     device = PDFPageAggregator(rsrcmgr, laparams=laparams)
+    #     return PDFPageInterpreter(rsrcmgr, device), device
 
     @staticmethod
-    def setup_pdfdocument(fh):
-        parser = PDFParser(fh)
-        doc = PDFDocument(parser)
-        return doc
+    def match_ltobjs_by_coordinate(headers, contents, coordinate):
+        if len(headers) != len(contents):
+            raise ValueError('Invalid input: counts of columns do not match.')
+        headers_sorted = sorted(headers, key=lambda o: o.bbox[coordinate])
+        contents_sorted = sorted(contents, key=lambda o: o.bbox[coordinate])
+        result = list()
+        for header, content in zip(headers_sorted, contents_sorted):
+            abs_tol = header.width / 2
+            if abs(header.bbox[coordinate] - content.bbox[coordinate]) <= abs_tol:
+                result.append((header, content))
+            else:
+                raise ValueError('Incorrect input: misaligned columns')
+        return result
 
     @staticmethod
-    def setup_interpreter():
-        rsrcmgr = PDFResourceManager()
-        laparams = LAParams()
-        device = PDFPageAggregator(rsrcmgr, laparams=laparams)
-        return PDFPageInterpreter(rsrcmgr, device), device
+    def unzip_ltobjs_inorder(ltobjs, sort_key):
+        cols_ordered = [obj for obj in sorted(ltobjs, key=sort_key)]
+        headers, contents = list(zip(*cols_ordered))
+        return list(headers), list(contents)
+
+
+    # returns a single dictionary
+    @staticmethod
+    def zip_dicts_by_keys(dicts, keys=None):
+        keys = list(dicts[0].keys()) if keys is None else keys
+        try:
+            return {k: flatten_list([dt[k] for dt in dicts]) for k in keys}
+        except KeyError:
+            value, tracestack = sys.exc_info()
+            raise KeyError('Unable to zip dictionaries: missing key(s)', value).with_traceback(tracestack)
+
+
+    # returns a list of dictionary with (y0, y1) as keys and the text as values
+    @staticmethod
+    def ltobjs_to_dict(ltobjs, crd, format=None):
+        format = format if format is not None else lambda x: x
+        result = list()
+        for obj in ltobjs:
+            if isinstance(obj, collections.Iterable):
+                crd_txt_dict = {tuple([o.bbox[c] for c in to_list(crd)]): format(PDFHelper.get_text_from_ltobj(o))
+                                for o in obj}
+            else:
+                crd_txt_dict = {
+                    tuple([obj.bbox[c] for c in to_list(crd)]): format(PDFHelper.get_text_from_ltobj(obj))}
+            result.append(crd_txt_dict)
+        return result
+
 
 
 
@@ -64,6 +143,7 @@ class PDFHelper(object):
 class CME(object):
     URL_ADV = 'http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_ADV_Report_CMEG.pdf'
     PDF_ADV = 'CME_Average_Daily_Volume.pdf'
+    TXT_ADV = 'CME_Average_Daily_Volume.txt'
 
     URL_PRODSLATE = 'http://www.cmegroup.com/CmeWS/mvc/ProductSlate/V1/Download.xls'
     XLS_PRODSLATE = 'Product_Slate.xls'
@@ -71,16 +151,15 @@ class CME(object):
     # metadata in adv.pdf
     adv_pdf_levels = [3, 4]
     adv_date_no = 1
-    adv_headers_no = range(3, 11)
-    adv_figures_no = range(11, 19)
+    adv_headers_no = list(range(3, 11))
+    adv_contents_no = list(range(11, 19))
     adv_products_no = 19
-
-
 
     def __init__(self, download_path):
         self.download_path = download_path
         self.full_path_adv = os.path.join(self.download_path, self.PDF_ADV)
         self.full_path_prodslate = os.path.join(self.download_path, self.XLS_PRODSLATE)
+        self.adv_txt = os.path.join(self.download_path, self.TXT_ADV)
 
     def download_adv(self):
         download(self.URL_ADV, self.full_path_adv)
@@ -88,23 +167,36 @@ class CME(object):
     def download_prodslate(self):
         download(self.URL_PRODSLATE, self.full_path_prodslate)
 
-    def parse_pdf_adv(self):
-        with open(self.full_path_adv, 'rb') as infile:
-            doc = PDFHelper.setup_pdfdocument(infile)
-            sections = PDFHelper.extract_pdf_sections(doc, self.adv_pdf_levels)
-            interpreter, device = PDFHelper.setup_interpreter()
+    # def parse_pdf_adv(self):
+    #     with open(self.full_path_adv, 'rb') as infile:
+    #         doc = PDFHelper.setup_pdfdocument(infile)
+    #         interpreter, device = PDFHelper.setup_interpreter()
+    #         table_df = pd.DataFrame()
+    #         for i, page in enumerate(PDFPage.create_pages(document=doc)):
+    #             interpreter.process_page(page)
+    #             ltobjs = list(device.get_result())
+    #             header_objs = self.__get_header_objs(ltobjs)
+    #             content_objs = self.__get_content_objs(ltobjs)
+    #             column_objs = PDFHelper.match_ltobjs_by_coordinate(header_objs, content_objs, 2)
+    #             header_objs, content_objs = PDFHelper.unzip_ltobjs_inorder(column_objs, lambda x: x[0].bbox[0])
+    #             contents = PDFHelper.ltobjs_to_dict(content_objs, [1, 3], self.format_text)
+    #             product_obj = ltobjs[self.adv_products_no]
+    #             products = PDFHelper.ltobjs_to_dict([product_obj], [1, 3], self.format_text)
+    #
+    #             table_dict = PDFHelper.zip_dicts_by_keys(products + contents, list(contents[0].keys()))
+    #             table = self.__sort_tabledict_by_row_crd(table_dict)
+    #             headers = self.get_output_header(header_objs)
+    #             tmp = pd.DataFrame(table, columns=headers)
+    #             print(tmp)
+    #             table_df.append(tmp, ignore_index=True)
+    #             print(table_df)
 
-            groups = self.get_product_group(sections)
-            for i, page in enumerate(PDFPage.create_pages(document=doc)):
-                interpreter.process_page(page)
-                ltobjs = list(device.get_result())
 
-                if i == 0:
-                    date = self.get_adv_todate(ltobjs)
-                    headers = self.get_adv_headers(ltobjs)
+    def tabula_parse(self):
+        tabula.convert_into(self.full_path_adv, 'OSE_ADV.csv', output_format='csv')
+        df = tabula.read_pdf(self.URL_ADV)
+        print(df)
 
-                for obj in [ltobjs[ind] for ind in self.adv_figures_no]:
-                    pdftext = PDFHelper.get_text_from_ltobj(obj)
 
     # returns a dictionary with key: full group name, and value: (asset, instrument)
     def get_product_group(self, sections):
@@ -120,36 +212,152 @@ class CME(object):
             prev_level = level
         return result
 
-    # returns a dictionary that has key: name, value: bbox
-    def get_adv_headers(self, ltobjs):
-        return {(' '.join(PDFHelper.get_text_from_ltobj(ltobjs[i]).split('\n'))).rstrip(): ltobjs[i]
-                for i in self.adv_headers_no}
+    def get_output_header(self, header_objs):
+        return ['Product'] + [self.get_adv_header(obj) for obj in header_objs]
+
+    def get_adv_header(self, ltobj):
+        return str(self.format_text(PDFHelper.get_text_from_ltobj(ltobj)))
+
+    def format_text(self, text):
+        return (' '.join(str(text).split('\n'))).rstrip()
 
     # returns the date string at the top of every page
     def get_adv_todate(self, ltobjs):
         return PDFHelper.get_text_from_ltobj(ltobjs[self.adv_date_no]).rstrip()
 
-    def match_col_by_coordinate(self, headers, coordinate, figures):
-        if len(headers) != len(figures):
-            raise ValueError('Invalid input: counts of columns do not match.')
-        headers_sorted = sorted(headers, key=lambda o: o.bbox[coordinate])
-        figures_sorted = sorted(figures, key=lambda o: o.bbox[coordinate])
-        abs_tol = 1
+    def __get_content_objs(self, ltobjs):
+        return [ltobjs[ind] for ind in self.adv_contents_no]
 
-        for header, figure in zip(headers_sorted, figures_sorted):
-            if abs(header.bbox[coordinate] - figure.bbox[coordinate]) <= abs_tol:
-                pass
+    def __get_header_objs(self, ltobjs):
+        return [ltobjs[ind] for ind in self.adv_headers_no]
+
+    def __sort_tabledict_by_row_crd(self, table_dict):
+        return [v for k, v in sorted(list(table_dict.items()), key=lambda x: x[0][0], reverse=True)]
+
+    # parameter columns is a ordered list of entries [header, dict{(y0, y1): text}]
+    # def zip_cols_by_key(self, columns):
+    #     cols_no_header = [content for header, content in columns]
+    #     if any(len(col) != len(cols_no_header[0]) for col in cols_no_header):
+    #         raise ValueError('Unable to zip columns: row numbers inconsistent')
+    #     rows = PDFHelper.__zip_dicts_by_equal_keys(cols_no_header)
+    #     return [v for k, v in (sorted(rows, key=rows.items()[0][0])).items()]
+    def read_from_txt(self):
+        with open(self.adv_txt, encoding='utf8') as fh:
+            lines = fh.readlines()
+        pattern = r'^(( *)([A-Za-z0-9\(\)/ \.,%-]+)( {2,})([A-Za-z0-9\(\)/ \.,%-]+)).*$'
+
+        if lines:
+            line = lines[60]
+            print(line)
+            sr = re.search(pattern, line)
+            if_match = re.match(pattern, line)
+            if if_match is not None:
+                print(line)
+            for line in lines:
+                if_match = re.match(pattern, line)
+                if if_match is not None:
+                    print(line)
 
 
 
 
 
 
+class OSE(object):
+    URL_OSE = 'http://www.jpx.co.jp'
+    URL_VOLUME = URL_OSE + '/english/markets/statistics-derivatives/trading-volume/01.html'
 
-download_path = '/Users/sheryllan/Downloads/'
-# download_path = '/home/slan/Documents/downloads/'
+    PDF_ADV = 'OSE_Average_Daily_Volume.pdf'
+
+    TABLE_TAB = 'table'
+    TR_TAB = 'tr'
+    TH_TAB = 'th'
+    TD_TAB = 'td'
+    A_TAB = 'a'
+    HREF_ATTR = 'href'
+    YEAR_INTERESTED = '2017'
+    TABLE_TITLE = 'Year'
+
+
+    def __init__(self, download_path):
+        self.download_path = download_path
+        self.full_path_adv = os.path.join(self.download_path, self.PDF_ADV)
+
+
+
+    def find_report_url(self):
+        soup = make_soup(self.URL_VOLUME)
+
+        tables = soup.find_all(self.TABLE_TAB)
+        table = self.filter_table(tables, self.TABLE_TITLE)
+        ths = table.find(self.TR_TAB).find_all(self.TH_TAB)
+
+        # find in headers for the column of the year
+        col_idx = self.get_indexes(ths, lambda x: x.text == self.YEAR_INTERESTED)[0]
+
+        trs = table.find_all(self.TR_TAB)
+        td_rows = [tr for tr in trs if tr.find_all(self.TD_TAB)]
+        tds = [tr.find_all(self.TD_TAB)[col_idx] for tr in td_rows]
+
+        links = [str(td.find(href=True)[self.HREF_ATTR]) for td in tds]
+        pattern = r'^(?=.*{}.*\.pdf).*$'.format(self.YEAR_INTERESTED)
+        file_url = self.find_first(links, lambda x: re.match(pattern, x))
+        return self.URL_OSE + file_url
+
+    def download_adv(self):
+        download(self.find_report_url(), self.full_path_adv)
+
+
+
+    def get_indexes(self, arry, condition):
+        return [i for i, a in enumerate(arry) if condition(a)]
+
+    # returns the table in which first tr has first th of which text = title
+    def filter_table(self, tables, title):
+        return [tbl for tbl in tables if tbl.find(self.TR_TAB).find(self.TH_TAB, text=title)][0]
+
+    def find_first(self, arry, condition):
+        for a in arry:
+            if condition(a):
+                return a
+        return None
+
+    def parse_pdf_adv(self):
+        with open(self.full_path_adv, 'rb') as infile:
+            doc = PDFHelper.setup_pdfdocument(infile)
+            outlines = PDFHelper.extract_pdf_sections(doc)
+
+            interpreter, device = PDFHelper.setup_interpreter()
+            table_df = pd.DataFrame()
+            # for i, page in enumerate(PDFPage.create_pages(document=doc)):
+            #     interpreter.process_page(page)
+            #     ltobjs = list(device.get_result())
+            #
+            #     pass
+
+
+
+    def tabula_parse(self):
+        #tabula.convert_into(self.full_path_adv, 'OSE_ADV.csv', output_format='csv', pages='all')
+        df = tabula.read_pdf(self.full_path_adv, pages=2)
+        print()
+
+
+
+
+
+#download_path = '/Users/sheryllan/Downloads/'
+download_path = '/home/slan/Documents/downloads/'
 cme = CME(download_path)
+cme.read_from_txt()
+#cme.tabula_parse()
 # cme.download_adv()
 # cme.download_prodslate()
 #tb = cme.parse_pdf_adv()
+
+#ose = OSE(download_path)
+#ose.download_adv()
+#ose.parse_pdf_adv()
+#ose.tabula_parse()
+
 

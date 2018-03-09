@@ -1,4 +1,4 @@
-#!/Users/sheryllan/LiquidPy/recordcleaner/env/bin/python
+#!/home/slan/Python/recordcleaner/env/bin/python
 #
 # dumppdf.py - dump pdf contents in XML format.
 #
