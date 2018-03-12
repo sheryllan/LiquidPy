@@ -277,7 +277,7 @@ class OSE(object):
 
         links = [str(td.find(href=True)[self.HREF_ATTR]) for td in tds]
         pattern = r'^(?=.*{}.*\.pdf).*$'.format(self.YEAR_INTERESTED)
-        file_url = self.find_first(links, lambda x: re.match(pattern, x))
+        file_url = self.find_first_n(links, lambda x: re.match(pattern, x))
         return self.URL_OSE + file_url
 
     def download_adv(self):
@@ -292,7 +292,7 @@ class OSE(object):
     def filter_table(self, tables, title):
         return [tbl for tbl in tables if tbl.find(self.TR_TAB).find(self.TH_TAB, text=title)][0]
 
-    def find_first(self, arry, condition):
+    def find_first_n(self, arry, condition):
         for a in arry:
             if condition(a):
                 return a

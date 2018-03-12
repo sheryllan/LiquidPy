@@ -1,4 +1,4 @@
-#!/home/slan/Python/recordcleaner/venv/bin/python
+#!/Users/sheryllan/LiquidPy/recordcleaner/venv/bin/python
 # See http://cens.ioc.ee/projects/f2py2e/
 from __future__ import division, print_function
 

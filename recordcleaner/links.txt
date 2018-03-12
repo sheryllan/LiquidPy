@@ -3,3 +3,6 @@ http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_Volume_Report_CMEG.pdf
 
 
 ^((\h*)([A-Za-z0-9\(\)/\h\.,%-]+)(\h{3,})([A-Za-z0-9\(\)/\h\.,%-]+)).*$
+
+--find all the words not separated by space longer than 2 
+([\w\(\)\.%$&'''',-]+( [\w\(\)\.%$&,-]+)*)+
