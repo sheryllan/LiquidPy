@@ -104,15 +104,16 @@ class TxtHelper(object):
 
     # r1, r2 are dictionaries with (x0, x1) as keys
     @classmethod
-    def merge_2rows(cls, rlonger, rshorter, alignment, atol, sep=' '):
+    def merge_2rows(cls, rlonger, rshorter, alignment, atol, merge=None):
+        merge = lambda x1, x2: ' '.join([x1, x2])
         if len(rlonger) < len(rshorter):
             rlonger, rshorter = swap(rlonger, rshorter)
         func = cls.alignment_metric[alignment]
         rlonger = list(sorted(rlonger.items(), key=lambda x: func(x[0])))
         rshorter = list(sorted(rshorter.items(), key=lambda x: func(x[0])))
         merged = dict()
-        j = 0
-        for i in range(0, len(rlonger)):
+        i, j = 0, 0
+        while i < len(rlonger):
             clonger, vlonger = rlonger[i]
             if j < len(rshorter):
                 cshorter, vshorter = rshorter[j]
@@ -125,10 +126,12 @@ class TxtHelper(object):
                         merged[cshorter] = vshorter
                         j += 1
                         cshorter, vshorter = rshorter[j]
-                merged[clonger] = sep.join([vlonger, vshorter])
+                merged[clonger] = merge(vshorter, vlonger)
+                i += 1
                 j += 1
             else:
                 merged[clonger] = vlonger
+                i += 1
         return [v for k, v in sorted(merged.items(), key=lambda x: func(x[0]))]
 
 
