@@ -1,16 +1,18 @@
 import collections
 import os
 import re
-import sys
 import urllib.error
 import urllib.parse
 import urllib.request
-from copy import deepcopy
+import subprocess
+import tempfile
 
 import pandas as pd
 import tabula
 from bs4 import BeautifulSoup
 from PyPDF2 import PdfFileReader
+
+import configparser
 
 
 USER_AGENT = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.0.7; X11; Linux x86_64) ' \
@@ -47,15 +49,23 @@ def find_first_n(arry, condition, n=1):
     return result
 
 
-def download(url, filename):
+def download(url, filename=None, mode='wb'):
     request = urllib.request.Request(url, headers={'User-Agent': USER_AGENT})
 
     try:
         response = urllib.request.urlopen(request)
-        with open(filename, 'wb') as fh:
-            print(('\n[*] Downloading: {}'.format(os.path.basename(filename))))
-            fh.write(response.read())
-            print('\n[*] Successful')
+        if filename is not None and isinstance(filename, str):
+            with open(filename, mode) as fh:
+                print(('\n[*] Downloading from: {}'.format(url)))
+                fh.write(response.read())
+                print('\n[*] Successfully downloaded to ' + filename)
+        elif filename is None:
+            filename = tempfile.NamedTemporaryFile()
+            print(('\n[*] Downloading from: {}'.format(url)))
+            filename.write(response.read())
+            print('\n[*] Successfully downloaded to ' + filename.name)
+
+        return filename
     except urllib.error.HTTPError as e:
         print(e.fp.read())
 
@@ -123,7 +133,7 @@ class TxtHelper(object):
 
 
 
-class CME(object):
+class CMEScraper(object):
     URL_ADV = 'http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_ADV_Report_CMEG.pdf'
     PDF_ADV = 'CME_Average_Daily_Volume.pdf'
     TXT_ADV = 'CME_Average_Daily_Volume.txt'
@@ -137,13 +147,6 @@ class CME(object):
                       OUTPUT_COLUMNS[1]: 'Product Group',
                       OUTPUT_COLUMNS[2]: 'Sub Group'}
 
-    # metadata in adv.pdf
-    adv_pdf_levels = [3, 4]
-    adv_date_no = 1
-    adv_headers_no = list(range(3, 11))
-    adv_contents_no = list(range(11, 19))
-    adv_products_no = 19
-
     def __init__(self, download_path):
         self.download_path = download_path
         self.pdf_path_adv = os.path.join(self.download_path, self.PDF_ADV)
@@ -151,16 +154,18 @@ class CME(object):
         self.txt_path_adv = os.path.join(self.download_path, self.TXT_ADV)
         self.xlsx_path_adv = os.path.join(self.download_path, self.XLSX_ADV)
 
+        self.pdf_path_prodslate = os.path.join(self.download_path, self.XLS_PRODSLATE)
+
         self.adv_headers = []
         self.report_name = None
         self.product_groups = None
 
-    def download_adv(self):
-        download(self.URL_ADV, self.pdf_path_adv)
+    def download_adv(self, path=None):
+        return download(self.URL_ADV, path)
 
-    def download_prodslate(self):
-        download(self.URL_PRODSLATE, self.xls_path_prodslate)
-
+    def download_prodslate(self, path=None):
+        path = self.pdf_path_prodslate if path is None else path
+        download(self.URL_PRODSLATE, path)
 
     # returns a dictionary with key: full group name, and value: (asset, instrument)
     def get_pdf_product_groups(self, sections):
@@ -176,40 +181,61 @@ class CME(object):
             prev_level = level
         return result
 
-    def read_pdf_metadata(self):
-        with open(self.pdf_path_adv, mode='rb') as fh:
+    def read_pdf_metadata(self, path=None):
+        path = self.pdf_path_adv if path is None else path
+        with open(path, mode='rb') as fh:
             fr = PdfFileReader(fh)
             outlines = fr.getOutlines()
             flat_outlines = flatten_list(outlines, list(), 0)
-            self.report_name = ' '.join([o.title for l, o in flat_outlines[0:2]])
+            self.report_name = ' '.join([o.title for l, o in flat_outlines[0:2]]).replace('/', '-')
             self.product_groups = self.get_pdf_product_groups([(l, o.title) for l, o in flat_outlines[2:]])
 
-    def parse_from_txt(self):
+    def parse_from_txt(self, path=None):
         self.read_pdf_metadata()
-
-        with open(self.txt_path_adv) as fh:
+        path = self.txt_path_adv if path is None else path
+        with open(path) as fh:
             lines = fh.readlines()
             pattern_data = '^((([\w\(\)\.%&,-]+) )+ {2,})+.*$'
             pattern_headers = '^ +((([\w\(\)\.%&,-]+) )+ {2,}){2,}.*$'
-
         if lines:
             header_line = find_first_n(lines, lambda x: re.match(pattern_headers, x) is not None, 2)
             self.adv_headers = self.__get_output_headers(header_line)
             df = pd.DataFrame(columns=self.adv_headers)
             for line in lines:
+                if 'total' in line.lower():
+                    break
                 line = line.rstrip()
                 if line in self.product_groups:
                     group, clearing = self.product_groups[line]
                 elif re.match(pattern_data, line) is not None:
                     df = self.__append_to_df(df, line, group, clearing)
+            return df
+        else:
+            return None
 
-        return df
+    def txt_to_xlsx_adv(self, inpath=None, outpath=None):
+        table = self.parse_from_txt(inpath)
+        outpath = self.xlsx_path_adv if outpath is None else outpath
+        return configparser.XlsxWriter.save_sheets(outpath, {self.report_name: table})
 
-    def __get_output_headers(self, pdf_headers, pattern=None, sep='\t'):
+    def get_adv_xlsx(self, outpath=None):
+        outpath = self.xlsx_path_adv if outpath is None else outpath
+        f_pdf = self.download_adv()
+        f_txt = tempfile.NamedTemporaryFile()
+        try:
+            out, err = subprocess.Popen(["pdftotext", "-layout", f_pdf.name, f_txt.name]).communicate()
+            if err is not None:
+                raise RuntimeError(err)
+            self.txt_to_xlsx_adv(f_txt.name, outpath)
+        finally:
+            f_pdf.close()
+            f_txt.close()
+
+
+    def __get_output_headers(self, pdf_headers, pattern=None):
         pattern = '([\w\(\)\.%&,-]+( [\w\(\)\.%&,-]+)*)+' if pattern is None else pattern
         heading_cols = self.OUTPUT_COLUMNS[0:1]
         tailing_cols = self.OUTPUT_COLUMNS[1:3]
-        cols = list()
         to_cord = lambda mobj: (mobj.start(), mobj.end())
         to_group = lambda mobj: mobj.group()
         headers = [to_dict(re.finditer(pattern, string), to_cord, to_group) for string in pdf_headers]
@@ -217,29 +243,41 @@ class CME(object):
         h1 = headers[0]
         for h2 in headers[1:]:
             h1 = TxtHelper.merge_2rows(h1, h2, alignment, 2)
-        cols = h1
-        return heading_cols + cols + tailing_cols
+        return heading_cols + h1 + tailing_cols
 
     def __parse_line(self, line, **kwargs):
         kw_pattern = 'pattern'
         kw_extras = 'extras'
         kw_sep = 'sep'
         line = line.rstrip()
-        pattern = kwargs[kw_pattern] if kw_pattern in kwargs else '(?<! )+ {2,}'
+        pattern = kwargs[kw_pattern] if kw_pattern in kwargs else '(?<! )+ {2,}|(?<=[0-9%,-])+ +?(?=[0-9%,-])+'
         sep = kwargs[kw_sep] if kw_sep in kwargs else '\t'
         repl = re.sub(pattern, sep, line)
-        return repl.split(sep) if kw_extras not in kwargs else repl.split(sep) + list(kwargs[kw_extras])
+        values = self.__text_to_num(repl.split(sep))
+        return values if kw_extras not in kwargs else values + list(kwargs[kw_extras])
 
     def __append_to_df(self, df, line, *args):
         line_parsed = self.__parse_line(line, extras=list(args))
-        df.append(pd.Series(line_parsed, index=list(df)), ignore_index=True)
+        df = df.append(pd.Series(line_parsed, index=list(df)), ignore_index=True)
         return df
 
-    def tabula_parse(self):
-        tabula.convert_into(self.pdf_path_adv, 'CME_ADV.csv', output_format='csv', pages='all')
+    def __text_to_num(self, values):
+        pattern = '^-?[\d\.,]+%?$'
+        for i, value in enumerate(values):
+            if re.match(pattern, value):
+                value = value.replace('%', '')
+                value = value.replace(',', '')
+                values[i] = float(value) if '.' in value else int(value)
+        return values
+
+    # def tabula_parse(self):
+    #     tabula.convert_into(self.pdf_path_adv, 'CME_ADV.csv', output_format='csv', pages='all')
 
 
-class OSE(object):
+
+
+
+class OSEScraper(object):
     URL_OSE = 'http://www.jpx.co.jp'
     URL_VOLUME = URL_OSE + '/english/markets/statistics-derivatives/trading-volume/01.html'
 
@@ -288,12 +326,10 @@ class OSE(object):
         print()
 
 
-download_path = '/Users/sheryllan/Downloads/'
-# download_path = '/home/slan/Documents/downloads/'
-cme = CME(download_path)
-#table = {cme.report_name: cme.parse_from_txt()}
-cme.tabula_parse()
-
+#download_path = '/Users/sheryllan/Downloads/'
+download_path = '/home/slan/Documents/downloads/'
+cme = CMEScraper(download_path)
+cme.get_adv_xlsx()
 # cme.tabula_parse()
 # cme.download_adv()
 # cme.download_prodslate()
@@ -303,3 +339,4 @@ cme.tabula_parse()
 # ose.download_adv()
 # ose.parse_pdf_adv()
 # ose.tabula_parse()
+

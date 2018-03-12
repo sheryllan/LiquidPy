@@ -10,7 +10,7 @@ class XmlParser(object):
     def fltr_attrs(tags, attrs=None):
         if attrs is None:
             return tags
-        return [{k: v for k, v in list(tag.attrs.items()) if k in attrs} for tag in tags]
+        return [{k: v for k, v in tag.attrs.items() if k in attrs} for tag in tags]
 
     @staticmethod
     def parse(path, tags=None):
@@ -45,10 +45,9 @@ class XlsxWriter(object):
     @staticmethod
     def save_sheets(path, sheet2data, columns=None, override=True):
         wrt = XlsxWriter.create_xlwriter(path, override)
-        for sheet, data in list(sheet2data.items()):
+        for sheet, data in sheet2data.items():
             XlsxWriter.to_xlsheet(data, wrt, sheet, columns)
         wrt.save()
-        return path
 
 
 base_path = '/home/slan/Documents/config_files/'

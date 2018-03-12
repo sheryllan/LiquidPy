@@ -1,4 +1,4 @@
-#!/Users/sheryllan/LiquidPy/recordcleaner/venv/bin/python
+#!/home/slan/Python/recordcleaner/venv/bin/python3.6
 import sys
 import io
 import getopt

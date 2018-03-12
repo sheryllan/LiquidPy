@@ -1,7 +1,6 @@
 import pandas as pd
 import configparser as cp
-from
-
+import xlrd
 
 
 # Parse the config files
@@ -37,10 +36,7 @@ xl = pd.ExcelFile(test_input[0][0])
 summary = xl.parse(test_input[0][1])
 products = xl.parse(test_input[1][1])['commodity_name']
 exp = lambda x: x in products.tolist()
-results = summary[list(filter(summary, 'Globex',  exp))]
-print((summary[list(filter(summary, 'Globex',  exp))].head()))
+results = summary[filter(summary, 'Globex',  exp)]
+print(summary[filter(summary, 'Globex',  exp)].head())
 
 
-class CMEChecker(object):
-
-    pass
