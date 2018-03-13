@@ -146,12 +146,10 @@ class CMEScraper(object):
     XLS_PRODSLATE = 'Product_Slate.xls'
 
     OUTPUT_COLUMNS = ['Product', 'Product Group', 'Cleared As']
-    COLUMN_MAPPING = {OUTPUT_COLUMNS[0]: 'Product Name',
-                      OUTPUT_COLUMNS[1]: 'Product Group',
-                      OUTPUT_COLUMNS[2]: 'Sub Group'}
 
-    def __init__(self, download_path):
-        self.download_path = download_path
+
+    def __init__(self, download_path=None):
+        self.download_path = os.getcwd() if download_path is None else download_path
         self.pdf_path_adv = os.path.join(self.download_path, self.PDF_ADV)
         self.xls_path_prodslate = os.path.join(self.download_path, self.XLS_PRODSLATE)
         self.txt_path_adv = os.path.join(self.download_path, self.TXT_ADV)
@@ -159,9 +157,7 @@ class CMEScraper(object):
 
         self.pdf_path_prodslate = os.path.join(self.download_path, self.XLS_PRODSLATE)
 
-        self.adv_headers = []
         self.report_name = None
-        self.product_groups = None
 
     def download_adv(self, path=None):
         return download(self.URL_ADV, path)
@@ -191,10 +187,10 @@ class CMEScraper(object):
             outlines = fr.getOutlines()
             flat_outlines = flatten_list(outlines, list(), 0)
             self.report_name = ' '.join([o.title for l, o in flat_outlines[0:2]]).replace('/', '-')
-            self.product_groups = self.get_pdf_product_groups([(l, o.title) for l, o in flat_outlines[2:]])
+            return self.get_pdf_product_groups([(l, o.title) for l, o in flat_outlines[2:]])
 
     def parse_from_txt(self, path=None):
-        self.read_pdf_metadata()
+        product_groups = self.read_pdf_metadata()
         path = self.txt_path_adv if path is None else path
         with open(path) as fh:
             lines = fh.readlines()
@@ -202,14 +198,13 @@ class CMEScraper(object):
             pattern_headers = '^ +((([\w\(\)\.%&,-]+) )+ {2,}){2,}.*$'
         if lines:
             header_line = find_first_n(lines, lambda x: re.match(pattern_headers, x) is not None, 2)
-            self.adv_headers = self.__get_output_headers(header_line)
-            df = pd.DataFrame(columns=self.adv_headers)
+            df = pd.DataFrame(columns=self.__get_output_headers(header_line))
             for line in lines:
                 if 'total' in line.lower():
                     break
                 line = line.rstrip()
-                if line in self.product_groups:
-                    group, clearing = self.product_groups[line]
+                if line in product_groups:
+                    group, clearing = product_groups[line]
                 elif re.match(pattern_data, line) is not None:
                     df = self.__append_to_df(df, line, group, clearing)
             return df
@@ -330,13 +325,10 @@ class OSEScraper(object):
 
 
 #download_path = '/Users/sheryllan/Downloads/'
-download_path = '/home/slan/Documents/downloads/'
-cme = CMEScraper(download_path)
-cme.get_adv_xlsx()
-# cme.tabula_parse()
-# cme.download_adv()
-# cme.download_prodslate()
-# tb = cme.parse_pdf_adv()
+# download_path = '/home/slan/Documents/downloads/'
+# cme = CMEScraper(download_path)
+# cme.get_adv_xlsx()
+
 
 # ose = OSE(download_path)
 # ose.download_adv()
