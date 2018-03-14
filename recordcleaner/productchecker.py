@@ -15,7 +15,8 @@ import datascraper as dtsp
 
 reports_path = '/home/slan/Documents/exch_report/'
 configs_path = '/home/slan/Documents/config_files/'
-checked_path = '/home/slan/Documents/checked_report/'
+# checked_path = '/home/slan/Documents/checked_report/'
+checked_path = os.getcwd()
 
 exchanges = ['asx', 'bloomberg', 'cme', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
 report_fmtname = '_Average_Daily_Volume.xlsx'
@@ -115,7 +116,7 @@ class CMEChecker(object):
         gdf_prods = self.__groupby(df_prods, self.cols_prods[1:2])
 
         gdf_adv = self.__groupby(df_adv, self.cols_adv[1:2])
-        self.exhibit([gdf_adv, gdf_prods], [self.cols_adv[0], self.cols_prods[0]])
+        self.exhibit([gdf_prods, gdf_adv], [self.cols_prods[0], self.cols_adv[0]])
 
         print()
 
@@ -124,15 +125,17 @@ class CMEChecker(object):
 
     def exhibit(self, gdfs, cols):
         output = os.path.join(checked_path, 'exhibit.xlsx')
-        # cdfs = {group: pd.concat([gdf[group][col].sort_values(col) for gdf, col in zip(gdfs, cols)], axis=1)
+
+        # cdfs = {group: pd.concat([gdf[group][col].sort_values() for gdf, col in zip(gdfs, cols)], axis=1)
         #         for group in gdfs[0].keys()}
-        cdfs = dict
+        cdfs = dict()
         print([list(gdf.keys()) for gdf in gdfs])
         for group in gdfs[0].keys():
             dfs = []
             for gdf, col in zip(gdfs, cols):
-                gdf[group][col]
-                dfs.append(gdf[group][col].sort_values())
+                found_gp = group if group in gdf.keys() \
+                    else dtsp.find_first_n(gdf.keys(), lambda x: SearchHelper.match_initials(group, x) or SearchHelper.match_first_n(group, x))[0]
+                dfs.append(gdf[found_gp][col].sort_values())
             cc = pd.concat(dfs)
             cdfs[group] = cc
 
@@ -142,13 +145,53 @@ class CMEChecker(object):
 
 
 
+class SearchHelper(object):
+    vowels = ('a', 'e', 'i', 'o', 'u')
+
+    @staticmethod
+    def get_words(string):
+        return re.split('[ ,\.\?;:]+', string)
+
+    @staticmethod
+    def get_initials(string):
+        words = SearchHelper.get_words(string)
+        initials = list()
+        for word in words:
+            if word[0:2] == 'ex':
+                initials.append('x')
+            elif re.match('[A-Za-z]', word[0]):
+                initials.append(word[0])
+        return initials
+
+    @staticmethod
+    def match_initials(s1, s2):
+        return SearchHelper.get_initials(s1) == SearchHelper.get_initials(s2)
+
+    @staticmethod
+    def match_first_n(s1, s2, n=2):
+        if len(s1) >= n and len(s2) >= n:
+            return s1[0:n] == s2[0:n]
+
+    @staticmethod
+    def match_sgl_plrl(s1, s2):
+        if s1 == s2:
+            return True
+        if len(s1) > 2 and len(s2) > 2:
+            if s1[-1] == 'y' and s1[-2] not in SearchHelper.vowels:
+                return s2[-3:] == 'ies'
+            if s2[-1] == 'y' and s2[-2] not in SearchHelper.vowels:
+                return s1[-3:] == 'ies'
+        else:
+            return False
+
+    @staticmethod
+    def match_sgl_plrl_instring(s1, s2):
+        words = SearchHelper.get_words(s1)
 
 
 
-
-
-
-cme_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
+# cme_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
+cme_prds_file = os.path.join(checked_path, 'Product Slate Export.xls')
 cme_adv_file = os.path.join(checked_path, report_files['cme'])
 
 cme = CMEChecker(cme_adv_file, cme_prds_file)
