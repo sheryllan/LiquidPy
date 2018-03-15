@@ -51,7 +51,7 @@ def find_first_n(arry, condition, n=1):
     return result if len(result) != 1 else result[0]
 
 
-def download(url, filename=None, mode='wb'):
+def download(url, filename=None, mode='w+b'):
     request = urllib.request.Request(url, headers={'User-Agent': USER_AGENT})
 
     try:
@@ -62,9 +62,10 @@ def download(url, filename=None, mode='wb'):
                 fh.write(response.read())
                 print('\n[*] Successfully downloaded to ' + filename)
         elif filename is None:
-            filename = tempfile.NamedTemporaryFile()
+            filename = tempfile.NamedTemporaryFile(mode=mode)
             print(('\n[*] Downloading from: {}'.format(url)))
             filename.write(response.read())
+            filename.flush()
             print('\n[*] Successfully downloaded to ' + filename.name)
 
         return filename
@@ -191,10 +192,11 @@ class CMEScraper(object):
             self.report_name = ' '.join([o.title for l, o in flat_outlines[0:2]]).replace('/', '-')
             return self.get_pdf_product_groups([(l, o.title) for l, o in flat_outlines[2:]])
 
-    def parse_from_txt(self, path=None):
-        product_groups = self.read_pdf_metadata()
-        path = self.txt_path_adv if path is None else path
-        with open(path) as fh:
+    def parse_from_txt(self, pdf_path=None, txt_path=None):
+        pdf_path = self.pdf_path_adv if pdf_path is None else pdf_path
+        txt_path = self.txt_path_adv if txt_path is None else txt_path
+        product_groups = self.read_pdf_metadata(pdf_path)
+        with open(txt_path) as fh:
             lines = fh.readlines()
             pattern_data = '^((([\w\(\)\.%&,-]+) )+ {2,})+.*$'
             pattern_headers = '^ +((([\w\(\)\.%&,-]+) )+ {2,}){2,}.*$'
@@ -213,20 +215,26 @@ class CMEScraper(object):
         else:
             return None
 
-    def txt_to_xlsx_adv(self, inpath=None, outpath=None):
-        table = self.parse_from_txt(inpath)
+    def to_xlsx_adv(self, pdfpath, txtpath, outpath=None):
+        table = self.parse_from_txt(pdfpath, txtpath)
         outpath = self.xlsx_path_adv if outpath is None else outpath
         return configparser.XlsxWriter.save_sheets(outpath, {self.report_name: table})
 
-    def get_adv_xlsx(self, outpath=None):
+    def run_pdftotext_cmd(self, pdf, txt=None):
+        txt = re.sub('\.pdf$', pdf, '.txt') if txt is None else txt
+        out, err = subprocess.Popen(["pdftotext", "-layout", pdf, txt]).communicate()
+        if err is not None:
+            raise RuntimeError(err)
+        return txt
+
+
+    def download_to_xlsx_adv(self, outpath=None):
         outpath = self.xlsx_path_adv if outpath is None else outpath
         f_pdf = self.download_adv()
         f_txt = tempfile.NamedTemporaryFile()
         try:
-            out, err = subprocess.Popen(["pdftotext", "-layout", f_pdf.name, f_txt.name]).communicate()
-            if err is not None:
-                raise RuntimeError(err)
-            self.txt_to_xlsx_adv(f_txt.name, outpath)
+            self.run_pdftotext_cmd(f_pdf.name, f_txt.name)
+            self.to_xlsx_adv(f_pdf.name, f_txt.name, outpath)
         finally:
             f_pdf.close()
             f_txt.close()
@@ -326,10 +334,10 @@ class OSEScraper(object):
         print()
 
 
-#download_path = '/Users/sheryllan/Downloads/'
+download_path = os.getcwd()
 # download_path = '/home/slan/Documents/downloads/'
-# cme = CMEScraper(download_path)
-# cme.get_adv_xlsx()
+cme = CMEScraper(download_path)
+cme.download_to_xlsx_adv()
 
 
 # ose = OSE(download_path)
