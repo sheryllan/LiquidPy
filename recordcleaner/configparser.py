@@ -2,6 +2,7 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import openpyxl
 import os
+from StyleFrame import StyleFrame
 
 
 class XmlParser(object):
@@ -38,15 +39,28 @@ class XlsxWriter(object):
         return wrt if override else XlsxWriter.__config_xlwriter(wrt, XlsxWriter.load_xlsx(path))
 
     @staticmethod
-    def to_xlsheet(data, wrt, sheet, columns=None):
+    def to_xlsheet(data, wrt, sheet, columns=None, col_width=None):
         df = pd.DataFrame(data) if columns is None else pd.DataFrame(data, columns=columns)
-        df.to_excel(wrt, sheet, index=False)
+        sf = StyleFrame(df)
+        if col_width is None:
+            col_width = {col: max(df[col].astype(str).map(len).max(), len(str(col))) + 1 for col in df.columns}
+        sf.set_column_width_dict(col_width)
+        sf.to_excel(excel_writer=wrt, sheet_name=sheet)
+
+    # @staticmethod
+    # def save_sheets(path, sheet2data, columns=None, override=True):
+    #     wrt = XlsxWriter.create_xlwriter(path, override)
+    #     for sheet, data in list(sheet2data.items()):
+    #         XlsxWriter.to_xlsheet(data, wrt, sheet, columns)
+    #     wrt.save()
+    #     return path
 
     @staticmethod
-    def save_sheets(path, sheet2data, columns=None, override=True):
-        wrt = XlsxWriter.create_xlwriter(path, override)
+    def save_sheets(path, sheet2data, columns=None, sheet2colwidth=None):
+        wrt = StyleFrame.ExcelWriter(path)
         for sheet, data in list(sheet2data.items()):
-            XlsxWriter.to_xlsheet(data, wrt, sheet, columns)
+            width = None if sheet2colwidth is None else sheet2colwidth[sheet]
+            XlsxWriter.to_xlsheet(data, wrt, sheet, columns, width)
         wrt.save()
         return path
 

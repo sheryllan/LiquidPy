@@ -35,6 +35,8 @@ def flatten_list(items, flat_list, level):
 
 
 def to_list(x):
+    if isinstance(x, str):
+        return [x]
     return [x] if not isinstance(x, collections.Iterable) else list(x)
 
 
@@ -42,11 +44,11 @@ def find_first_n(arry, condition, n=1):
     result = list()
     for a in arry:
         if n == 0:
-            return result
+            break
         if condition(a):
             result.append(a)
             n -= 1
-    return result
+    return result if len(result) != 1 else result[0]
 
 
 def download(url, filename=None, mode='wb'):

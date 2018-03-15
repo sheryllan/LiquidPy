@@ -3,25 +3,34 @@ import numpy as np
 import configparser as cp
 import os
 import re
+import inflect
+from math import isnan
+
+
+from whoosh.fields import *
+from whoosh.index import create_in
+from whoosh.index import open_dir
+from whoosh.query import *
+from whoosh.qparser import QueryParser
 
 
 import datascraper as dtsp
 
-
-
 # Parse the config files
-#cp.parse_save()
+# cp.parse_save()
 
 
 reports_path = '/home/slan/Documents/exch_report/'
 configs_path = '/home/slan/Documents/config_files/'
-# checked_path = '/home/slan/Documents/checked_report/'
-checked_path = os.getcwd()
+checked_path = '/home/slan/Documents/checked_report/'
+# checked_path = os.getcwd()
 
 exchanges = ['asx', 'bloomberg', 'cme', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
 report_fmtname = '_Average_Daily_Volume.xlsx'
 
 report_files = {e: e.upper() + report_fmtname for e in exchanges}
+
+
 # config_files = {e: e + '.xlsx' for e in exchanges}
 #
 # test_input = [(reports_path + report_files['cme'], 'Summary'), (configs_path + config_files['cme'], 'Config')]
@@ -41,10 +50,12 @@ def xl_consolidate(file2sheet, dest):
         cp.XlsxWriter.to_xlsheet(dt, wrt, sht)
     wrt.save()
 
+
 def filter(df, col, exp):
     return df[col].map(exp)
 
-#xl_consolidate(test_input, test_output)
+
+# xl_consolidate(test_input, test_output)
 # xl = pd.ExcelFile(test_input[0][0])
 # summary = xl.parse(test_input[0][1])
 # products = xl.parse(test_input[1][1])['commodity_name']
@@ -55,10 +66,9 @@ def filter(df, col, exp):
 
 class CMEChecker(object):
     PATTERN_ADV_YTD = 'ADV Y.T.D'
+    INDEX = 'CME_Product_Index'
 
-
-
-    def __init__(self, adv_file, prods_file):
+    def __init__(self, adv_file, prods_file, out_path=None):
         self.adv_file = adv_file
         self.prods_file = prods_file
         self.cols_adv = dtsp.CMEScraper.OUTPUT_COLUMNS
@@ -66,24 +76,22 @@ class CMEChecker(object):
                              self.cols_adv[1]: 'Product Group',
                              self.cols_adv[2]: 'Cleared As'}
         self.cols_prods = list(self.cols_mapping.values()) + ['Globex', 'Sub Group', 'Exchange']
+        self.out_path = out_path if out_path is not None else os.path.dirname(prods_file)
+        self.index = os.path.join(self.out_path, self.INDEX)
 
-
-
-    def __from_adv(self):
+    def __from_adv(self, encoding='utf-8'):
         with open(self.adv_file, 'rb') as fh:
-            df = pd.read_excel(fh)
+            df = pd.read_excel(fh, encoding=encoding)
         headers = list(df.columns.values)
         ytd = dtsp.find_first_n(headers, lambda x: self.PATTERN_ADV_YTD in x)
-        self.cols_adv = self.cols_adv + ytd
+        self.cols_adv.append(ytd)
         df = df[self.cols_adv]
         return df
 
-
-
-    def __from_prods(self, df=None):
+    def __from_prods(self, df=None, encoding='utf-8'):
         if df is None:
             with open(self.prods_file, 'rb') as fh:
-                df = pd.read_excel(fh)
+                df = pd.read_excel(fh, encoding=encoding)
             df.dropna(how='all', inplace=True)
             df.columns = df.iloc[0]
             df.drop(df.head(3).index, inplace=True)
@@ -113,35 +121,82 @@ class CMEChecker(object):
             row[self.cols_prods[0]] = self.__clean_prod_name(row)
             df_prods.iloc[index] = row
 
-        gdf_prods = self.__groupby(df_prods, self.cols_prods[1:2])
 
-        gdf_adv = self.__groupby(df_adv, self.cols_adv[1:2])
-        self.exhibit([gdf_prods, gdf_adv], [self.cols_prods[0], self.cols_adv[0]])
+        #ix = self.setup_prod_ix(df_prods)
+        ix = open_dir(self.index)
+        myquery = And([Term('Product_Group', 'Agriculture'), Term('Cleared_As', 'Futures')])
+        with ix.searcher() as searcher:
+            results = searcher.search(myquery)
+            print(results[0])
+
+
+        gdf_prods = self.__groupby(df_prods, self.cols_prods[1:3])
+        gdf_adv = self.__groupby(df_adv, self.cols_adv[1:3])
+
+
+
+        # self.exhibit([gdf_prods, gdf_adv], [self.cols_prods[0], self.cols_adv[0]])
 
         print()
 
 
+    def __create_schema(self, cols):
+        dt = {col: TEXT(stored=is_stored) for col, is_stored in cols}
+        schema = Schema(**dt)
+        return schema
+
+    def __create_index(self, schema):
+        if not os.path.exists(self.index):
+            os.mkdir(self.index)
+            return create_in(self.index, schema)
+        else:
+            return open_dir(self.index)
+
+    def __index_docs(self, ix, df):
+        wrt = ix.writer()
+        records = df.to_dict('records')
+        for record in records:
+            record = {k: record[k] for k in record if not pd.isnull(record[k])}
+            wrt.add_document(**record)
+        wrt.commit()
 
 
+    def setup_prod_ix(self, df):
+        df.columns = [col.replace(' ', '_') for col in df.columns]
+        fields = [(col, True) for col in df.columns]
+        schema = self.__create_schema(fields)
+        ix = self.__create_index(schema)
+        self.__index_docs(ix, df)
+        return ix
+
+
+    # just for development
     def exhibit(self, gdfs, cols):
         output = os.path.join(checked_path, 'exhibit.xlsx')
-
-        # cdfs = {group: pd.concat([gdf[group][col].sort_values() for gdf, col in zip(gdfs, cols)], axis=1)
-        #         for group in gdfs[0].keys()}
         cdfs = dict()
-        print([list(gdf.keys()) for gdf in gdfs])
-        for group in gdfs[0].keys():
-            dfs = []
-            for gdf, col in zip(gdfs, cols):
-                found_gp = group if group in gdf.keys() \
-                    else dtsp.find_first_n(gdf.keys(), lambda x: SearchHelper.match_initials(group, x) or SearchHelper.match_first_n(group, x))[0]
-                dfs.append(gdf[found_gp][col].sort_values())
-            cc = pd.concat(dfs)
-            cdfs[group] = cc
-
+        for gdf, col in zip(gdfs, cols):
+            for gp in gdf.keys():
+                df_sr = gdf[gp][[col]].sort_values(col).reset_index(drop=True)
+                gp_key = dtsp.find_first_n(cdfs.keys(), lambda x: self.__match_pdgp(gp, x))
+                if not gp_key:
+                    cdfs[gp] = df_sr
+                else:
+                    if col in cdfs[gp_key].columns:
+                        cdfs[gp_key] = pd.merge(cdfs[gp_key], df_sr, how='outer')
+                    else:
+                        cdfs[gp_key] = pd.concat([cdfs[gp_key], df_sr], axis=1)
 
         cp.XlsxWriter.save_sheets(output, cdfs)
         print(output)
+
+    def __match_pdgp(self, s1, s2):
+        wds1 = SearchHelper.get_words(s1)
+        wds2 = SearchHelper.get_words(s2)
+        if len(wds1) == 1 and len(wds2) == 1:
+            return s1 == s2 or SearchHelper.match_sgl_plrl(wds1[0], wds2[0]) or SearchHelper.match_first_n(wds1[0], wds2[0])
+        else:
+            return s1 == s2 or SearchHelper.match_initials(s1, s2) or SearchHelper.match_first_n(s1, s2)
+
 
 
 
@@ -157,41 +212,40 @@ class SearchHelper(object):
         words = SearchHelper.get_words(string)
         initials = list()
         for word in words:
-            if word[0:2] == 'ex':
-                initials.append('x')
+            if word[0:2].lower() == 'ex':
+                initials.append(word[1])
             elif re.match('[A-Za-z]', word[0]):
                 initials.append(word[0])
         return initials
 
     @staticmethod
     def match_initials(s1, s2):
-        return SearchHelper.get_initials(s1) == SearchHelper.get_initials(s2)
+        return ''.join(SearchHelper.get_initials(s1)).lower() == s2.lower() \
+               or ''.join(SearchHelper.get_initials(s2)).lower() == s1.lower()
 
     @staticmethod
     def match_first_n(s1, s2, n=2):
         if len(s1) >= n and len(s2) >= n:
             return s1[0:n] == s2[0:n]
+        elif len(s1) < n:
+            return s1[0:] == s2[0:n]
+        elif len(s2) < n:
+            return s1[0:n] == s2[0:]
+        return False
 
     @staticmethod
     def match_sgl_plrl(s1, s2):
-        if s1 == s2:
-            return True
-        if len(s1) > 2 and len(s2) > 2:
-            if s1[-1] == 'y' and s1[-2] not in SearchHelper.vowels:
-                return s2[-3:] == 'ies'
-            if s2[-1] == 'y' and s2[-2] not in SearchHelper.vowels:
-                return s1[-3:] == 'ies'
-        else:
-            return False
+        p = inflect.engine()
+        return p.plural(s1) == s2
+
 
     @staticmethod
     def match_sgl_plrl_instring(s1, s2):
         words = SearchHelper.get_words(s1)
 
 
-
-# cme_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
-cme_prds_file = os.path.join(checked_path, 'Product Slate Export.xls')
+cme_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
+# cme_prds_file = os.path.join(checked_path, 'Product Slate Export.xls')
 cme_adv_file = os.path.join(checked_path, report_files['cme'])
 
 cme = CMEChecker(cme_adv_file, cme_prds_file)
