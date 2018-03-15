@@ -51,24 +51,15 @@ def find_first_n(arry, condition, n=1):
     return result if len(result) != 1 else result[0]
 
 
-def download(url, filename=None, mode='w+b'):
+def download(url, fh):
     request = urllib.request.Request(url, headers={'User-Agent': USER_AGENT})
-
     try:
         response = urllib.request.urlopen(request)
-        if filename is not None and isinstance(filename, str):
-            with open(filename, mode) as fh:
-                print(('\n[*] Downloading from: {}'.format(url)))
-                fh.write(response.read())
-                print('\n[*] Successfully downloaded to ' + filename)
-        elif filename is None:
-            filename = tempfile.NamedTemporaryFile(mode=mode)
-            print(('\n[*] Downloading from: {}'.format(url)))
-            filename.write(response.read())
-            filename.flush()
-            print('\n[*] Successfully downloaded to ' + filename.name)
-
-        return filename
+        print(('\n[*] Downloading from: {}'.format(url)))
+        fh.write(response.read())
+        fh.flush()
+        print('\n[*] Successfully downloaded to ' + fh.name)
+        return fh
     except urllib.error.HTTPError as e:
         print(e.fp.read())
 
@@ -85,8 +76,10 @@ def swap(a, b):
     b = tmp
     return a, b
 
+
 def to_dict(items, tkey, tval):
     return {tkey(x): tval(x) for x in items}
+
 
 class TxtHelper(object):
     alignment_metric = {'left': lambda x: x[0],
@@ -107,8 +100,7 @@ class TxtHelper(object):
 
     # r1, r2 are dictionaries with (x0, x1) as keys
     @classmethod
-    def merge_2rows(cls, rlonger, rshorter, alignment, atol, merge=None):
-        merge = lambda x1, x2: ' '.join([x1, x2])
+    def merge_2rows(cls, rlonger, rshorter, alignment, atol, merge):
         if len(rlonger) < len(rshorter):
             rlonger, rshorter = swap(rlonger, rshorter)
         func = cls.alignment_metric[alignment]
@@ -163,6 +155,7 @@ class CMEScraper(object):
         self.report_name = None
 
     def download_adv(self, path=None):
+        path = self.pdf_path_adv if path is None else path
         return download(self.URL_ADV, path)
 
     def download_prodslate(self, path=None):
@@ -225,12 +218,12 @@ class CMEScraper(object):
         out, err = subprocess.Popen(["pdftotext", "-layout", pdf, txt]).communicate()
         if err is not None:
             raise RuntimeError(err)
+        print('\n[*] Successfully convert {} to {}'.format(pdf, txt))
         return txt
-
 
     def download_to_xlsx_adv(self, outpath=None):
         outpath = self.xlsx_path_adv if outpath is None else outpath
-        f_pdf = self.download_adv()
+        f_pdf = self.download_adv(tempfile.NamedTemporaryFile())
         f_txt = tempfile.NamedTemporaryFile()
         try:
             self.run_pdftotext_cmd(f_pdf.name, f_txt.name)
@@ -250,8 +243,13 @@ class CMEScraper(object):
         alignment = 'right'
         h1 = headers[0]
         for h2 in headers[1:]:
-            h1 = TxtHelper.merge_2rows(h1, h2, alignment, 2)
+            h1 = TxtHelper.merge_2rows(h1, h2, alignment, 2, self.__merge_headers)
         return heading_cols + h1 + tailing_cols
+
+    def __merge_headers(self, *headers):
+        headers = [h.lstrip()for h in headers]
+        headers = [h.rstrip()for h in headers]
+        return ' '.join(headers)
 
     def __parse_line(self, line, **kwargs):
         kw_pattern = 'pattern'
@@ -266,8 +264,7 @@ class CMEScraper(object):
 
     def __append_to_df(self, df, line, *args):
         line_parsed = self.__parse_line(line, extras=list(args))
-        df = df.append(pd.Series(line_parsed, index=list(df)), ignore_index=True)
-        return df
+        return df.append(pd.Series(line_parsed, index=list(df)), ignore_index=True)
 
     def __text_to_num(self, values):
         pattern = '^-?[\d\.,]+%?$'
@@ -334,10 +331,10 @@ class OSEScraper(object):
         print()
 
 
-download_path = os.getcwd()
+# download_path = os.getcwd()
 # download_path = '/home/slan/Documents/downloads/'
-cme = CMEScraper(download_path)
-cme.download_to_xlsx_adv()
+# cme = CMEScraper(download_path)
+# cme.download_to_xlsx_adv()
 
 
 # ose = OSE(download_path)

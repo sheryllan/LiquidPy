@@ -11,7 +11,8 @@ from whoosh.fields import *
 from whoosh.index import create_in
 from whoosh.index import open_dir
 from whoosh.query import *
-from whoosh.qparser import QueryParser
+from whoosh import qparser
+from whoosh import writing
 
 
 import datascraper as dtsp
@@ -72,12 +73,22 @@ class CMEChecker(object):
         self.adv_file = adv_file
         self.prods_file = prods_file
         self.cols_adv = dtsp.CMEScraper.OUTPUT_COLUMNS
-        self.cols_mapping = {self.cols_adv[0]: 'Product Name',
-                             self.cols_adv[1]: 'Product Group',
-                             self.cols_adv[2]: 'Cleared As'}
-        self.cols_prods = list(self.cols_mapping.values()) + ['Globex', 'Sub Group', 'Exchange']
+
+        self.cols_prods = ['Product Name', 'Product Group', 'Cleared As', 'Clearing', 'Globex', 'Sub Group', 'Exchange']
+        self.cols_mapping = {self.cols_adv[0]: self.cols_prods[0],
+                             self.cols_adv[1]: self.cols_prods[1],
+                             self.cols_adv[2]: self.cols_prods[2]}
+        self.index_fields = {'Product_Name': TEXT(stored=True),
+                             'Product_Group': KEYWORD(stored=True, scorable=True),
+                             'Cleared_As': KEYWORD(stored=True, scorable=True),
+                             'Clearing': ID(stored=True, unique=True),
+                             'Globex':ID(stored=True, unique=True),
+                             'Sub_Group': TEXT(stored=True),
+                             'Exchange':KEYWORD(scorable=True)}
+        self.col2field = {col: col.replace(' ', '_') for col in self.cols_prods}
         self.out_path = out_path if out_path is not None else os.path.dirname(prods_file)
         self.index = os.path.join(self.out_path, self.INDEX)
+
 
     def __from_adv(self, encoding='utf-8'):
         with open(self.adv_file, 'rb') as fh:
@@ -114,60 +125,6 @@ class CMEChecker(object):
                 group_dict[group] = self.__groupby(new_df, cols[1:])
             return group_dict
 
-    def match_prod_code(self):
-        df_adv = self.__from_adv()
-        df_prods = self.__from_prods()
-        for index, row in df_prods.iterrows():
-            row[self.cols_prods[0]] = self.__clean_prod_name(row)
-            df_prods.iloc[index] = row
-
-
-        #ix = self.setup_prod_ix(df_prods)
-        ix = open_dir(self.index)
-        myquery = And([Term('Product_Group', 'Agriculture'), Term('Cleared_As', 'Futures')])
-        with ix.searcher() as searcher:
-            results = searcher.search(myquery)
-            print(results[0])
-
-
-        gdf_prods = self.__groupby(df_prods, self.cols_prods[1:3])
-        gdf_adv = self.__groupby(df_adv, self.cols_adv[1:3])
-
-
-
-        # self.exhibit([gdf_prods, gdf_adv], [self.cols_prods[0], self.cols_adv[0]])
-
-        print()
-
-
-    def __create_schema(self, cols):
-        dt = {col: TEXT(stored=is_stored) for col, is_stored in cols}
-        schema = Schema(**dt)
-        return schema
-
-    def __create_index(self, schema):
-        if not os.path.exists(self.index):
-            os.mkdir(self.index)
-            return create_in(self.index, schema)
-        else:
-            return open_dir(self.index)
-
-    def __index_docs(self, ix, df):
-        wrt = ix.writer()
-        records = df.to_dict('records')
-        for record in records:
-            record = {k: record[k] for k in record if not pd.isnull(record[k])}
-            wrt.add_document(**record)
-        wrt.commit()
-
-
-    def setup_prod_ix(self, df):
-        df.columns = [col.replace(' ', '_') for col in df.columns]
-        fields = [(col, True) for col in df.columns]
-        schema = self.__create_schema(fields)
-        ix = self.__create_index(schema)
-        self.__index_docs(ix, df)
-        return ix
 
 
     # just for development
@@ -196,6 +153,79 @@ class CMEChecker(object):
             return s1 == s2 or SearchHelper.match_sgl_plrl(wds1[0], wds2[0]) or SearchHelper.match_first_n(wds1[0], wds2[0])
         else:
             return s1 == s2 or SearchHelper.match_initials(s1, s2) or SearchHelper.match_first_n(s1, s2)
+
+
+    def match_prod_code(self):
+        df_adv = self.__from_adv()
+        df_prods = self.__from_prods()
+        for index, adv_row in df_prods.iterrows():
+            adv_row[self.cols_prods[0]] = self.__clean_prod_name(adv_row)
+            df_prods.iloc[index] = adv_row
+
+        # gdf_prods = self.__groupby(df_prods, self.cols_prods[1:2])
+        # gdf_adv = self.__groupby(df_adv, self.cols_adv[1:2])
+        # self.exhibit([gdf_prods, gdf_adv], [self.cols_prods[0], self.cols_adv[0]])
+
+        # gdf_prods = self.__groupby(df_prods, self.cols_prods[1:3])
+        # gdf_adv = self.__groupby(df_adv, self.cols_adv[1:3])
+
+        adv_pdgp_col = 'Product Group'
+        adv_clas_col = 'Cleared As'
+        adv_pd_col = 'Product'
+        prods_pdgps = set(df_prods[self.cols_mapping[adv_pdgp_col]])
+        #slate_class = set(df_prods[self.cols_mapping[adv_clas_col]])
+
+        adv_row = df_adv.iloc[49]
+        pdgp = dtsp.find_first_n(prods_pdgps, lambda x: self.__match_pdgp(x, adv_row[adv_pdgp_col]))
+
+        pdgp_field = self.col2field[self.cols_mapping[adv_pdgp_col]]
+        clas_field = self.col2field[self.cols_mapping[adv_clas_col]]
+        pd_field = self.col2field[self.cols_mapping[adv_pd_col]]
+
+        # df_prods.rename(columns=self.col2field, inplace=True)
+        # ix = self.__setup_ix(self.index, self.index_fields, df_prods, False)
+        # docs = list(ix.searcher().documents())
+        ix = open_dir(self.index)
+        # myquery = And([Term(pdgp_field, pdgp), Term(clas_field, adv_row[adv_clas_col]), Term(pd_field, adv_row[adv_pd_col].lower())])
+        #myquery = And([Term(pdgp_field, pdgp), Term(clas_field, adv_row[adv_clas_col])])
+        parser = qparser.QueryParser(pd_field, schema=ix.schema, group=qparser.OrGroup)
+        print(adv_row[adv_pd_col])
+        query = parser.parse(adv_row[adv_pd_col])
+        with ix.searcher() as searcher:
+            results = searcher.search(query)
+            print(results[0])
+
+
+        print()
+
+
+    def __create_index(self, index, fields, clean=False):
+        if (not clean) and os.path.exists(index):
+            return open_dir(index)
+        if not os.path.exists(index):
+            os.mkdir(index)
+        schema = Schema(**fields)
+        return create_in(index, schema)
+
+    def __index_from_df(self, ix, df, clean=False):
+        wrt = ix.writer()
+        records = df.to_dict('records')
+        for record in records:
+            record = {k: record[k] for k in record if not pd.isnull(record[k])}
+            if clean:
+                wrt.add_document(**record)
+            else:
+                wrt.update_document(**record)
+        wrt.commit()
+
+    def __setup_ix(self, ix, fields, df, clean=False):
+        ix = self.__create_index(ix, fields, clean)
+        self.__index_from_df(ix, df, clean)
+        return ix
+
+    def __clear_index(self, ix):
+        wrt = ix.writer()
+        wrt.commit(mergetype=writing.CLEAR)
 
 
 

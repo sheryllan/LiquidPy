@@ -1,8 +1,9 @@
 from bs4 import BeautifulSoup
 import pandas as pd
 import openpyxl
+from openpyxl.cell import get_column_letter
 import os
-from StyleFrame import StyleFrame
+
 
 
 class XmlParser(object):
@@ -39,30 +40,28 @@ class XlsxWriter(object):
         return wrt if override else XlsxWriter.__config_xlwriter(wrt, XlsxWriter.load_xlsx(path))
 
     @staticmethod
-    def to_xlsheet(data, wrt, sheet, columns=None, col_width=None):
+    def to_xlsheet(data, wrt, sheet, columns=None):
         df = pd.DataFrame(data) if columns is None else pd.DataFrame(data, columns=columns)
-        sf = StyleFrame(df)
-        if col_width is None:
-            col_width = {col: max(df[col].astype(str).map(len).max(), len(str(col))) + 1 for col in df.columns}
-        sf.set_column_width_dict(col_width)
-        sf.to_excel(excel_writer=wrt, sheet_name=sheet)
-
-    # @staticmethod
-    # def save_sheets(path, sheet2data, columns=None, override=True):
-    #     wrt = XlsxWriter.create_xlwriter(path, override)
-    #     for sheet, data in list(sheet2data.items()):
-    #         XlsxWriter.to_xlsheet(data, wrt, sheet, columns)
-    #     wrt.save()
-    #     return path
+        df.to_excel(wrt, sheet, index=False)
 
     @staticmethod
-    def save_sheets(path, sheet2data, columns=None, sheet2colwidth=None):
-        wrt = StyleFrame.ExcelWriter(path)
+    def auto_size_cols(ws):
+        i = 0
+        while i < ws.max_column:
+            max_len = max([len(str(row.value)) for row in ws.columns[i]])
+            ws.column_dimensions[get_column_letter(i + 1)].width = max_len + 2
+            i += 1
+
+    @staticmethod
+    def save_sheets(path, sheet2data, columns=None, override=True, auto_size=True):
+        wrt = XlsxWriter.create_xlwriter(path, override)
         for sheet, data in list(sheet2data.items()):
-            width = None if sheet2colwidth is None else sheet2colwidth[sheet]
-            XlsxWriter.to_xlsheet(data, wrt, sheet, columns, width)
+            XlsxWriter.to_xlsheet(data, wrt, sheet, columns)
+            if auto_size:
+                XlsxWriter.auto_size_cols(wrt.sheets[sheet])
         wrt.save()
         return path
+
 
 
 base_path = '/home/slan/Documents/config_files/'
