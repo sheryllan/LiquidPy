@@ -8,6 +8,7 @@ from math import isnan
 
 
 from whoosh.fields import *
+from whoosh.analysis import *
 from whoosh.index import create_in
 from whoosh.index import open_dir
 from whoosh.query import *
@@ -79,15 +80,16 @@ class CMEChecker(object):
                              self.cols_adv[1]: self.cols_prods[1],
                              self.cols_adv[2]: self.cols_prods[2]}
         self.index_fields = {'Product_Name': TEXT(stored=True),
-                             'Product_Group': KEYWORD(stored=True, scorable=True),
+                             'Product_Group': KEYWORD(stored=True, scorable=True, analyzer=FancyAnalyzer()),
                              'Cleared_As': KEYWORD(stored=True, scorable=True),
                              'Clearing': ID(stored=True, unique=True),
-                             'Globex':ID(stored=True, unique=True),
+                             'Globex': ID(stored=True, unique=True),
                              'Sub_Group': TEXT(stored=True),
-                             'Exchange':KEYWORD(scorable=True)}
+                             'Exchange': KEYWORD(scorable=True)}
         self.col2field = {col: col.replace(' ', '_') for col in self.cols_prods}
         self.out_path = out_path if out_path is not None else os.path.dirname(prods_file)
         self.index = os.path.join(self.out_path, self.INDEX)
+        self.matched_file = os.path.join(os.getcwd(), 'CME_matched.xlsx')
 
 
     def __from_adv(self, encoding='utf-8'):
@@ -103,13 +105,15 @@ class CMEChecker(object):
         if df is None:
             with open(self.prods_file, 'rb') as fh:
                 df = pd.read_excel(fh, encoding=encoding)
-            df.dropna(how='all', inplace=True)
+            df.dropna(axis=0, how='all', inplace=True)
             df.columns = df.iloc[0]
             df.drop(df.head(3).index, inplace=True)
             df.reset_index(drop=0, inplace=True)
+            clean_1stcol = pd.Series([self.__clean_prod_name(r, i) for i, r in df.iterrows()], name=self.cols_prods[0])
+            df.update(clean_1stcol)
         return df[self.cols_prods]
 
-    def __clean_prod_name(self, row):
+    def __clean_prod_name(self, row, i):
         product = row[self.cols_prods[0]]
         der_type = row[self.cols_prods[2]]
         return product.replace(der_type, '') if last_word(product) == der_type else product
@@ -155,57 +159,62 @@ class CMEChecker(object):
             return s1 == s2 or SearchHelper.match_initials(s1, s2) or SearchHelper.match_first_n(s1, s2)
 
 
-    def match_prod_code(self):
-        df_adv = self.__from_adv()
-        df_prods = self.__from_prods()
-        for index, adv_row in df_prods.iterrows():
-            adv_row[self.cols_prods[0]] = self.__clean_prod_name(adv_row)
-            df_prods.iloc[index] = adv_row
-
+    def match_prod_code(self, df_adv, df_prods, ix, output=None):
         # gdf_prods = self.__groupby(df_prods, self.cols_prods[1:2])
         # gdf_adv = self.__groupby(df_adv, self.cols_adv[1:2])
         # self.exhibit([gdf_prods, gdf_adv], [self.cols_prods[0], self.cols_adv[0]])
-
         # gdf_prods = self.__groupby(df_prods, self.cols_prods[1:3])
         # gdf_adv = self.__groupby(df_adv, self.cols_adv[1:3])
 
-        adv_pdgp_col = 'Product Group'
-        adv_clas_col = 'Cleared As'
-        adv_pd_col = 'Product'
+        adv_pd_col = self.cols_adv[0]
+        adv_pdgp_col = self.cols_adv[1]
+        adv_clas_col = self.cols_adv[2]
+
         prods_pdgps = set(df_prods[self.cols_mapping[adv_pdgp_col]])
-        #slate_class = set(df_prods[self.cols_mapping[adv_clas_col]])
-
-        adv_row = df_adv.iloc[49]
-        pdgp = dtsp.find_first_n(prods_pdgps, lambda x: self.__match_pdgp(x, adv_row[adv_pdgp_col]))
-
         pdgp_field = self.col2field[self.cols_mapping[adv_pdgp_col]]
         clas_field = self.col2field[self.cols_mapping[adv_clas_col]]
         pd_field = self.col2field[self.cols_mapping[adv_pd_col]]
 
-        # df_prods.rename(columns=self.col2field, inplace=True)
-        # ix = self.__setup_ix(self.index, self.index_fields, df_prods, False)
-        # docs = list(ix.searcher().documents())
-        ix = open_dir(self.index)
-        # myquery = And([Term(pdgp_field, pdgp), Term(clas_field, adv_row[adv_clas_col]), Term(pd_field, adv_row[adv_pd_col].lower())])
-        #myquery = And([Term(pdgp_field, pdgp), Term(clas_field, adv_row[adv_clas_col])])
-        parser = qparser.QueryParser(pd_field, schema=ix.schema, group=qparser.OrGroup)
-        print(adv_row[adv_pd_col])
-        query = parser.parse(adv_row[adv_pd_col])
+        df_matched = pd.DataFrame(columns=list(df_adv.columns) + ix.schema.names())
         with ix.searcher() as searcher:
-            results = searcher.search(query)
-            print(results[0])
+            for i, row in df_adv.iterrows():
+                pdgp = dtsp.find_first_n(prods_pdgps, lambda x: self.__match_pdgp(x, row[adv_pdgp_col]))
+                grouping_q = And([Term(pdgp_field, pdgp), Term(clas_field, row[adv_clas_col])])
+                parser = qparser.QueryParser(pd_field, schema=ix.schema)
+                query = parser.parse(row[adv_pd_col])
+                results = searcher.search(query, filter=grouping_q, limit=None)
+                if results:
+                    hit = results[0].fields()
+                    row_matched = {**row, **hit}
+                else:
+                    row_matched = row
+                df_matched = df_matched.append(row_matched, ignore_index=True)
+        output = self.matched_file if output is None else output
+        cp.XlsxWriter.save_sheets(output, {'adv vs prods': df_matched})
 
 
-        print()
 
 
-    def __create_index(self, index, fields, clean=False):
-        if (not clean) and os.path.exists(index):
-            return open_dir(index)
-        if not os.path.exists(index):
-            os.mkdir(index)
+    def mark_recorded(self):
+        pass
+
+    def run_pd_chck(self, clean=False):
+        df_adv = cme.__from_adv()
+        df_prods = self.__from_prods()
+
+        # df_ix = df_prods.rename(columns=self.col2field)
+        # ix = self.__setup_ix(self.index, self.index_fields, df_ix, clean)
+        ix = open_dir(self.index)
+
+        self.match_prod_code(df_adv, df_prods, ix)
+
+    def __create_index(self, ix_path, fields, clean=False):
+        if (not clean) and os.path.exists(ix_path):
+            return open_dir(ix_path)
+        if not os.path.exists(ix_path):
+            os.mkdir(ix_path)
         schema = Schema(**fields)
-        return create_in(index, schema)
+        return create_in(ix_path, schema)
 
     def __index_from_df(self, ix, df, clean=False):
         wrt = ix.writer()
@@ -218,8 +227,9 @@ class CMEChecker(object):
                 wrt.update_document(**record)
         wrt.commit()
 
-    def __setup_ix(self, ix, fields, df, clean=False):
-        ix = self.__create_index(ix, fields, clean)
+    def __setup_ix(self, fields, df, ix_path=None, clean=False):
+        ix_path = self.index if ix_path is None else ix_path
+        ix = self.__create_index(ix_path, fields, clean)
         self.__index_from_df(ix, df, clean)
         return ix
 
@@ -279,4 +289,25 @@ cme_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
 cme_adv_file = os.path.join(checked_path, report_files['cme'])
 
 cme = CMEChecker(cme_adv_file, cme_prds_file)
-cme.match_prod_code()
+cme.run_pd_chck(False)
+
+
+prod = 'RENMINBI CHINESE/USD FF'
+pdgp = 'FX'
+ca = 'Futures'
+pdgp_field = 'Product_Group'
+clas_field = 'Cleared_As'
+pd_field = 'Product_Name'
+ix = open_dir(cme.index)
+with ix.searcher() as searcher:
+    grouping_q = And([Term(pdgp_field, pdgp), Term(clas_field, ca)])
+    parser = qparser.QueryParser(pd_field, schema=ix.schema)
+    query = parser.parse(prod)
+    results = searcher.search(query, filter=grouping_q, limit=None)
+    # results = searcher.search(grouping_q, limit=None)
+    if results:
+        # hit = results[0].fields()
+        rs = [r.fields() for r in results]
+        print(pd.DataFrame(rs))
+
+    print()
