@@ -11,6 +11,7 @@ import pandas as pd
 import tabula
 from bs4 import BeautifulSoup
 from PyPDF2 import PdfFileReader
+import jaconv
 
 import configparser
 
@@ -79,6 +80,15 @@ def swap(a, b):
 
 def to_dict(items, tkey, tval):
     return {tkey(x): tval(x) for x in items}
+
+
+def run_pdftotext_cmd(pdf, txt=None):
+        txt = re.sub('\.pdf$', pdf, '.txt') if txt is None else txt
+        out, err = subprocess.Popen(["pdftotext", "-layout", pdf, txt]).communicate()
+        if err is not None:
+            raise RuntimeError(err)
+        print('\n[*] Successfully convert {} to {}'.format(pdf, txt))
+        return txt
 
 
 class TxtHelper(object):
@@ -213,20 +223,14 @@ class CMEScraper(object):
         outpath = self.xlsx_path_adv if outpath is None else outpath
         return configparser.XlsxWriter.save_sheets(outpath, {self.report_name: table})
 
-    def run_pdftotext_cmd(self, pdf, txt=None):
-        txt = re.sub('\.pdf$', pdf, '.txt') if txt is None else txt
-        out, err = subprocess.Popen(["pdftotext", "-layout", pdf, txt]).communicate()
-        if err is not None:
-            raise RuntimeError(err)
-        print('\n[*] Successfully convert {} to {}'.format(pdf, txt))
-        return txt
+
 
     def download_to_xlsx_adv(self, outpath=None):
         outpath = self.xlsx_path_adv if outpath is None else outpath
         f_pdf = self.download_adv(tempfile.NamedTemporaryFile())
         f_txt = tempfile.NamedTemporaryFile()
         try:
-            self.run_pdftotext_cmd(f_pdf.name, f_txt.name)
+            run_pdftotext_cmd(f_pdf.name, f_txt.name)
             self.to_xlsx_adv(f_pdf.name, f_txt.name, outpath)
         finally:
             f_pdf.close()
@@ -287,13 +291,17 @@ class OSEScraper(object):
     URL_VOLUME = URL_OSE + '/english/markets/statistics-derivatives/trading-volume/01.html'
 
     PDF_ADV = 'OSE_Average_Daily_Volume.pdf'
+    CSV_ADV = 'OSE_Average_Daily_Volume.csv'
+    TXT_ADV = 'OSE_Average_Daily_Volume.txt'
 
     YEAR_INTERESTED = '2017'
     TABLE_TITLE = 'Year'
 
-    def __init__(self, download_path):
-        self.download_path = download_path
-        self.full_path_adv = os.path.join(self.download_path, self.PDF_ADV)
+    def __init__(self, download_path=None):
+        self.download_path = os.getcwd() if download_path is None else download_path
+        self.pdf_path_adv = os.path.join(self.download_path, self.PDF_ADV)
+        self.csv_path_adv = os.path.join(self.download_path, self.CSV_ADV)
+        self.txt_path_adv = os.path.join(self.download_path, self.TXT_ADV)
 
     def find_report_url(self):
         soup = make_soup(self.URL_VOLUME)
@@ -314,8 +322,9 @@ class OSEScraper(object):
         file_url = find_first_n(links, lambda x: re.match(pattern, x))
         return self.URL_OSE + file_url
 
-    def download_adv(self):
-        download(self.find_report_url(), self.full_path_adv)
+    def download_adv(self, path=None):
+        path = self.pdf_path_adv if path is None else path
+        return download(self.find_report_url(), path)
 
     def get_indexes(self, arry, condition):
         return [i for i, a in enumerate(arry) if condition(a)]
@@ -324,11 +333,40 @@ class OSEScraper(object):
     def filter_table(self, tables, title):
         return [tbl for tbl in tables if tbl.find(TR_TAB).find(TH_TAB, text=title)][0]
 
+    def parse_from_txt(self, txt_path=None):
+        txt_path = self.txt_path_adv if txt_path is None else txt_path
+        with open(txt_path) as fh:
+            lines = fh.readlines()
+            pattern_data = '([A-Za-z0-9\(\)\.%&,-]+( [A-Za-z0-9\(\)\.%&,-]+)*)+'
+        if lines:
+            for line in lines:
+                ln = jaconv.z2h(line, kana=False, digit=True, ascii=True)
+                mobj = re.match(pattern_data, ln)
+                if mobj:
+                    print(mobj.group())
 
-    def tabula_parse(self):
-        # tabula.convert_into(self.full_path_adv, 'OSE_ADV.csv', output_format='csv', pages='all')
-        df = tabula.read_pdf(self.full_path_adv, pages=2)
-        print()
+        else:
+            return None
+
+
+    def tabula_parse(self, infile=None, outfile=None):
+        infile = self.pdf_path_adv if infile is None else infile
+        outfile = self.CSV_ADV if outfile is None else outfile
+        tabula.convert_into(infile, outfile, output_format='csv', pages='all')
+        # df = tabula.read_pdf(self.pdf_path_adv, pages=2)
+        print('\n[*] Successfully convert {} to {}'.format(infile, outfile))
+
+    def download_to_xlsx_adv(self, outpath=None):
+        outpath = self.csv_path_adv if outpath is None else outpath
+        f_pdf = self.download_adv(tempfile.NamedTemporaryFile())
+        f_txt = tempfile.NamedTemporaryFile()
+        try:
+            run_pdftotext_cmd(f_pdf.name, f_txt.name)
+            self.parse_from_txt(f_txt.name)
+            # self.tabula_parse(f_pdf.name, outpath)
+        finally:
+            f_pdf.close()
+
 
 
 # download_path = os.getcwd()
@@ -337,7 +375,9 @@ class OSEScraper(object):
 # cme.download_to_xlsx_adv()
 
 
-# ose = OSE(download_path)
+
+ose = OSEScraper()
+ose.download_to_xlsx_adv()
 # ose.download_adv()
 # ose.parse_pdf_adv()
 # ose.tabula_parse()

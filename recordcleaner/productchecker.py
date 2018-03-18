@@ -24,8 +24,8 @@ import datascraper as dtsp
 
 reports_path = '/home/slan/Documents/exch_report/'
 configs_path = '/home/slan/Documents/config_files/'
-checked_path = '/home/slan/Documents/checked_report/'
-# checked_path = os.getcwd()
+# checked_path = '/home/slan/Documents/checked_report/'
+checked_path = os.getcwd()
 
 exchanges = ['asx', 'bloomberg', 'cme', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
 report_fmtname = '_Average_Daily_Volume.xlsx'
@@ -75,7 +75,7 @@ class CMEChecker(object):
         self.prods_file = prods_file
         self.cols_adv = dtsp.CMEScraper.OUTPUT_COLUMNS
 
-        self.cols_prods = ['Product Name', 'Product Group', 'Cleared As', 'Clearing', 'Globex', 'Sub Group', 'Exchange']
+        self.cols_prods = ['Product Name', 'Product Group', 'Cleared As', 'Clearing', 'Globex', 'Sub Group', 'Exchange', 'Matched']
         self.cols_mapping = {self.cols_adv[0]: self.cols_prods[0],
                              self.cols_adv[1]: self.cols_prods[1],
                              self.cols_adv[2]: self.cols_prods[2]}
@@ -85,7 +85,8 @@ class CMEChecker(object):
                              'Clearing': ID(stored=True, unique=True),
                              'Globex': ID(stored=True, unique=True),
                              'Sub_Group': TEXT(stored=True),
-                             'Exchange': KEYWORD(scorable=True)}
+                             'Exchange': KEYWORD(scorable=True),
+                             'Matched': BOOLEAN(stored=True)}
         self.col2field = {col: col.replace(' ', '_') for col in self.cols_prods}
         self.out_path = out_path if out_path is not None else os.path.dirname(prods_file)
         self.index = os.path.join(self.out_path, self.INDEX)
@@ -108,9 +109,11 @@ class CMEChecker(object):
             df.dropna(axis=0, how='all', inplace=True)
             df.columns = df.iloc[0]
             df.drop(df.head(3).index, inplace=True)
+            df = df[df[self.cols_prods[0]] != np.nan]
             df.reset_index(drop=0, inplace=True)
             clean_1stcol = pd.Series([self.__clean_prod_name(r, i) for i, r in df.iterrows()], name=self.cols_prods[0])
             df.update(clean_1stcol)
+            df[self.cols_prods[-1]] = pd.Series(np.repeat(False, len(df.index)), index=df.index)
         return df[self.cols_prods]
 
     def __clean_prod_name(self, row, i):
@@ -174,25 +177,66 @@ class CMEChecker(object):
         pdgp_field = self.col2field[self.cols_mapping[adv_pdgp_col]]
         clas_field = self.col2field[self.cols_mapping[adv_clas_col]]
         pd_field = self.col2field[self.cols_mapping[adv_pd_col]]
+        mcth_field = self.col2field[self.cols_prods[-1]]
+
+        for doc in ix.searcher().documents():
+            print(doc)
 
         df_matched = pd.DataFrame(columns=list(df_adv.columns) + ix.schema.names())
         with ix.searcher() as searcher:
             for i, row in df_adv.iterrows():
                 pdgp = dtsp.find_first_n(prods_pdgps, lambda x: self.__match_pdgp(x, row[adv_pdgp_col]))
-                grouping_q = And([Term(pdgp_field, pdgp), Term(clas_field, row[adv_clas_col])])
-                parser = qparser.QueryParser(pd_field, schema=ix.schema)
-                query = parser.parse(row[adv_pd_col])
+                grouping_q = And([Term(pdgp_field, pdgp), Term(clas_field, row[adv_clas_col]), Term(mcth_field, False)])
+                query = self.__exact_and_query(pd_field, ix.schema, row[adv_pd_col])
                 results = searcher.search(query, filter=grouping_q, limit=None)
                 if results:
-                    hit = results[0].fields()
-                    row_matched = {**row, **hit}
+                    row_matched, hit = self.__join_best_result(results, row)
+                    hit[mcth_field] = True
+                    self.__update_doc(ix, hit)
+                    inresults = searcher.search(Term(mcth_field, True))
+
                 else:
-                    row_matched = row
+                    query = self.__fuzzy_and_query(pd_field, ix.schema, row[adv_pd_col])
+                    results = searcher.search(query, filter=grouping_q, limit=None)
+                    if results:
+                        row_matched = self.__join_best_result(results, row)
+                    else:
+                        query = self.__exact_or_query(pd_field, ix.schema, row[adv_pd_col])
+                        results = searcher.search(query, filter=grouping_q, limit=None)
+                        if results:
+                            row_matched = self.__join_best_result(results, row)
+                        else:
+                            row_matched = row
                 df_matched = df_matched.append(row_matched, ignore_index=True)
         output = self.matched_file if output is None else output
         cp.XlsxWriter.save_sheets(output, {'adv vs prods': df_matched})
 
+    def __join_best_result(self, results, *dfs):
+        joined_dict = results[0].fields()
+        for df in dfs:
+            joined_dict.update(df)
+        return joined_dict, results[0].fields()
 
+
+    def __exact_and_query(self, field, schema, text):
+        parser = qparser.QueryParser(field, schema=schema)
+        return parser.parse(text)
+
+    def __fuzzy_and_query(self, field, schema, text, maxdist=2, prefixlength=1):
+        parser = qparser.QueryParser(field, schema=schema)
+        query = parser.parse(text)
+        fuzzy_terms = And([FuzzyTerm(f, t, maxdist=maxdist, prefixlength=prefixlength) for f, t in query.iter_all_terms()])
+        return fuzzy_terms
+
+    def __exact_or_query(self, field, schema, text):
+        og = qparser.OrGroup.factory(0.9)
+        parser = qparser.QueryParser(field, schema=schema, group=og)
+        return parser.parse(text)
+
+    def __update_doc(self, ix, doc):
+        wrt = ix.writer()
+        wrt.update_document(**doc)
+        wrt.commit()
 
 
     def mark_recorded(self):
@@ -202,9 +246,9 @@ class CMEChecker(object):
         df_adv = cme.__from_adv()
         df_prods = self.__from_prods()
 
-        # df_ix = df_prods.rename(columns=self.col2field)
-        # ix = self.__setup_ix(self.index, self.index_fields, df_ix, clean)
-        ix = open_dir(self.index)
+        df_ix = df_prods.rename(columns=self.col2field)
+        ix = self.__setup_ix(self.index_fields, df_ix, self.index, clean)
+        # ix = open_dir(self.index)
 
         self.match_prod_code(df_adv, df_prods, ix)
 
@@ -279,20 +323,15 @@ class SearchHelper(object):
         return p.plural(s1) == s2
 
 
-    @staticmethod
-    def match_sgl_plrl_instring(s1, s2):
-        words = SearchHelper.get_words(s1)
-
 
 cme_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
 # cme_prds_file = os.path.join(checked_path, 'Product Slate Export.xls')
 cme_adv_file = os.path.join(checked_path, report_files['cme'])
 
 cme = CMEChecker(cme_adv_file, cme_prds_file)
-cme.run_pd_chck(False)
+# cme.run_pd_chck(False)
 
-
-prod = 'RENMINBI CHINESE/USD FF'
+prod = 'NEW ZEALND DOLLAR'
 pdgp = 'FX'
 ca = 'Futures'
 pdgp_field = 'Product_Group'
@@ -303,8 +342,10 @@ with ix.searcher() as searcher:
     grouping_q = And([Term(pdgp_field, pdgp), Term(clas_field, ca)])
     parser = qparser.QueryParser(pd_field, schema=ix.schema)
     query = parser.parse(prod)
-    results = searcher.search(query, filter=grouping_q, limit=None)
-    # results = searcher.search(grouping_q, limit=None)
+    ts = query.iter_all_terms()
+    fuzzy_terms = And([FuzzyTerm(f, t, maxdist=2, prefixlength=1) for f, t in ts])
+    # results = searcher.search(query, filter=grouping_q, limit=None)
+    results = searcher.search(grouping_q, limit=None)
     if results:
         # hit = results[0].fields()
         rs = [r.fields() for r in results]
