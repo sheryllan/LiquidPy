@@ -376,8 +376,8 @@ class OSEScraper(object):
 
 
 
-ose = OSEScraper()
-ose.download_to_xlsx_adv()
+# ose = OSEScraper()
+# ose.download_to_xlsx_adv()
 # ose.download_adv()
 # ose.parse_pdf_adv()
 # ose.tabula_parse()
