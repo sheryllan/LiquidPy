@@ -201,8 +201,8 @@ class CMEScraper(object):
         product_groups = self.read_pdf_metadata(pdf_path)
         with open(txt_path) as fh:
             lines = fh.readlines()
-            pattern_data = '^((([\w\(\)\.%&,-]+) )+ {2,})+.*$'
-            pattern_headers = '^ +((([\w\(\)\.%&,-]+) )+ {2,}){2,}.*$'
+            pattern_data = '^(((\S+) )+ {2,})+.*$'
+            pattern_headers = '^ +(((\S+) )+ {2,}){2,}.*$'
         if lines:
             header_line = find_first_n(lines, lambda x: re.match(pattern_headers, x) is not None, 2)
             df = pd.DataFrame(columns=self.__get_output_headers(header_line))
@@ -238,7 +238,7 @@ class CMEScraper(object):
 
 
     def __get_output_headers(self, pdf_headers, pattern=None):
-        pattern = '([\w\(\)\.%&,-]+( [\w\(\)\.%&,-]+)*)+' if pattern is None else pattern
+        pattern = '(\S+( \S+)*)+' if pattern is None else pattern
         heading_cols = self.OUTPUT_COLUMNS[0:1]
         tailing_cols = self.OUTPUT_COLUMNS[1:3]
         to_cord = lambda mobj: (mobj.start(), mobj.end())
@@ -337,11 +337,11 @@ class OSEScraper(object):
         txt_path = self.txt_path_adv if txt_path is None else txt_path
         with open(txt_path) as fh:
             lines = fh.readlines()
-            pattern_data = '([A-Za-z0-9\(\)\.%&,-]+( [A-Za-z0-9\(\)\.%&,-]+)*)+'
+            pattern_data = '([A-Za-z0-9/\(\)\.%&$,-]+( [A-Za-z0-9/\(\)\.%&$,-]+)*)+'
         if lines:
             for line in lines:
                 ln = jaconv.z2h(line, kana=False, digit=True, ascii=True)
-                mobj = re.match(pattern_data, ln)
+                mobj = re.search(pattern_data, ln)
                 if mobj:
                     print(mobj.group())
 
@@ -376,8 +376,8 @@ class OSEScraper(object):
 
 
 
-# ose = OSEScraper()
-# ose.download_to_xlsx_adv()
+ose = OSEScraper()
+ose.download_to_xlsx_adv()
 # ose.download_adv()
 # ose.parse_pdf_adv()
 # ose.tabula_parse()
