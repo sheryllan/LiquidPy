@@ -24,13 +24,13 @@ import datascraper as dtsp
 
 reports_path = '/home/slan/Documents/exch_report/'
 configs_path = '/home/slan/Documents/config_files/'
-checked_path = '/home/slan/Documents/checked_report/'
-# checked_path = os.getcwd()
+# checked_path = '/home/slan/Documents/checked_report/'
+checked_path = os.getcwd()
 
-exchanges = ['asx', 'bloomberg', 'cme', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
-report_fmtname = '_Average_Daily_Volume.xlsx'
+exchanges = ['asx', 'bloomberg', 'cme', 'cbot', 'nymex_comex', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
+report_fmtname = 'Web_ADV_Report_{}.xlsx'
 
-report_files = {e: e.upper() + report_fmtname for e in exchanges}
+report_files = {e: report_fmtname.format(e.upper()) for e in exchanges}
 
 
 # config_files = {e: e + '.xlsx' for e in exchanges}
@@ -66,16 +66,29 @@ def filter(df, col, exp):
 # print((summary[list(filter(summary, 'Globex',  exp))].head()))
 
 
-class CMEChecker(object):
+class CMEGChecker(object):
     PATTERN_ADV_YTD = 'ADV Y.T.D'
-    INDEX = 'CME_Product_Index'
+    INDEX_CME = 'CME_Product_Index'
+    INDEX_CBOT = 'CBOT_Product_Index'
+    CME = 'CME'
+    CBOT = 'CBOT'
+    NYMEX = 'NYMEX'
+    COMEX = 'COMEX'
+    EXCH = 'Exchange'
+    COMMODITY = 'Commodity'
+    GLOBEX = 'Globex'
+    CLEARING = 'Clearing'
 
-    def __init__(self, adv_file, prods_file, out_path=None):
-        self.adv_file = adv_file
+    def __init__(self, adv_files, prods_file, out_path=None):
+        self.adv_files = adv_files
+        self.adv_cme = dtsp.find_first_n(adv_files, lambda x: self.CME.lower() in x.lower())
+        self.adv_cbot = dtsp.find_first_n(adv_files, lambda x: self.CBOT.lower() in x.lower())
+        self.adv_nymex_comex = dtsp.find_first_n(adv_files, lambda x: self.NYMEX.lower() in x.lower())
+
         self.prods_file = prods_file
-        self.cols_adv = dtsp.CMEScraper.OUTPUT_COLUMNS
+        self.cols_adv = dtsp.CMEGScraper.OUTPUT_COLUMNS
 
-        self.cols_prods = ['Product Name', 'Product Group', 'Cleared As', 'Clearing', 'Globex', 'Sub Group', 'Matched']
+        self.cols_prods = ['Product Name', 'Product Group', 'Cleared As', 'Clearing', 'Globex', 'Sub Group', 'Exchange', 'Matched']
         self.cols_mapping = {self.cols_adv[0]: self.cols_prods[0],
                              self.cols_adv[1]: self.cols_prods[1],
                              self.cols_adv[2]: self.cols_prods[2]}
@@ -85,25 +98,28 @@ class CMEChecker(object):
                              'Clearing': ID(stored=True, unique=True),
                              'Globex': ID(stored=True, unique=True),
                              'Sub_Group': TEXT(stored=True),
+                             'Exchange': KEYWORD,
                              'Matched': BOOLEAN(stored=True)}
         self.col2field = {col: col.replace(' ', '_') for col in self.cols_prods}
         self.out_path = out_path if out_path is not None else os.path.dirname(prods_file)
-        self.index = os.path.join(self.out_path, self.INDEX)
+
+        self.index_cme = os.path.join(self.out_path, self.INDEX_CME)
+        self.index_cbot = os.path.join(self.out_path, self.INDEX_CBOT)
         self.matched_file = os.path.join(os.getcwd(), 'CME_matched.xlsx')
 
-
-    def __from_adv(self, encoding='utf-8'):
-        with open(self.adv_file, 'rb') as fh:
+    def __from_adv(self, filename, cols=None, encoding='utf-8'):
+        with open(filename, 'rb') as fh:
             df = pd.read_excel(fh, encoding=encoding)
         headers = list(df.columns.values)
         ytd = dtsp.find_first_n(headers, lambda x: self.PATTERN_ADV_YTD in x)
         self.cols_adv.append(ytd)
-        df = df[self.cols_adv]
+        cols = self.cols_adv if cols is None else cols
+        df = df[cols]
         return df
 
-    def __from_prods(self, df=None, encoding='utf-8'):
+    def __from_prods(self, filename, df=None, encoding='utf-8'):
         if df is None:
-            with open(self.prods_file, 'rb') as fh:
+            with open(filename, 'rb') as fh:
                 df = pd.read_excel(fh, encoding=encoding)
             df.dropna(axis=0, how='all', inplace=True)
             df.columns = df.iloc[0]
@@ -161,7 +177,7 @@ class CMEChecker(object):
             return s1 == s2 or SearchHelper.match_initials(s1, s2) or SearchHelper.match_first_n(s1, s2)
 
 
-    def match_prod_code(self, df_adv, df_prods, ix, output=None):
+    def match_prod_code(self, df_adv, df_prods, ix):
         # gdf_prods = self.__groupby(df_prods, self.cols_prods[1:2])
         # gdf_adv = self.__groupby(df_adv, self.cols_adv[1:2])
         # self.exhibit([gdf_prods, gdf_adv], [self.cols_prods[0], self.cols_adv[0]])
@@ -196,17 +212,29 @@ class CMEChecker(object):
                         query = self.__exact_or_query(pd_field, ix.schema, row[adv_pd_col])
                         results = searcher.search(query, filter=grouping_q, limit=None)
                         if results:
-                            row_matched = self.__after_hit_results(results, {mcth_field: True}, ix, row)
+                            row_matched = self.__after_hit_results(results, {mcth_field: True}, ix, row, False)
                         else:
                             row_matched = row
                 df_matched = df_matched.append(row_matched, ignore_index=True)
-        output = self.matched_file if output is None else output
-        cp.XlsxWriter.save_sheets(output, {'adv vs prods': df_matched})
+                if row_matched == row:
+                    print('Failed matching {}'.format(row[adv_pd_col]))
+                else:
+                    print('Successful matching {} with {}'.format(row[adv_pd_col], row_matched[pd_field]))
+        return df_matched
 
-    def __after_hit_results(self, results, updates, ix, row):
+    def __chk_prodcode_matched(self, prods, adv):
+        df_prods, col_prods = prods
+        df_adv, col_adv = adv
+
+        unmatched = [entry for entry in df_adv[col_adv] if entry not in df_prods[col_prods].unique()]
+        j = [entry for entry in unmatched if entry not in df_prods[self.CLEARING].unique()]
+        return any(entry not in df_prods[self.CLEARING].unique() for entry in unmatched)
+
+    def __after_hit_results(self, results, updates, ix, row, mark=True):
         row_joined, hit = self.__join_best_result(results, row)
-        hit.update(updates)
-        self.__update_doc(ix, hit)
+        if mark:
+            hit.update(updates)
+            self.__update_doc(ix, hit)
         return row_joined
 
 
@@ -242,15 +270,29 @@ class CMEChecker(object):
     def mark_recorded(self):
         pass
 
-    def run_pd_chck(self, clean=False):
-        df_adv = cme.__from_adv()
-        df_prods = self.__from_prods()
+    def run_pd_chck(self, outpath=None, clean=False):
+        dfs_adv = {self.CME: self.__from_adv(self.adv_cme, self.cols_adv),
+                   self.CBOT: self.__from_adv(self.adv_cbot, self.cols_adv),
+                   self.NYMEX: self.__from_adv(self.adv_nymex_comex, self.cols_adv + [self.COMMODITY])}
+
+        df_prods = self.__from_prods(self.prods_file)
 
         df_ix = df_prods.rename(columns=self.col2field)
-        ix = self.__setup_ix(self.index_fields, df_ix, self.index, clean)
-        # ix = open_dir(self.index)
+        gdf_exch = self.__groupby(df_ix, [self.EXCH])
 
-        self.match_prod_code(df_adv, df_prods, ix)
+        df_nymex_comex_prods = gdf_exch[self.NYMEX].append(gdf_exch[self.COMEX])
+        if self.__chk_prodcode_matched((df_nymex_comex_prods, self.GLOBEX), (dfs_adv[self.NYMEX], self.COMMODITY)):
+            cp.XlsxWriter.save_sheets(self.matched_file, {self.NYMEX: dfs_adv[self.NYMEX]}, override=False)
+
+        ix_cme = self.__setup_ix(self.index_fields, gdf_exch[self.CME], self.index_cme, clean)
+        ix_cbot = self.__setup_ix(self.index_fields, gdf_exch[self.CBOT], self.index_cbot, clean)
+
+        mdf_cme = self.match_prod_code(dfs_adv[self.CME], gdf_exch[self.CME], ix_cme)
+        mdf_cbot = self.match_prod_code(dfs_adv[self.CBOT], gdf_exch[self.CBOT], ix_cbot)
+
+        outpath = self.matched_file if outpath is None else outpath
+        cp.XlsxWriter.save_sheets(outpath, {self.CME: mdf_cme, self.CBOT: mdf_cbot}, override=False)
+
 
     def __create_index(self, ix_path, fields, clean=False):
         if (not clean) and os.path.exists(ix_path):
@@ -272,7 +314,7 @@ class CMEChecker(object):
         wrt.commit()
 
     def __setup_ix(self, fields, df, ix_path=None, clean=False):
-        ix_path = self.index if ix_path is None else ix_path
+        ix_path = self.index_cme if ix_path is None else ix_path
         ix = self.__create_index(ix_path, fields, clean)
         self.__index_from_df(ix, df, clean)
         return ix
@@ -326,9 +368,11 @@ class SearchHelper(object):
 
 cme_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
 # cme_prds_file = os.path.join(checked_path, 'Product Slate Export.xls')
-cme_adv_file = os.path.join(checked_path, report_files['cme'])
+cme_adv_files = [os.path.join(checked_path, report_files['cme']),
+                 os.path.join(checked_path, report_files['cbot']),
+                 os.path.join(checked_path, report_files['nymex_comex'])]
 
-cme = CMEChecker(cme_adv_file, cme_prds_file)
+cme = CMEGChecker(cme_adv_files, cme_prds_file)
 cme.run_pd_chck(False)
 
 # prod = 'NEW ZEALND DOLLAR'

@@ -15,7 +15,6 @@ import jaconv
 
 import configparser
 
-
 USER_AGENT = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.0.7; X11; Linux x86_64) ' \
              'Gecko/2009021910 Firefox/3.0.7 Chrome/23.0.1271.64 Safari/537.11'
 TABLE_TAB = 'table'
@@ -71,6 +70,7 @@ def make_soup(url):
     soup = BeautifulSoup(html, 'html.parser')
     return soup
 
+
 def swap(a, b):
     tmp = a
     a = b
@@ -82,29 +82,34 @@ def to_dict(items, tkey, tval):
     return {tkey(x): tval(x) for x in items}
 
 
+def rreplace(s, old, new, occurrence):
+    li = s.rsplit(old, occurrence)
+    return new.join(li)
+
+
 def run_pdftotext_cmd(pdf, txt=None):
-        txt = re.sub('\.pdf$', pdf, '.txt') if txt is None else txt
-        out, err = subprocess.Popen(["pdftotext", "-layout", pdf, txt]).communicate()
-        if err is not None:
-            raise RuntimeError(err)
-        print('\n[*] Successfully convert {} to {}'.format(pdf, txt))
-        return txt
+    txt = re.sub('\.pdf$', pdf, '.txt') if txt is None else txt
+    out, err = subprocess.Popen(["pdftotext", "-layout", pdf, txt]).communicate()
+    if err is not None:
+        raise RuntimeError(err)
+    print('\n[*] Successfully convert {} to {}'.format(pdf, txt))
+    return txt
 
 
 class TxtHelper(object):
     alignment_metric = {'left': lambda x: x[0],
                         'right': lambda x: x[1],
-                        'centre': lambda x: (x[0] + x[1])/2}
+                        'centre': lambda x: (x[0] + x[1]) / 2}
 
     alignment_func = {'left': lambda cord1, cord2: abs(cord1[0] - cord2[0]),
                       'right': lambda cord1, cord2: abs(cord1[1] - cord2[1]),
-                      'centre': lambda cord1, cord2: abs((cord1[0] + cord1[1])/2 - (cord2[0] + cord2[1])/2)}
+                      'centre': lambda cord1, cord2: abs((cord1[0] + cord1[1]) / 2 - (cord2[0] + cord2[1]) / 2)}
 
     @classmethod
     def which_alignment(cls, cord1, cord2):
         left = abs(cord1[0] - cord2[0])
         right = abs(cord1[1] - cord2[1])
-        centre = abs((cord1[0] + cord1[1])/2 - (cord2[0] + cord2[1])/2)
+        centre = abs((cord1[0] + cord1[1]) / 2 - (cord2[0] + cord2[1]) / 2)
         offsets = {left: 'left', right: 'right', centre: 'centre'}
         return offsets[min(offsets)]
 
@@ -140,37 +145,33 @@ class TxtHelper(object):
         return [v for k, v in sorted(merged.items(), key=lambda x: func(x[0]))]
 
 
+class CMEGScraper(object):
+    PDF_SUFFIX = '.pdf'
+    TXT_SUFFIX = '.txt'
+    XLSX_SUFFIX = '.xlsx'
 
-class CMEScraper(object):
-    URL_ADV = 'http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_ADV_Report_CMEG.pdf'
-    PDF_ADV = 'CME_Average_Daily_Volume.pdf'
-    TXT_ADV = 'CME_Average_Daily_Volume.txt'
-    XLSX_ADV = 'CME_Average_Daily_Volume.xlsx'
+    URL_CME_ADV = 'http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_ADV_Report_CME.pdf'
+    URL_CBOT_ADV = 'http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_ADV_Report_CBOT.pdf'
+    URL_NYMEX_COMEX_ADV = 'http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_ADV_Report_NYMEX_COMEX.pdf'
+
+    BASENAME_CME = rreplace(os.path.basename(URL_CME_ADV), PDF_SUFFIX, '', 1)
+    BASENAME_CBOT = rreplace(os.path.basename(URL_CBOT_ADV), PDF_SUFFIX, '', 1)
+    BASENAME_NYMEX_COMEX = rreplace(os.path.basename(URL_NYMEX_COMEX_ADV), PDF_SUFFIX, '', 1)
 
     URL_PRODSLATE = 'http://www.cmegroup.com/CmeWS/mvc/ProductSlate/V1/Download.xls'
     XLS_PRODSLATE = 'Product_Slate.xls'
 
     OUTPUT_COLUMNS = ['Product', 'Product Group', 'Cleared As']
 
-
     def __init__(self, download_path=None):
         self.download_path = os.getcwd() if download_path is None else download_path
-        self.pdf_path_adv = os.path.join(self.download_path, self.PDF_ADV)
-        self.xls_path_prodslate = os.path.join(self.download_path, self.XLS_PRODSLATE)
-        self.txt_path_adv = os.path.join(self.download_path, self.TXT_ADV)
-        self.xlsx_path_adv = os.path.join(self.download_path, self.XLSX_ADV)
 
-        self.pdf_path_prodslate = os.path.join(self.download_path, self.XLS_PRODSLATE)
+        self.xlsx_cme_adv = os.path.join(self.download_path, self.BASENAME_CME + self.XLSX_SUFFIX)
+        self.xlsx_cbot_adv = os.path.join(self.download_path, self.BASENAME_CBOT + self.XLSX_SUFFIX)
+        self.xlsx_nymex_comex_adv = os.path.join(self.download_path, self.BASENAME_NYMEX_COMEX + self.XLSX_SUFFIX)
 
+        self.xls_prodslate = os.path.join(self.download_path, self.XLS_PRODSLATE)
         self.report_name = None
-
-    def download_adv(self, path=None):
-        path = self.pdf_path_adv if path is None else path
-        return download(self.URL_ADV, path)
-
-    def download_prodslate(self, path=None):
-        path = self.pdf_path_prodslate if path is None else path
-        download(self.URL_PRODSLATE, path)
 
     # returns a dictionary with key: full group name, and value: (asset, instrument)
     def get_pdf_product_groups(self, sections):
@@ -186,8 +187,7 @@ class CMEScraper(object):
             prev_level = level
         return result
 
-    def read_pdf_metadata(self, path=None):
-        path = self.pdf_path_adv if path is None else path
+    def read_pdf_metadata(self, path):
         with open(path, mode='rb') as fh:
             fr = PdfFileReader(fh)
             outlines = fr.getOutlines()
@@ -195,39 +195,34 @@ class CMEScraper(object):
             self.report_name = ' '.join([o.title for l, o in flat_outlines[0:2]]).replace('/', '-')
             return self.get_pdf_product_groups([(l, o.title) for l, o in flat_outlines[2:]])
 
-    def parse_from_txt(self, pdf_path=None, txt_path=None):
-        pdf_path = self.pdf_path_adv if pdf_path is None else pdf_path
-        txt_path = self.txt_path_adv if txt_path is None else txt_path
+    def parse_from_txt(self, pdf_path, txt_path):
         product_groups = self.read_pdf_metadata(pdf_path)
         with open(txt_path) as fh:
             lines = fh.readlines()
-            pattern_data = '^((([\w\(\)\.%&,-]+) )+ {2,})+.*$'
-            pattern_headers = '^ +((([\w\(\)\.%&,-]+) )+ {2,}){2,}.*$'
+            pattern_data = '^ ?((\S+ )+ {2,}){2,}.*$'
+            pattern_headers = '^ {10,}((\S+ )+ {2,}){2,}.*$'
         if lines:
             header_line = find_first_n(lines, lambda x: re.match(pattern_headers, x) is not None, 2)
             df = pd.DataFrame(columns=self.__get_output_headers(header_line))
+            group, clearing = None, None
             for line in lines:
                 if 'total' in line.lower():
                     break
                 line = line.rstrip()
-                if line in product_groups:
-                    group, clearing = product_groups[line]
+                if line.lstrip() in product_groups:
+                    group, clearing = product_groups[line.lstrip()]
                 elif re.match(pattern_data, line) is not None:
                     df = self.__append_to_df(df, line, group, clearing)
             return df
         else:
             return None
 
-    def to_xlsx_adv(self, pdfpath, txtpath, outpath=None):
+    def to_xlsx_adv(self, pdfpath, txtpath, outpath):
         table = self.parse_from_txt(pdfpath, txtpath)
-        outpath = self.xlsx_path_adv if outpath is None else outpath
         return configparser.XlsxWriter.save_sheets(outpath, {self.report_name: table})
 
-
-
-    def download_to_xlsx_adv(self, outpath=None):
-        outpath = self.xlsx_path_adv if outpath is None else outpath
-        f_pdf = self.download_adv(tempfile.NamedTemporaryFile())
+    def download_to_xlsx_adv(self, url, outpath, dlpath=None):
+        f_pdf = download(url, tempfile.NamedTemporaryFile()) if dlpath is None else download(url, dlpath)
         f_txt = tempfile.NamedTemporaryFile()
         try:
             run_pdftotext_cmd(f_pdf.name, f_txt.name)
@@ -235,10 +230,19 @@ class CMEScraper(object):
         finally:
             f_pdf.close()
             f_txt.close()
+        return outpath
 
+    def run_scraper(self):
+        with open(self.xls_prodslate, mode='wb') as ps:
+            download(self.URL_PRODSLATE, ps)
+
+        paths = [(self.URL_CME_ADV, self.xlsx_cme_adv),
+                 (self.URL_CBOT_ADV, self.xlsx_cbot_adv),
+                 (self.URL_NYMEX_COMEX_ADV, self.xlsx_nymex_comex_adv)]
+        return [self.download_to_xlsx_adv(url, outpath) for url, outpath in paths]
 
     def __get_output_headers(self, pdf_headers, pattern=None):
-        pattern = '([\w\(\)\.%&,-]+( [\w\(\)\.%&,-]+)*)+' if pattern is None else pattern
+        pattern = '(\S+( \S+)*)+' if pattern is None else pattern
         heading_cols = self.OUTPUT_COLUMNS[0:1]
         tailing_cols = self.OUTPUT_COLUMNS[1:3]
         to_cord = lambda mobj: (mobj.start(), mobj.end())
@@ -251,8 +255,8 @@ class CMEScraper(object):
         return heading_cols + h1 + tailing_cols
 
     def __merge_headers(self, *headers):
-        headers = [h.lstrip()for h in headers]
-        headers = [h.rstrip()for h in headers]
+        headers = [h.lstrip() for h in headers]
+        headers = [h.rstrip() for h in headers]
         return ' '.join(headers)
 
     def __parse_line(self, line, **kwargs):
@@ -281,9 +285,6 @@ class CMEScraper(object):
 
     # def tabula_parse(self):
     #     tabula.convert_into(self.pdf_path_adv, 'CME_ADV.csv', output_format='csv', pages='all')
-
-
-
 
 
 class OSEScraper(object):
@@ -337,7 +338,7 @@ class OSEScraper(object):
         txt_path = self.txt_path_adv if txt_path is None else txt_path
         with open(txt_path) as fh:
             lines = fh.readlines()
-            pattern_data = '([A-Za-z0-9\(\)\.%&,-]+( [A-Za-z0-9\(\)\.%&,-]+)*)+'
+            pattern_data = '([A-Za-z0-9/\(\)\.%&$,-]+( [A-Za-z0-9/\(\)\.%&$,-]+)*)+'
         if lines:
             for line in lines:
                 ln = jaconv.z2h(line, kana=False, digit=True, ascii=True)
@@ -347,7 +348,6 @@ class OSEScraper(object):
 
         else:
             return None
-
 
     def tabula_parse(self, infile=None, outfile=None):
         infile = self.pdf_path_adv if infile is None else infile
@@ -367,13 +367,11 @@ class OSEScraper(object):
         finally:
             f_pdf.close()
 
-
-
 # download_path = os.getcwd()
 # download_path = '/home/slan/Documents/downloads/'
-# cme = CMEScraper(download_path)
+# cme = CMEGScraper(download_path)
+# cme.run_scraper()
 # cme.download_to_xlsx_adv()
-
 
 
 # ose = OSEScraper()
@@ -381,4 +379,3 @@ class OSEScraper(object):
 # ose.download_adv()
 # ose.parse_pdf_adv()
 # ose.tabula_parse()
-
