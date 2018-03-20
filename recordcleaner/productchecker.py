@@ -112,8 +112,8 @@ class CMEGChecker(object):
             df = pd.read_excel(fh, encoding=encoding)
         headers = list(df.columns.values)
         ytd = dtsp.find_first_n(headers, lambda x: self.PATTERN_ADV_YTD in x)
-        self.cols_adv.append(ytd)
         cols = self.cols_adv if cols is None else cols
+        cols = cols + [ytd]
         df = df[cols]
         return df
 
@@ -222,13 +222,14 @@ class CMEGChecker(object):
                     print('Successful matching {} with {}'.format(row[adv_pd_col], row_matched[pd_field]))
         return df_matched
 
-    def __chk_prodcode_matched(self, prods, adv):
-        df_prods, col_prods = prods
-        df_adv, col_adv = adv
-
-        unmatched = [entry for entry in df_adv[col_adv] if entry not in df_prods[col_prods].unique()]
-        j = [entry for entry in unmatched if entry not in df_prods[self.CLEARING].unique()]
-        return any(entry not in df_prods[self.CLEARING].unique() for entry in unmatched)
+    def __chk_prodcode_matched(self, df_prods, df_adv):
+        unmatched = [(i, str(entry)) for i, entry in df_adv[self.COMMODITY].iteritems() if str(entry) not in df_prods[self.GLOBEX].astype(str).unique()]
+        unmatched = [(i, entry) for i, entry in unmatched if entry not in df_prods[self.CLEARING].astype(str).unique()]
+        ytd = dtsp.find_first_n(list(df_adv.columns), lambda x: self.PATTERN_ADV_YTD in x)
+        indices = [i for i, _ in unmatched if df_adv.iloc[i][ytd] == 0]
+        df_adv.drop(df_adv.index[indices], inplace=True)
+        df_adv.reset_index(drop=0, inplace=True)
+        return df_adv
 
     def __after_hit_results(self, results, updates, ix, row, mark=True):
         row_joined, hit = self.__join_best_result(results, row)
@@ -278,11 +279,11 @@ class CMEGChecker(object):
         df_prods = self.__from_prods(self.prods_file)
 
         df_ix = df_prods.rename(columns=self.col2field)
-        gdf_exch = self.__groupby(df_ix, [self.EXCH])
+        gdf_exch = {exch: df.reset_index(drop=0) for exch, df in self.__groupby(df_ix, [self.EXCH]).items()}
 
-        df_nymex_comex_prods = gdf_exch[self.NYMEX].append(gdf_exch[self.COMEX])
-        if self.__chk_prodcode_matched((df_nymex_comex_prods, self.GLOBEX), (dfs_adv[self.NYMEX], self.COMMODITY)):
-            cp.XlsxWriter.save_sheets(self.matched_file, {self.NYMEX: dfs_adv[self.NYMEX]}, override=False)
+        df_nymex_comex_prods = gdf_exch[self.NYMEX].append(gdf_exch[self.COMEX], ignore_index=True)
+        dfs_adv[self.NYMEX] = self.__chk_prodcode_matched(df_nymex_comex_prods, dfs_adv[self.NYMEX])
+        cp.XlsxWriter.save_sheets(self.matched_file, {self.NYMEX: dfs_adv[self.NYMEX]}, override=False)
 
         ix_cme = self.__setup_ix(self.index_fields, gdf_exch[self.CME], self.index_cme, clean)
         ix_cbot = self.__setup_ix(self.index_fields, gdf_exch[self.CBOT], self.index_cbot, clean)
