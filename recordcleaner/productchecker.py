@@ -4,7 +4,8 @@ import configparser as cp
 import os
 import re
 import inflect
-from math import isnan
+import itertools
+
 
 
 from whoosh.fields import *
@@ -65,8 +66,93 @@ def filter(df, col, exp):
 # results = summary[list(filter(summary, 'Globex',  exp))]
 # print((summary[list(filter(summary, 'Globex',  exp))].head()))
 
+class WhooshExtension(object):
+    VOWELS = ('a', 'e', 'i', 'o', 'u')
+    STEM_ANA = StemmingAnalyzer('[^ /\.\(\)]+')
+    CME_SPECIAL_MAPPING = {'midcurve': 'mc',
+                           'mc': 'midcurve',
+                           '$': 'USD'
+                           }
 
-class CMEGChecker(object):
+    @staticmethod
+    def CMESpecialFilter(stream):
+        for token in stream:
+            if token.text in WhooshExtension.CME_SPECIAL_MAPPING:
+                token.text = WhooshExtension.CME_SPECIAL_MAPPING[token.text]
+            yield token
+
+    @staticmethod
+    def ConsonantFilter(stream):
+        pass
+
+
+
+class SearchHelper(object):
+    vowels = ('a', 'e', 'i', 'o', 'u')
+
+    @staticmethod
+    def get_words(string):
+        return re.split('[ ,\.\?;:]+', string)
+
+    @staticmethod
+    def get_initials(string):
+        words = SearchHelper.get_words(string)
+        initials = list()
+        for word in words:
+            if word[0:2].lower() == 'ex':
+                initials.append(word[1])
+            elif re.match('[A-Za-z]', word[0]):
+                initials.append(word[0])
+        return initials
+
+    @staticmethod
+    def match_initials(s1, s2, casesensitive=False):
+        if not casesensitive:
+            s1 = s1.lower()
+            s2 = s2.lower()
+        return ''.join(SearchHelper.get_initials(s1)) == s2 \
+               or ''.join(SearchHelper.get_initials(s2)) == s1
+
+    @staticmethod
+    def match_first_n(s1, s2, n=2, casesensitive=False):
+        if not casesensitive:
+            s1 = s1.lower()
+            s2 = s2.lower()
+        if len(s1) >= n and len(s2) >= n:
+            return s1[0:n] == s2[0:n]
+        elif len(s1) < n:
+            return s1[0:] == s2[0:n]
+        elif len(s2) < n:
+            return s1[0:n] == s2[0:]
+        return False
+
+    @staticmethod
+    def match_sgl_plrl(s1, s2, casesensitive=False):
+        if not casesensitive:
+            s1 = s1.lower()
+            s2 = s2.lower()
+        p = inflect.engine()
+        return p.plural(s1) == s2
+
+    @staticmethod
+    def match_any_word(s1, s2, stemming=False, casesensitive=False):
+        if not casesensitive:
+            s1 = s1.lower()
+            s2 = s2.lower()
+        p = inflect.engine()
+        words1 = [(w, 1) for w in SearchHelper.get_words(s1)]
+        words2 = [(w, 2) for w in SearchHelper.get_words(s2)]
+        if stemming:
+            words1 = words1 + [(p.plural(w), 1) for w, i in words1]
+        words = set(words1 + words2)
+        words = itertools.groupby(words, key=lambda x: x[0])
+        for key, group in itertools.groupby(words, key=lambda x: x[0]):
+            if len(list(group)) == 2:
+                return True
+        return False
+
+
+class CMEGMatcher(object):
     PATTERN_ADV_YTD = 'ADV Y.T.D'
     INDEX_CME = 'CME_Product_Index'
     INDEX_CBOT = 'CBOT_Product_Index'
@@ -86,10 +172,9 @@ class CMEGChecker(object):
     SUB_GROUP = 'Sub Group'
     EXCHANGE = 'Exchange'
     COMMODITY = 'Commodity'
-    MATCHED = 'Matched'
 
     COLS_MAPPING = {PRODUCT: PRODUCT_NAME, PRODUCT_GROUP: PRODUCT_GROUP, CLEARED_AS: CLEARED_AS}
-    COLS_PRODS = [PRODUCT_NAME, PRODUCT_GROUP, CLEARED_AS, CLEARING, GLOBEX, SUB_GROUP, EXCHANGE, MATCHED]
+    COLS_PRODS = [PRODUCT_NAME, PRODUCT_GROUP, CLEARED_AS, CLEARING, GLOBEX, SUB_GROUP, EXCHANGE]
 
     F_PRODUCT_NAME = 'Product_Name'
     F_PRODUCT_GROUP = 'Product_Group'
@@ -98,16 +183,14 @@ class CMEGChecker(object):
     F_GLOBEX = GLOBEX
     F_SUB_GROUP = 'Sub_Group'
     F_EXCHANGE = EXCHANGE
-    F_MATCHED = MATCHED
 
-    INDEX_FIELDS = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=FancyAnalyzer()),
-                    F_PRODUCT_GROUP: KEYWORD(stored=True, scorable=True),
-                    F_CLEARED_AS: KEYWORD(stored=True, scorable=True),
+    INDEX_FIELDS = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=WhooshExtension.STEM_ANA),
+                    F_PRODUCT_GROUP: ID(stored=True),
+                    F_CLEARED_AS: ID(stored=True, unique=True),
                     F_CLEARING: ID(stored=True, unique=True),
                     F_GLOBEX: ID(stored=True, unique=True),
-                    F_SUB_GROUP: TEXT(stored=True),
-                    F_EXCHANGE: KEYWORD,
-                    F_MATCHED: BOOLEAN(stored=True)}
+                    F_SUB_GROUP: TEXT(stored=True, analyzer=WhooshExtension.STEM_ANA),
+                    F_EXCHANGE: ID}
 
     COL2FIELD = {PRODUCT_NAME: F_PRODUCT_NAME,
                  PRODUCT_GROUP: F_PRODUCT_GROUP,
@@ -115,8 +198,32 @@ class CMEGChecker(object):
                  CLEARING: F_CLEARING,
                  GLOBEX: F_GLOBEX,
                  SUB_GROUP: F_SUB_GROUP,
-                 EXCHANGE: F_EXCHANGE,
-                 MATCHED: F_MATCHED}
+                 EXCHANGE: F_EXCHANGE}
+
+    CME_PROD_MAPPING = {'NIKKEI 225 ($) STOCK': 'Nikkei/USD',
+                        'NIKKEI 225 (YEN) STOCK': 'Nikkei/Yen Futures'}
+    CME_FX_MAPPING = {'AD': 'Australian Dollar',
+                      'BP': 'British Pound',
+                      'CD': 'Canadian Dollar',
+                      'EC': 'Euro',
+                      'EFX': 'Euro',
+                      'JY': 'Japanese Yen',
+                      'NE': 'New Zealand Dollar',
+                      'NOK': 'Norwegian Krone',
+                      'SEK': 'Swedish Krona',
+                      'SF': 'Swiss Franc',
+                      'SKR': 'Swedish Krona',
+                      'USD': 'US Dollar',
+                      'ZAR': 'South African Rand',
+                      'AUD': 'Australian Dollar',
+                      'EUR': 'Euro',
+                      'GBP': 'British Pound',
+                      'PLN': 'Polish Zloty',
+                      'NKR': 'Norwegian Krone',
+                      'INR': 'Indian Rupee',
+                      'RMB': 'Chinese Renminbi',
+                      'BDI': 'CME Bloomberg Dollar Spot Index'
+    }
 
     def __init__(self, adv_files, prods_file, out_path=None):
         self.adv_files = adv_files
@@ -129,7 +236,7 @@ class CMEGChecker(object):
 
         self.index_cme = os.path.join(self.out_path, self.INDEX_CME)
         self.index_cbot = os.path.join(self.out_path, self.INDEX_CBOT)
-        self.matched_file = os.path.join(os.getcwd(), 'CME_matched.xlsx')
+        self.matched_file = os.path.join(os.getcwd(), 'CMEG_matched.xlsx')
 
     def __from_adv(self, filename, cols=None, encoding='utf-8'):
         with open(filename, 'rb') as fh:
@@ -152,7 +259,6 @@ class CMEGChecker(object):
             df.reset_index(drop=0, inplace=True)
             clean_1stcol = pd.Series([self.__clean_prod_name(r) for i, r in df.iterrows()], name=self.PRODUCT_NAME)
             df.update(clean_1stcol)
-            df[self.MATCHED] = pd.Series(np.repeat(False, len(df.index)), index=df.index)
         return df[self.COLS_PRODS]
 
     def __clean_prod_name(self, row):
@@ -196,30 +302,32 @@ class CMEGChecker(object):
         wds1 = SearchHelper.get_words(s1)
         wds2 = SearchHelper.get_words(s2)
         if len(wds1) == 1 and len(wds2) == 1:
-            return s1 == s2 or SearchHelper.match_sgl_plrl(wds1[0], wds2[0]) or SearchHelper.match_first_n(wds1[0], wds2[0])
+            return s1 == s2 or SearchHelper.match_sgl_plrl(wds1[0], wds2[0]) \
+                   or SearchHelper.match_first_n(wds1[0], wds2[0])
         else:
-            return s1 == s2 or SearchHelper.match_initials(s1, s2) or SearchHelper.match_first_n(s1, s2)
+            return s1 == s2 or SearchHelper.match_any_word(s1, s2) \
+                   or SearchHelper.match_initials(s1, s2) or SearchHelper.match_first_n(s1, s2)
 
     def match_prod_code(self, df_adv, prods_pdgps, ix):
         df_matched = pd.DataFrame(columns=list(df_adv.columns) + ix.schema.names())
         for i, row in df_adv.iterrows():
             with ix.searcher() as searcher:
                 pdgp = dtsp.find_first_n(prods_pdgps, lambda x: self.__match_pdgp(x, row[self.PRODUCT_GROUP]))
-                grouping_q = And([Term(self.F_PRODUCT_GROUP, pdgp), Term(self.F_CLEARED_AS, row[self.CLEARED_AS]), Term(self.F_MATCHED, False)])
+                grouping_q = And([Term(self.F_PRODUCT_GROUP, pdgp), Term(self.F_CLEARED_AS, row[self.CLEARED_AS])])
                 query = self.__exact_and_query(self.F_PRODUCT_NAME, ix.schema, row[self.PRODUCT])
                 results = searcher.search(query, filter=grouping_q, limit=None)
                 if results:
-                    row_matched = self.__after_hit_results(results, {self.F_MATCHED: True}, ix, row)
+                    row_matched = self.__join_best_result(results, row)
                 else:
                     query = self.__fuzzy_and_query(self.F_PRODUCT_NAME, ix.schema, row[self.PRODUCT])
                     results = searcher.search(query, filter=grouping_q, limit=None)
                     if results:
-                        row_matched = self.__after_hit_results(results, {self.F_MATCHED: True}, ix, row)
+                        row_matched = self.__join_best_result(results, row)
                     else:
                         query = self.__exact_or_query(self.F_PRODUCT_NAME, ix.schema, row[self.PRODUCT])
                         results = searcher.search(query, filter=grouping_q, limit=None)
                         if results:
-                            row_matched = self.__after_hit_results(results, {self.F_MATCHED: True}, ix, row, False)
+                            row_matched = self.__join_best_result(results, row)
                         else:
                             row_matched = row
                 df_matched = df_matched.append(row_matched, ignore_index=True)
@@ -238,20 +346,12 @@ class CMEGChecker(object):
         df_adv.reset_index(drop=0, inplace=True)
         return df_adv
 
-    def __after_hit_results(self, results, updates, ix, row, mark=True):
-        row_joined, hit = self.__join_best_result(results, row)
-        if mark:
-            hit.update(updates)
-            self.__update_doc(ix, hit)
-        return row_joined
-
-
     def __join_best_result(self, results, *dfs):
         joined_dict = results[0].fields()
         if dfs is not None:
             for df in dfs:
                 joined_dict.update(df)
-        return joined_dict, results[0].fields()
+        return joined_dict
 
 
     def __exact_and_query(self, field, schema, text):
@@ -273,6 +373,7 @@ class CMEGChecker(object):
         wrt = ix.writer()
         wrt.update_document(**doc)
         wrt.commit()
+        print(len(list(ix.searcher().documents())))
 
 
     def mark_recorded(self):
@@ -323,6 +424,11 @@ class CMEGChecker(object):
             else:
                 wrt.update_document(**record)
         wrt.commit()
+        # a = list(ix.searcher().documents())
+        # for row in a:
+        #     if 'Cash-Settled' in row[cme.F_PRODUCT_NAME]:
+        #         print(row)
+        # print()
 
     def __setup_ix(self, fields, df, ix_path, clean=False):
         ix = self.__create_index(ix_path, fields, clean)
@@ -335,86 +441,55 @@ class CMEGChecker(object):
 
 
 
-
-class SearchHelper(object):
-    vowels = ('a', 'e', 'i', 'o', 'u')
-
-    @staticmethod
-    def get_words(string):
-        return re.split('[ ,\.\?;:]+', string)
-
-    @staticmethod
-    def get_initials(string):
-        words = SearchHelper.get_words(string)
-        initials = list()
-        for word in words:
-            if word[0:2].lower() == 'ex':
-                initials.append(word[1])
-            elif re.match('[A-Za-z]', word[0]):
-                initials.append(word[0])
-        return initials
-
-    @staticmethod
-    def match_initials(s1, s2):
-        return ''.join(SearchHelper.get_initials(s1)).lower() == s2.lower() \
-               or ''.join(SearchHelper.get_initials(s2)).lower() == s1.lower()
-
-    @staticmethod
-    def match_first_n(s1, s2, n=2):
-        if len(s1) >= n and len(s2) >= n:
-            return s1[0:n] == s2[0:n]
-        elif len(s1) < n:
-            return s1[0:] == s2[0:n]
-        elif len(s2) < n:
-            return s1[0:n] == s2[0:]
-        return False
-
-    @staticmethod
-    def match_sgl_plrl(s1, s2):
-        p = inflect.engine()
-        return p.plural(s1) == s2
-
-
-
 cme_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
 # cme_prds_file = os.path.join(checked_path, 'Product Slate Export.xls')
 cme_adv_files = [os.path.join(checked_path, report_files['cme']),
                  os.path.join(checked_path, report_files['cbot']),
                  os.path.join(checked_path, report_files['nymex_comex'])]
 
-cme = CMEGChecker(cme_adv_files, cme_prds_file)
-cme.run_pd_chck(clean=True)
+cme = CMEGMatcher(cme_adv_files, cme_prds_file)
+# cme.run_pd_chck(clean=True)
 
-# ix = open_dir(cme.index_cme)
-# docs = list(ix.searcher().documents())
-# k = len(docs)
-# print(pd.DataFrame(docs))
+ix = open_dir(cme.index_cme)
+# print(ix.schema.items())
+docs = list(ix.searcher().documents())
+print(len(docs))
 
-# prod = 'NEW ZEALND DOLLAR'
-# pdgp = 'FX'
+# #
+# # for row in docs:
+# #     if 'Eurodollar' in row[cme.F_PRODUCT_NAME]:
+# #         print(row)
+# # for i, row in pd.DataFrame(docs).iterrows():
+# #     if 'Cash-Settled' in row[cme.F_PRODUCT_NAME]:
+# #         print(row[cme.F_PRODUCT_NAME], row[cme.F_CLEARED_AS])
+#
+# prod = 'EURODOLLARS'
+# pdgp = 'Interest Rate'
 # ca = 'Futures'
-# pdgp_field = 'Product_Group'
-# clas_field = 'Cleared_As'
-# pd_field = 'Product_Name'
-# mcth_field = 'Matched'
-# ix = open_dir(cme.index)
+#
+# ix = open_dir(cme.index_cme)
 # with ix.searcher() as searcher:
 #
 #     # for doc in searcher.documents():
 #     #     print(doc)
 #
-#     grouping_q = Term(mcth_field, True)
-#     # grouping_q = And([Term(pdgp_field, pdgp), Term(clas_field, ca), Term(mcth_field, False)])
+#     # grouping_q = And([Term(cme.F_PRODUCT_GROUP, pdgp), Term(cme.F_CLEARED_AS, ca), Term(cme.F_MATCHED, False)])
+#     grouping_q = And([Term(cme.F_PRODUCT_GROUP, pdgp), Term(cme.F_CLEARED_AS, ca)])
 #     # grouping_q = qparser.QueryParser(pdgp_field, schema=ix.schema).parse(pdgp)
-#     parser = qparser.QueryParser(pd_field, schema=ix.schema)
+#     parser = qparser.QueryParser(cme.F_PRODUCT_NAME, schema=ix.schema)
 #     query = parser.parse(prod)
-#     ts = query.iter_all_terms()
-#     fuzzy_terms = And([FuzzyTerm(f, t, maxdist=2, prefixlength=1) for f, t in ts])
-#     # results = searcher.search(query, filter=grouping_q, limit=None)
-#     results = searcher.search(grouping_q, limit=None)
+#     # ts = query.iter_all_terms()
+#     # fuzzy_terms = And([FuzzyTerm(f, t, maxdist=2, prefixlength=1) for f, t in ts])
+#     results = searcher.search(query, filter=grouping_q, limit=None)
+#     # results = searcher.search(Term(cme.F_PRODUCT_NAME, 'Eurodollar'), filter=grouping_q, limit=None)
 #     if results:
-#         # hit = results[0].fields()
 #         rs = [r.fields() for r in results]
 #         print(pd.DataFrame(rs))
+#     # results = searcher.search(grouping_q, limit=None)
+#     # if results:
+#     #     # hit = results[0].fields()
+#     #     rs = [r.fields() for r in results]
+#     #     print(pd.DataFrame(rs))
 #
-#     print()
+# docs = list(ix.searcher().documents())
+# print(len(docs))
