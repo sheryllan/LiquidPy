@@ -6,6 +6,7 @@ import re
 import inflect
 import itertools
 import copy
+import collections
 
 from whoosh.fields import *
 from whoosh.analysis import *
@@ -66,7 +67,6 @@ def filter(df, col, exp):
 
 class WhooshExtension(object):
     STEM_ANA = StemmingAnalyzer('[^ /\.\(\)]+')
-    FANCY_ANA = FancyAnalyzer('[^ /\.\(\)]+')
     CME_SPECIAL_MAPPING = {'midcurve': 'mc',
                            'mc': 'midcurve',
                            '$': 'USD'}
@@ -80,8 +80,11 @@ class WhooshExtension(object):
 
 
 
-class ConsonantFilter(Filter):
+class VowelFilter(Filter):
     VOWELS = ('a', 'e', 'i', 'o', 'u')
+
+    def __init__(self, exclusions=list()):
+        self.exclusions = exclusions
 
     def __remove_vowels(self, string):
         if len(string) < 4:
@@ -94,14 +97,17 @@ class ConsonantFilter(Filter):
 
     def __call__(self, stream):
         for token in stream:
-            txt_changed = self.__remove_vowels(token.text)
-            if txt_changed != token.text:
-                token_cpy = copy.deepcopy(token)
-                token_cpy.text = txt_changed
+            if token.text in self.exclusions:
                 yield token
-                yield token_cpy
             else:
-                yield token
+                txt_changed = self.__remove_vowels(token.text)
+                if txt_changed != token.text:
+                    token_cpy = copy.deepcopy(token)
+                    token_cpy.text = txt_changed
+                    yield token
+                    yield token_cpy
+                else:
+                    yield token
 
 
 class CurrencyConverter(Filter):
@@ -111,6 +117,7 @@ class CurrencyConverter(Filter):
                       'ec': 'euro',
                       'efx': 'euro',
                       'jy': 'japanese yen',
+                      'jpy': 'japanese yen',
                       'ne': 'new zealand dollar',
                       'nok': 'norwegian krone',
                       'sek': 'swedish krona',
@@ -118,6 +125,7 @@ class CurrencyConverter(Filter):
                       'skr': 'swedish krona',
                       'zar': 'south african rand',
                       'aud': 'australian dollar',
+                      'cad': 'canadian dollar',
                       'eur': 'euro',
                       'gbp': 'british pound',
                       'pln': 'polish zloty',
@@ -125,6 +133,13 @@ class CurrencyConverter(Filter):
                       'inr': 'indian rupee',
                       'rmb': 'chinese renminbi',
                       'usd': 'us dollar'}
+
+    @classmethod
+    def get_cnvtd_kws(cls):
+        kws = set()
+        for val in CurrencyConverter.CRRNCY_MAPPING.values():
+            kws.update(val.split(' '))
+        return list(kws)
 
     def __call__(self, stream):
         for token in stream:
@@ -137,6 +152,61 @@ class CurrencyConverter(Filter):
             else:
                 yield token
 
+
+class SplitFilter(Filter):
+    SRC_PTN_UPCS = 'A-Z'
+    SRC_PTN_LWCS = 'a-z'
+    SRC_PTN_NUM = '0-9'
+    SRC_PTN_COLL = '([{}]+)'
+
+    def __init__(self, delims='\W+', origin=True, splitwords=True, splitnums=True, mergewords=False, mergenums=False):
+        self.delims = delims
+        self.origin = origin
+        # if splitwords == mergewords:
+        #     wrd_ptn = [self.SRC_PTN_UPCS + self.SRC_PTN_LWCS]
+        #     wrdnum_ptn = [w + self.SRC_PTN_NUM for w in wrd_ptn] if splitnums == mergenums \
+        #         else wrd_ptn + [self.SRC_PTN_NUM]
+        # else:
+        #     wrd_ptn = [self.SRC_PTN_UPCS, self.SRC_PTN_LWCS] if splitwords else [self.SRC_PTN_UPCS + self.SRC_PTN_LWCS]
+        #     wrdnum_ptn = wrd_ptn + [self.SRC_PTN_NUM] if splitnums else [w + self.SRC_PTN_NUM for w in wrd_ptn]
+        #
+        # self.wrdnum_ptn = '|'.join([self.SRC_PTN_COLL.format(p) for p in wrdnum_ptn])
+
+        splt_wrd_ptn = [self.SRC_PTN_UPCS, self.SRC_PTN_LWCS] if splitwords else [self.SRC_PTN_UPCS + self.SRC_PTN_LWCS]
+        splt_wrdnum_ptn = splt_wrd_ptn + [self.SRC_PTN_NUM] if splitnums else [w + self.SRC_PTN_NUM for w in splt_wrd_ptn]
+        mrg_wrd_ptn = [self.SRC_PTN_UPCS + self.SRC_PTN_LWCS] if mergewords else [self.SRC_PTN_UPCS, self.SRC_PTN_LWCS]
+        mrg_wrdnum_ptn = [w + self.SRC_PTN_NUM for w in mrg_wrd_ptn] if mergenums else mrg_wrd_ptn + [self.SRC_PTN_NUM]
+
+        self.splt_ptn = '|'.join([self.SRC_PTN_COLL.format(p) for p in splt_wrdnum_ptn])
+        self.mrg_ptn = '|'.join([self.SRC_PTN_COLL.format(p) for p in mrg_wrdnum_ptn])
+
+    def __call__(self, stream):
+        for token in stream:
+            if self.origin:
+                yield token
+            words = re.split(self.delims, token.text) if re.search(self.delims, token.text) else [token.text]
+            for t in self.__get_matched_tokens(token, self.splt_ptn, self.mrg_ptn, words):
+                yield t
+
+    def __get_matched_tokens(self, token, splt_ptn, mrg_ptn, words):
+        for w in self.__get_matched_words(splt_ptn, mrg_ptn, words):
+            if w != token.text:
+                cpy = copy.deepcopy(token)
+                cpy.text = w
+                yield cpy
+
+    def __get_matched_words(self, splt_ptn, mrg_ptn, words):
+        for word in words:
+            chains = self.__findall(splt_ptn, word) if splt_ptn == mrg_ptn \
+                else set(itertools.chain(self.__findall(splt_ptn, word), self.__findall(mrg_ptn, word)))
+            for w in chains:
+                yield w
+
+    def __findall(self, pattern, word):
+        for w in re.findall(pattern, word):
+            if isinstance(w, collections.Iterable):
+                w = ''.join(w)
+            yield w
 
 
 class SearchHelper(object):
@@ -236,22 +306,26 @@ class CMEGMatcher(object):
     F_SUB_GROUP = 'Sub_Group'
     F_EXCHANGE = EXCHANGE
 
-    INDEX_FIELDS_CME = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=WhooshExtension.FANCY_ANA
-                                                                   | ConsonantFilter()
-                                                                   | CurrencyConverter()),
+    STOP_LIST = ['and', 'is', 'it', 'an', 'as', 'at', 'have', 'in', 'yet', 'if', 'from', 'for', 'when',
+                 'by', 'to', 'you', 'be', 'we', 'that', 'may', 'not', 'with', 'tbd', 'a', 'on', 'your',
+                 'this', 'of', 'will', 'can', 'the', 'or', 'are']
+
+    STD_ANA = StandardAnalyzer('\S+', stoplist=STOP_LIST, minsize=1)
+    CME_PDNM_ANA = STD_ANA | SplitFilter() | VowelFilter(CurrencyConverter.get_cnvtd_kws()) | CurrencyConverter()
+    INDEX_FIELDS_CME = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=CME_PDNM_ANA),
                         F_PRODUCT_GROUP: ID(stored=True),
                         F_CLEARED_AS: ID(stored=True, unique=True),
                         F_CLEARING: ID(stored=True, unique=True),
                         F_GLOBEX: ID(stored=True, unique=True),
-                        F_SUB_GROUP: TEXT(stored=True, analyzer=WhooshExtension.FANCY_ANA),
+                        F_SUB_GROUP: TEXT(stored=True, analyzer=SimpleAnalyzer()),
                         F_EXCHANGE: ID}
 
-    INDEX_FIELDS_CBOT = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=WhooshExtension.FANCY_ANA),
+    INDEX_FIELDS_CBOT = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=STD_ANA),
                          F_PRODUCT_GROUP: ID(stored=True),
                          F_CLEARED_AS: ID(stored=True, unique=True),
                          F_CLEARING: ID(stored=True, unique=True),
                          F_GLOBEX: ID(stored=True, unique=True),
-                         F_SUB_GROUP: TEXT(stored=True, analyzer=WhooshExtension.FANCY_ANA),
+                         F_SUB_GROUP: TEXT(stored=True, analyzer=SimpleAnalyzer()),
                          F_EXCHANGE: ID}
 
     COL2FIELD = {PRODUCT_NAME: F_PRODUCT_NAME,
@@ -487,10 +561,10 @@ cme_adv_files = [os.path.join(checked_path, report_files['cme']),
 cme = CMEGMatcher(cme_adv_files, cme_prds_file)
 # cme.run_pd_chck(clean=True)
 
-ix = open_dir(cme.index_cme)
-# print(ix.schema.items())
-docs = list(ix.searcher().documents())
-print(len(docs))
+# ix = open_dir(cme.index_cme)
+# # print(ix.schema.items())
+# docs = list(ix.searcher().documents())
+# print(len(docs))
 
 # #
 # # for row in docs:
@@ -530,3 +604,10 @@ print(len(docs))
 #
 # docs = list(ix.searcher().documents())
 # print(len(docs))
+
+# ana = StandardAnalyzer('\S+', stoplist=cme.STOP_LIST, minsize=1) | SplitFilter()
+# # ana = RegexTokenizer('\S+') | SplitFilter()
+# print([t.text for t in ana(' E-Mini S&P500')])
+
+ana = cme.CME_PDNM_ANA
+print([t.text for t in ana('Premium Quoted European Style on Australian Dollar/US Dollar  CHINESE RENMINBI (CNH) E-MICRO CAD/USD')])
