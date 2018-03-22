@@ -5,8 +5,7 @@ import os
 import re
 import inflect
 import itertools
-
-
+import copy
 
 from whoosh.fields import *
 from whoosh.analysis import *
@@ -15,7 +14,6 @@ from whoosh.index import open_dir
 from whoosh.query import *
 from whoosh import qparser
 from whoosh import writing
-
 
 import datascraper as dtsp
 
@@ -67,12 +65,11 @@ def filter(df, col, exp):
 # print((summary[list(filter(summary, 'Globex',  exp))].head()))
 
 class WhooshExtension(object):
-    VOWELS = ('a', 'e', 'i', 'o', 'u')
     STEM_ANA = StemmingAnalyzer('[^ /\.\(\)]+')
+    FANCY_ANA = FancyAnalyzer('[^ /\.\(\)]+')
     CME_SPECIAL_MAPPING = {'midcurve': 'mc',
                            'mc': 'midcurve',
-                           '$': 'USD'
-                           }
+                           '$': 'USD'}
 
     @staticmethod
     def CMESpecialFilter(stream):
@@ -81,9 +78,64 @@ class WhooshExtension(object):
                 token.text = WhooshExtension.CME_SPECIAL_MAPPING[token.text]
             yield token
 
-    @staticmethod
-    def ConsonantFilter(stream):
-        pass
+
+
+class ConsonantFilter(Filter):
+    VOWELS = ('a', 'e', 'i', 'o', 'u')
+
+    def __remove_vowels(self, string):
+        if len(string) < 4:
+            return string
+        result = string[0]
+        for s in string[1:]:
+            if s not in self.VOWELS:
+                result = result + s
+        return result
+
+    def __call__(self, stream):
+        for token in stream:
+            txt_changed = self.__remove_vowels(token.text)
+            if txt_changed != token.text:
+                token_cpy = copy.deepcopy(token)
+                token_cpy.text = txt_changed
+                yield token
+                yield token_cpy
+            else:
+                yield token
+
+
+class CurrencyConverter(Filter):
+    CRRNCY_MAPPING = {'ad': 'australian dollar',
+                      'bp': 'british pound',
+                      'cd': 'canadian dollar',
+                      'ec': 'euro',
+                      'efx': 'euro',
+                      'jy': 'japanese yen',
+                      'ne': 'new zealand dollar',
+                      'nok': 'norwegian krone',
+                      'sek': 'swedish krona',
+                      'sf': 'swiss franc',
+                      'skr': 'swedish krona',
+                      'zar': 'south african rand',
+                      'aud': 'australian dollar',
+                      'eur': 'euro',
+                      'gbp': 'british pound',
+                      'pln': 'polish zloty',
+                      'nkr': 'norwegian krone',
+                      'inr': 'indian rupee',
+                      'rmb': 'chinese renminbi',
+                      'usd': 'us dollar'}
+
+    def __call__(self, stream):
+        for token in stream:
+            if token.text in self.CRRNCY_MAPPING:
+                currency = self.CRRNCY_MAPPING[token.text].split(' ')
+                for c in currency:
+                    token_cpy = copy.deepcopy(token)
+                    token_cpy.text = c
+                    yield token_cpy
+            else:
+                yield token
 
 
 
@@ -184,13 +236,23 @@ class CMEGMatcher(object):
     F_SUB_GROUP = 'Sub_Group'
     F_EXCHANGE = EXCHANGE
 
-    INDEX_FIELDS = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=WhooshExtension.STEM_ANA),
-                    F_PRODUCT_GROUP: ID(stored=True),
-                    F_CLEARED_AS: ID(stored=True, unique=True),
-                    F_CLEARING: ID(stored=True, unique=True),
-                    F_GLOBEX: ID(stored=True, unique=True),
-                    F_SUB_GROUP: TEXT(stored=True, analyzer=WhooshExtension.STEM_ANA),
-                    F_EXCHANGE: ID}
+    INDEX_FIELDS_CME = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=WhooshExtension.FANCY_ANA
+                                                                   | ConsonantFilter()
+                                                                   | CurrencyConverter()),
+                        F_PRODUCT_GROUP: ID(stored=True),
+                        F_CLEARED_AS: ID(stored=True, unique=True),
+                        F_CLEARING: ID(stored=True, unique=True),
+                        F_GLOBEX: ID(stored=True, unique=True),
+                        F_SUB_GROUP: TEXT(stored=True, analyzer=WhooshExtension.FANCY_ANA),
+                        F_EXCHANGE: ID}
+
+    INDEX_FIELDS_CBOT = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=WhooshExtension.FANCY_ANA),
+                         F_PRODUCT_GROUP: ID(stored=True),
+                         F_CLEARED_AS: ID(stored=True, unique=True),
+                         F_CLEARING: ID(stored=True, unique=True),
+                         F_GLOBEX: ID(stored=True, unique=True),
+                         F_SUB_GROUP: TEXT(stored=True, analyzer=WhooshExtension.FANCY_ANA),
+                         F_EXCHANGE: ID}
 
     COL2FIELD = {PRODUCT_NAME: F_PRODUCT_NAME,
                  PRODUCT_GROUP: F_PRODUCT_GROUP,
@@ -200,30 +262,9 @@ class CMEGMatcher(object):
                  SUB_GROUP: F_SUB_GROUP,
                  EXCHANGE: F_EXCHANGE}
 
-    CME_PROD_MAPPING = {'NIKKEI 225 ($) STOCK': 'Nikkei/USD',
-                        'NIKKEI 225 (YEN) STOCK': 'Nikkei/Yen Futures'}
-    CME_FX_MAPPING = {'AD': 'Australian Dollar',
-                      'BP': 'British Pound',
-                      'CD': 'Canadian Dollar',
-                      'EC': 'Euro',
-                      'EFX': 'Euro',
-                      'JY': 'Japanese Yen',
-                      'NE': 'New Zealand Dollar',
-                      'NOK': 'Norwegian Krone',
-                      'SEK': 'Swedish Krona',
-                      'SF': 'Swiss Franc',
-                      'SKR': 'Swedish Krona',
-                      'USD': 'US Dollar',
-                      'ZAR': 'South African Rand',
-                      'AUD': 'Australian Dollar',
-                      'EUR': 'Euro',
-                      'GBP': 'British Pound',
-                      'PLN': 'Polish Zloty',
-                      'NKR': 'Norwegian Krone',
-                      'INR': 'Indian Rupee',
-                      'RMB': 'Chinese Renminbi',
-                      'BDI': 'CME Bloomberg Dollar Spot Index'
-    }
+    CME_EQUITIES_MAPPING = {'NIKKEI 225 ($) STOCK': 'Nikkei/USD',
+                            'NIKKEI 225 (YEN) STOCK': 'Nikkei/Yen Futures',
+                            'FT-SE 100': 'FTSE 100 (GBP)'}
 
     def __init__(self, adv_files, prods_file, out_path=None):
         self.adv_files = adv_files
@@ -276,8 +317,6 @@ class CMEGMatcher(object):
                 new_df = gpobj.get_group(group)
                 group_dict[group] = self.__groupby(new_df, cols[1:])
             return group_dict
-
-
 
     # just for development
     def exhibit(self, gdfs, cols):
@@ -338,7 +377,8 @@ class CMEGMatcher(object):
         return df_matched
 
     def __chk_prodcode_matched(self, df_prods, df_adv):
-        unmatched = [(i, str(entry)) for i, entry in df_adv[self.COMMODITY].iteritems() if str(entry) not in df_prods[self.GLOBEX].astype(str).unique()]
+        unmatched = [(i, str(entry)) for i, entry in df_adv[self.COMMODITY].iteritems() if
+                     str(entry) not in df_prods[self.GLOBEX].astype(str).unique()]
         unmatched = [(i, entry) for i, entry in unmatched if entry not in df_prods[self.CLEARING].astype(str).unique()]
         ytd = dtsp.find_first_n(list(df_adv.columns), lambda x: self.PATTERN_ADV_YTD in x)
         indices = [i for i, _ in unmatched if df_adv.iloc[i][ytd] == 0]
@@ -353,7 +393,6 @@ class CMEGMatcher(object):
                 joined_dict.update(df)
         return joined_dict
 
-
     def __exact_and_query(self, field, schema, text):
         parser = qparser.QueryParser(field, schema=schema)
         return parser.parse(text)
@@ -361,7 +400,8 @@ class CMEGMatcher(object):
     def __fuzzy_and_query(self, field, schema, text, maxdist=2, prefixlength=1):
         parser = qparser.QueryParser(field, schema=schema)
         query = parser.parse(text)
-        fuzzy_terms = And([FuzzyTerm(f, t, maxdist=maxdist, prefixlength=prefixlength) for f, t in query.iter_all_terms()])
+        fuzzy_terms = And(
+            [FuzzyTerm(f, t, maxdist=maxdist, prefixlength=prefixlength) for f, t in query.iter_all_terms()])
         return fuzzy_terms
 
     def __exact_or_query(self, field, schema, text):
@@ -374,7 +414,6 @@ class CMEGMatcher(object):
         wrt.update_document(**doc)
         wrt.commit()
         print(len(list(ix.searcher().documents())))
-
 
     def mark_recorded(self):
         pass
@@ -393,8 +432,8 @@ class CMEGMatcher(object):
         dfs_adv[self.NYMEX] = self.__chk_prodcode_matched(df_nymex_comex_prods, dfs_adv[self.NYMEX])
         cp.XlsxWriter.save_sheets(self.matched_file, {self.NYMEX: dfs_adv[self.NYMEX]}, override=False)
 
-        ix_cme = self.__setup_ix(self.INDEX_FIELDS, gdf_exch[self.CME], self.index_cme, clean)
-        ix_cbot = self.__setup_ix(self.INDEX_FIELDS, gdf_exch[self.CBOT], self.index_cbot, clean)
+        ix_cme = self.__setup_ix(self.INDEX_FIELDS_CME, gdf_exch[self.CME], self.index_cme, clean)
+        ix_cbot = self.__setup_ix(self.INDEX_FIELDS_CBOT, gdf_exch[self.CBOT], self.index_cbot, clean)
 
         pdgp_cme = set(gdf_exch[self.CME][self.COL2FIELD[self.PRODUCT_GROUP]])
         mdf_cme = self.match_prod_code(dfs_adv[self.CME], pdgp_cme, ix_cme)
@@ -403,7 +442,6 @@ class CMEGMatcher(object):
 
         outpath = self.matched_file if outpath is None else outpath
         cp.XlsxWriter.save_sheets(outpath, {self.CME: mdf_cme, self.CBOT: mdf_cbot}, override=False)
-
 
     def __create_index(self, ix_path, fields, clean=False):
         if (not clean) and os.path.exists(ix_path):
@@ -438,7 +476,6 @@ class CMEGMatcher(object):
     def __clear_index(self, ix):
         wrt = ix.writer()
         wrt.commit(mergetype=writing.CLEAR)
-
 
 
 cme_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
