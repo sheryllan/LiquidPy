@@ -5,8 +5,7 @@ import os
 import re
 import inflect
 import itertools
-import copy
-import collections
+
 
 from whoosh.fields import *
 from whoosh.analysis import *
@@ -17,6 +16,7 @@ from whoosh import qparser
 from whoosh import writing
 
 import datascraper as dtsp
+from whooshext import *
 
 # Parse the config files
 # cp.parse_save()
@@ -80,133 +80,6 @@ class WhooshExtension(object):
 
 
 
-class VowelFilter(Filter):
-    VOWELS = ('a', 'e', 'i', 'o', 'u')
-
-    def __init__(self, exclusions=list()):
-        self.exclusions = exclusions
-
-    def __remove_vowels(self, string):
-        if len(string) < 4:
-            return string
-        result = string[0]
-        for s in string[1:]:
-            if s not in self.VOWELS:
-                result = result + s
-        return result
-
-    def __call__(self, stream):
-        for token in stream:
-            if token.text in self.exclusions:
-                yield token
-            else:
-                txt_changed = self.__remove_vowels(token.text)
-                if txt_changed != token.text:
-                    token_cpy = copy.deepcopy(token)
-                    token_cpy.text = txt_changed
-                    yield token
-                    yield token_cpy
-                else:
-                    yield token
-
-
-class CurrencyConverter(Filter):
-    CRRNCY_MAPPING = {'ad': 'australian dollar',
-                      'bp': 'british pound',
-                      'cd': 'canadian dollar',
-                      'ec': 'euro',
-                      'efx': 'euro',
-                      'jy': 'japanese yen',
-                      'jpy': 'japanese yen',
-                      'ne': 'new zealand dollar',
-                      'nok': 'norwegian krone',
-                      'sek': 'swedish krona',
-                      'sf': 'swiss franc',
-                      'skr': 'swedish krona',
-                      'zar': 'south african rand',
-                      'aud': 'australian dollar',
-                      'cad': 'canadian dollar',
-                      'eur': 'euro',
-                      'gbp': 'british pound',
-                      'pln': 'polish zloty',
-                      'nkr': 'norwegian krone',
-                      'inr': 'indian rupee',
-                      'rmb': 'chinese renminbi',
-                      'usd': 'us dollar'}
-
-    @classmethod
-    def get_cnvtd_kws(cls):
-        kws = set()
-        for val in CurrencyConverter.CRRNCY_MAPPING.values():
-            kws.update(val.split(' '))
-        return list(kws)
-
-    def __call__(self, stream):
-        for token in stream:
-            if token.text in self.CRRNCY_MAPPING:
-                currency = self.CRRNCY_MAPPING[token.text].split(' ')
-                for c in currency:
-                    token_cpy = copy.deepcopy(token)
-                    token_cpy.text = c
-                    yield token_cpy
-            else:
-                yield token
-
-
-class SplitFilter(Filter):
-    SRC_PTN_UPCS = 'A-Z'
-    SRC_PTN_LWCS = 'a-z'
-    SRC_PTN_NUM = '0-9'
-    SRC_PTN_COLL = '([{}]+)'
-
-    def __init__(self, delims='\W+', origin=True, splitwords=True, splitnums=True, mergewords=False, mergenums=False):
-        self.delims = delims
-        self.origin = origin
-        # if splitwords == mergewords:
-        #     wrd_ptn = [self.SRC_PTN_UPCS + self.SRC_PTN_LWCS]
-        #     wrdnum_ptn = [w + self.SRC_PTN_NUM for w in wrd_ptn] if splitnums == mergenums \
-        #         else wrd_ptn + [self.SRC_PTN_NUM]
-        # else:
-        #     wrd_ptn = [self.SRC_PTN_UPCS, self.SRC_PTN_LWCS] if splitwords else [self.SRC_PTN_UPCS + self.SRC_PTN_LWCS]
-        #     wrdnum_ptn = wrd_ptn + [self.SRC_PTN_NUM] if splitnums else [w + self.SRC_PTN_NUM for w in wrd_ptn]
-        #
-        # self.wrdnum_ptn = '|'.join([self.SRC_PTN_COLL.format(p) for p in wrdnum_ptn])
-
-        splt_wrd_ptn = [self.SRC_PTN_UPCS, self.SRC_PTN_LWCS] if splitwords else [self.SRC_PTN_UPCS + self.SRC_PTN_LWCS]
-        splt_wrdnum_ptn = splt_wrd_ptn + [self.SRC_PTN_NUM] if splitnums else [w + self.SRC_PTN_NUM for w in splt_wrd_ptn]
-        mrg_wrd_ptn = [self.SRC_PTN_UPCS + self.SRC_PTN_LWCS] if mergewords else [self.SRC_PTN_UPCS, self.SRC_PTN_LWCS]
-        mrg_wrdnum_ptn = [w + self.SRC_PTN_NUM for w in mrg_wrd_ptn] if mergenums else mrg_wrd_ptn + [self.SRC_PTN_NUM]
-
-        self.splt_ptn = '|'.join([self.SRC_PTN_COLL.format(p) for p in splt_wrdnum_ptn])
-        self.mrg_ptn = '|'.join([self.SRC_PTN_COLL.format(p) for p in mrg_wrdnum_ptn])
-
-    def __call__(self, stream):
-        for token in stream:
-            if self.origin:
-                yield token
-            words = re.split(self.delims, token.text) if re.search(self.delims, token.text) else [token.text]
-            for t in self.__get_matched_tokens(token, self.splt_ptn, self.mrg_ptn, words):
-                yield t
-
-    def __get_matched_tokens(self, token, splt_ptn, mrg_ptn, words):
-        for w in self.__get_matched_words(splt_ptn, mrg_ptn, words):
-            if w != token.text:
-                cpy = copy.deepcopy(token)
-                cpy.text = w
-                yield cpy
-
-    def __get_matched_words(self, splt_ptn, mrg_ptn, words):
-        for word in words:
-            chains = self.__findall(splt_ptn, word) if splt_ptn == mrg_ptn \
-                else set(itertools.chain(self.__findall(splt_ptn, word), self.__findall(mrg_ptn, word)))
-            for w in chains:
-                yield w
-
-    def __findall(self, pattern, word):
-        for w in re.findall(pattern, word):
-            if isinstance(w, collections.Iterable):
-                w = ''.join(w)
-            yield w
 
 
 class SearchHelper(object):
