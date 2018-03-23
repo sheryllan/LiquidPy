@@ -179,11 +179,13 @@ class CMEGMatcher(object):
     F_SUB_GROUP = 'Sub_Group'
     F_EXCHANGE = EXCHANGE
 
-    STOP_LIST = ['and', 'is', 'it', 'an', 'as', 'at', 'have', 'in', 'yet', 'if', 'from', 'for', 'when',
-                 'by', 'to', 'you', 'be', 'we', 'that', 'may', 'not', 'with', 'tbd', 'a', 'on', 'your',
-                 'this', 'of', 'will', 'can', 'the', 'or', 'are']
+    CME_EQUITIES_MAPPING = {'NIKKEI 225 ($) STOCK': 'Nikkei/USD',
+                            'NIKKEI 225 (YEN) STOCK': 'Nikkei/Yen Futures',
+                            'FT-SE 100': 'FTSE 100 (GBP)',
+                            }
 
-    STD_ANA = StandardAnalyzer('\S+', stoplist=STOP_LIST, minsize=1)
+    KYWRD_EXCLU = ['nasdq', 'ibovespa', 'index', 'mini', 'nikkei', 'russell', 'ftse', 'biotech', 'futures', 'options', ]
+
     CME_PDNM_ANA = STD_ANA | SplitFilter() | VowelFilter(CurrencyConverter.get_cnvtd_kws()) | CurrencyConverter()
     INDEX_FIELDS_CME = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=CME_PDNM_ANA),
                         F_PRODUCT_GROUP: ID(stored=True),
@@ -208,10 +210,6 @@ class CMEGMatcher(object):
                  GLOBEX: F_GLOBEX,
                  SUB_GROUP: F_SUB_GROUP,
                  EXCHANGE: F_EXCHANGE}
-
-    CME_EQUITIES_MAPPING = {'NIKKEI 225 ($) STOCK': 'Nikkei/USD',
-                            'NIKKEI 225 (YEN) STOCK': 'Nikkei/Yen Futures',
-                            'FT-SE 100': 'FTSE 100 (GBP)'}
 
     def __init__(self, adv_files, prods_file, out_path=None):
         self.adv_files = adv_files
@@ -264,25 +262,6 @@ class CMEGMatcher(object):
                 new_df = gpobj.get_group(group)
                 group_dict[group] = self.__groupby(new_df, cols[1:])
             return group_dict
-
-    # just for development
-    def exhibit(self, gdfs, cols):
-        output = os.path.join(checked_path, 'exhibit.xlsx')
-        cdfs = dict()
-        for gdf, col in zip(gdfs, cols):
-            for gp in gdf.keys():
-                df_sr = gdf[gp][[col]].sort_values(col).reset_index(drop=True)
-                gp_key = dtsp.find_first_n(cdfs.keys(), lambda x: self.__match_pdgp(gp, x))
-                if not gp_key:
-                    cdfs[gp] = df_sr
-                else:
-                    if col in cdfs[gp_key].columns:
-                        cdfs[gp_key] = pd.merge(cdfs[gp_key], df_sr, how='outer')
-                    else:
-                        cdfs[gp_key] = pd.concat([cdfs[gp_key], df_sr], axis=1)
-
-        cp.XlsxWriter.save_sheets(output, cdfs)
-        print(output)
 
     def __match_pdgp(self, s1, s2):
         wds1 = SearchHelper.get_words(s1)
@@ -432,7 +411,7 @@ cme_adv_files = [os.path.join(checked_path, report_files['cme']),
                  os.path.join(checked_path, report_files['nymex_comex'])]
 
 cme = CMEGMatcher(cme_adv_files, cme_prds_file)
-# cme.run_pd_chck(clean=True)
+cme.run_pd_chck(clean=True)
 
 # ix = open_dir(cme.index_cme)
 # # print(ix.schema.items())
@@ -482,5 +461,3 @@ cme = CMEGMatcher(cme_adv_files, cme_prds_file)
 # # ana = RegexTokenizer('\S+') | SplitFilter()
 # print([t.text for t in ana(' E-Mini S&P500')])
 
-ana = cme.CME_PDNM_ANA
-print([t.text for t in ana('Premium Quoted European Style on Australian Dollar/US Dollar  CHINESE RENMINBI (CNH) E-MICRO CAD/USD')])

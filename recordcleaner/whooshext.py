@@ -1,9 +1,4 @@
 import re
-import itertools
-import copy
-import collections
-import concurrent.futures
-from concurrent.futures import ThreadPoolExecutor
 
 from whoosh.analysis import *
 
@@ -25,16 +20,17 @@ class VowelFilter(Filter):
 
     def __call__(self, stream):
         for token in stream:
-            yield token
             if token.text not in self.exclusions:
                 txt_changed = self.__remove_vowels(token.text)
                 if txt_changed != token.text:
+                    yield token
                     token.text = txt_changed
                     yield token
+                else:
+                    yield token
+            else:
+                yield token
 
-    # def __and__(self, other):
-    #     other
-    #     self.__call__()
 
 
 class CurrencyConverter(Filter):
@@ -70,118 +66,108 @@ class CurrencyConverter(Filter):
 
     def __call__(self, stream):
         for token in stream:
-            yield token
             if token.text in self.CRRNCY_MAPPING:
                 currency = self.CRRNCY_MAPPING[token.text].split(' ')
+                yield token
                 for c in currency:
                     token.text = c
                     yield token
+            else:
+                yield token
 
 
 class SplitFilter(Filter):
-    SRC_PTN_UPCS = 'A-Z'
-    SRC_PTN_LWCS = 'a-z'
-    SRC_PTN_NUM = '0-9'
-    SRC_PTN_COLL = '([{}]+)'
+    PTN_SPLT_WRD = '([A-Z]+[^A-Z]*|[^A-Z]+)((?=[A-Z])|$)'
+    PTN_SPLT_NUM = '[0-9]+((?=[^0-9])|$)|[^0-9]+((?=[0-9])|$)'
+    PTN_SPLT_WRDNUM = '[0-9]+((?=[^0-9])|$)|([A-Z]+[^A-Z0-9]*|[^A-Z0-9]+)((?=[A-Z])|(?=[0-9])|$)'
+
+    PTN_MRG_WRD = '[A-Za-z]+'
+    PTN_MRG_NUM = '[0-9]+'
 
     def __init__(self, delims='\W+', origin=True, splitwords=True, splitnums=True, mergewords=False, mergenums=False):
         self.delims = delims
         self.origin = origin
-        # if splitwords == mergewords:
-        #     wrd_ptn = [self.SRC_PTN_UPCS + self.SRC_PTN_LWCS]
-        #     wrdnum_ptn = [w + self.SRC_PTN_NUM for w in wrd_ptn] if splitnums == mergenums \
-        #         else wrd_ptn + [self.SRC_PTN_NUM]
-        # else:
-        #     wrd_ptn = [self.SRC_PTN_UPCS, self.SRC_PTN_LWCS] if splitwords else [self.SRC_PTN_UPCS + self.SRC_PTN_LWCS]
-        #     wrdnum_ptn = wrd_ptn + [self.SRC_PTN_NUM] if splitnums else [w + self.SRC_PTN_NUM for w in wrd_ptn]
-        #
-        # self.wrdnum_ptn = '|'.join([self.SRC_PTN_COLL.format(p) for p in wrdnum_ptn])
+        self.splt_ptn = None
+        self.mrg_ptn = None
 
-        splt_wrd_ptn = [self.SRC_PTN_UPCS, self.SRC_PTN_LWCS] if splitwords else [self.SRC_PTN_UPCS + self.SRC_PTN_LWCS]
-        splt_wrdnum_ptn = splt_wrd_ptn + [self.SRC_PTN_NUM] if splitnums else [w + self.SRC_PTN_NUM for w in splt_wrd_ptn]
-        mrg_wrd_ptn = [self.SRC_PTN_UPCS + self.SRC_PTN_LWCS] if mergewords else [self.SRC_PTN_UPCS, self.SRC_PTN_LWCS]
-        mrg_wrdnum_ptn = [w + self.SRC_PTN_NUM for w in mrg_wrd_ptn] if mergenums else mrg_wrd_ptn + [self.SRC_PTN_NUM]
+        if mergewords and mergenums:
+            self.mrg_ptn = '|'.join([self.PTN_MRG_WRD, self.PTN_MRG_NUM])
+        elif mergewords:
+            self.mrg_ptn = self.PTN_MRG_WRD
+        elif mergenums:
+            self.mrg_ptn = self.PTN_MRG_NUM
 
-        self.splt_ptn = '|'.join([self.SRC_PTN_COLL.format(p) for p in splt_wrdnum_ptn])
-        self.mrg_ptn = '|'.join([self.SRC_PTN_COLL.format(p) for p in mrg_wrdnum_ptn])
+        if splitwords & splitnums:
+            self.splt_ptn = self.PTN_SPLT_WRDNUM
+        else:
+            if splitwords:
+                self.splt_ptn = self.PTN_SPLT_WRD
+            elif splitnums:
+                self.splt_ptn = self.PTN_SPLT_NUM
 
     def __call__(self, stream):
         for token in stream:
+            text = token.text
             if self.origin:
                 yield token
-            words = re.split(self.delims, token.text) if re.search(self.delims, token.text) else [token.text]
-            for t in self.__get_matched_tokens(token, self.splt_ptn, self.mrg_ptn, words):
-                yield t
+            words = re.split(self.delims, text) if re.search(self.delims, text) else [text]
+            for token in self.__split_merge(words, token):
+                if not (self.origin and token.text == text):
+                    yield token
 
-    def __get_matched_tokens(self, token, splt_ptn, mrg_ptn, words):
-        for w in self.__get_matched_words(splt_ptn, mrg_ptn, words):
-            if w != token.text:
-                cpy = copy.deepcopy(token)
-                cpy.text = w
-                yield cpy
-
-    def __get_matched_words(self, splt_ptn, mrg_ptn, words):
+    def __split_merge(self, words, token):
+        mrg_stream = ''
+        yielded = False
+        splits = []
         for word in words:
-            chains = self.__findall(splt_ptn, word) if splt_ptn == mrg_ptn \
-                else set(itertools.chain(self.__findall(splt_ptn, word), self.__findall(mrg_ptn, word)))
-            for w in chains:
-                yield w
+            # yield splits
+            if self.splt_ptn is None:
+                continue
+            splits = list(self.__findall(self.splt_ptn, word))
+            for split in splits:
+                token.text = split
+                yield token
+
+            # yield merges
+            if self.mrg_ptn is None:
+                continue
+            mtchobjs = re.finditer(self.mrg_ptn, word)
+            for match in mtchobjs:
+                if self.__can_merge(mrg_stream, match):
+                    mrg_stream = mrg_stream + match.group()
+                    yielded = False
+                else:
+                    if not mrg_stream in splits:
+                        token.text = mrg_stream
+                        yield token
+                    mrg_stream = match.group()
+                    yielded = True
+
+        if (self.mrg_ptn is not None) and (not yielded) and (mrg_stream not in splits):
+            token.text = mrg_stream
+            yield token
+
+    def __are_same_type(self, s1, s2):
+        return (re.match(self.PTN_MRG_WRD, s1) and re.match(self.PTN_MRG_WRD, s2)) \
+               or (re.match(self.PTN_MRG_NUM, s1) and re.match(self.PTN_MRG_NUM, s2))
+
+    def __can_merge(self, string, mtchobj):
+        return (not string) or (self.__are_same_type(string, mtchobj.group()) and mtchobj.start() == 0)
 
     def __findall(self, pattern, word):
-        for w in re.findall(pattern, word):
-            if isinstance(w, collections.Iterable):
-                w = ''.join(w)
-            yield w
-
-
-class ChainedAnalyzer(Analyzer):
-    def __init__(self, analyzer, *composables):
-        if not isinstance(analyzer, Analyzer):
-            raise TypeError("First argument must be of type Analyzer")
-        self.analyzer = analyzer
-        self.items = []
-        for composable in composables:
-            if isinstance(composable, Tokenizer):
-                raise CompositionError("No tokenizer allowed appending the analyzer: %r" % self.items)
-            if isinstance(composable, Filter):
-                self.items.append(composable)
-
-    def __and__(self, other):
-        if not isinstance(other, Composable):
-            raise TypeError("%r is not composable with %r" % (self, other))
-        return ChainedAnalyzer(self, other)
-
-    def __call__(self, value, no_morph=False, **kwargs):
-        pool = ThreadPoolExecutor()
-        future = pool.submit(self.analyzer, value, **kwargs)
-        while not future.done():
-            pass
-        gen = future.result()
-
-        items = self.items
-        for item in items:
-            if not (no_morph and hasattr(item, "is_morph") and item.is_morph):
-                gen = item(gen)
-        return gen
-
-
-    def __analyzer_cb(self, gen, no_morph):
-        items = self.items
-        for item in items:
-            if not (no_morph and hasattr(item, "is_morph") and item.is_morph):
-                gen = item(gen)
-        return gen
+        for mobj in re.finditer(pattern, word):
+            yield mobj.group()
 
 
 STOP_LIST = ['and', 'is', 'it', 'an', 'as', 'at', 'have', 'in', 'yet', 'if', 'from', 'for', 'when',
                  'by', 'to', 'you', 'be', 'we', 'that', 'may', 'not', 'with', 'tbd', 'a', 'on', 'your',
                  'this', 'of', 'will', 'can', 'the', 'or', 'are']
 
-STD_ANA = StandardAnalyzer(stoplist=STOP_LIST, minsize=1)
-# CME_PDNM_ANA = STD_ANA | SplitFilter() | CurrencyConverter() | VowelFilter()
-CME_PDNM_ANA = ChainedAnalyzer(STD_ANA) & VowelFilter() & CurrencyConverter()
+STD_ANA = StandardAnalyzer('[^\s/]+', stoplist=STOP_LIST, minsize=1)
 
-ana = CME_PDNM_ANA
-# print([t.text for t in ana('Premium Quoted European Style on Australian Dollar/US Dollar  CHINESE RENMINBI (CNH) E-MICRO CAD/USD aud')])
-print([t.text for t in ana('ec zar')])
+ana = STD_ANA | SplitFilter() | VowelFilter(CurrencyConverter.get_cnvtd_kws()) | CurrencyConverter()
+# ana = FancyAnalyzer()
+# print([t.text for t in ana('Premium-Quoted European Style on Australian Dollar/US Dollar  CHINESE RENMINBI (CNH) E-MICRO CAD/USD aud')])
+# print([t.text for t in ana(' E-MINI S&P500*30 ECapTotal5-3-city')])
+print([t.text for t in ana(' NASDAQ BIOTECH')])
 
