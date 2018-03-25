@@ -25,12 +25,18 @@ A_TAB = 'a'
 HREF_ATTR = 'href'
 
 
-def flatten_list(items, flat_list, level):
+def flatten_list(items, flat_list, level=None):
     if isinstance(items, list):
         for sublist in items:
-            flatten_list(sublist, flat_list, level + 1)
+            if level is not None:
+                flatten_list(sublist, flat_list, level + 1)
+            else:
+                flatten_list(sublist, flat_list, None)
     else:
-        flat_list.append((level, items))
+        if level is not None:
+            flat_list.append((level, items))
+        else:
+            flat_list.append(items)
     return flat_list
 
 
@@ -265,12 +271,15 @@ class CMEGScraper(object):
     def __parse_line(self, line, **kwargs):
         kw_pattern = 'pattern'
         kw_extras = 'extras'
-        kw_sep = 'sep'
-        line = line.rstrip()
-        pattern = kwargs[kw_pattern] if kw_pattern in kwargs else '(?<! )+ {2,}|(?<=[0-9%,-])+ +?(?=[0-9%,-])+'
-        sep = kwargs[kw_sep] if kw_sep in kwargs else '\t'
-        repl = re.sub(pattern, sep, line)
-        values = self.__text_to_num(repl.split(sep))
+        # kw_sep = 'sep'
+        # line = line.rstrip()
+        # pattern = kwargs[kw_pattern] if kw_pattern in kwargs else '(?<! )+ {2,}|(?<=[0-9%,-])+ +?(?=[0-9%,-])+'
+        # sep = kwargs[kw_sep] if kw_sep in kwargs else '\t'
+        # repl = re.sub(pattern, sep, line)
+        # values = self.__text_to_num(repl.split(sep))
+        pattern = kwargs[kw_pattern] if kw_pattern in kwargs else '(\S+( \S+)*)+'
+        values = [v[0] for v in re.findall(pattern, line)]
+        values = self.__text_to_num(values)
         return values if kw_extras not in kwargs else values + list(kwargs[kw_extras])
 
     def __append_to_df(self, df, line, *args):
@@ -371,7 +380,7 @@ class OSEScraper(object):
             f_pdf.close()
 
 # download_path = os.getcwd()
-# download_path = '/home/slan/Documents/downloads/'
+# # download_path = '/home/slan/Documents/downloads/'
 # cme = CMEGScraper(download_path)
 # cme.run_scraper()
 # cme.download_to_xlsx_adv()

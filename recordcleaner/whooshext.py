@@ -33,47 +33,47 @@ class VowelFilter(Filter):
 
 
 
-class CurrencyConverter(Filter):
-    CRRNCY_MAPPING = {'ad': 'australian dollar',
-                      'bp': 'british pound',
-                      'cd': 'canadian dollar',
-                      'ec': 'euro',
-                      'efx': 'euro',
-                      'jy': 'japanese yen',
-                      'jpy': 'japanese yen',
-                      'ne': 'new zealand dollar',
-                      'nok': 'norwegian krone',
-                      'sek': 'swedish krona',
-                      'sf': 'swiss franc',
-                      'skr': 'swedish krona',
-                      'zar': 'south african rand',
-                      'aud': 'australian dollar',
-                      'cad': 'canadian dollar',
-                      'eur': 'euro',
-                      'gbp': 'british pound',
-                      'pln': 'polish zloty',
-                      'nkr': 'norwegian krone',
-                      'inr': 'indian rupee',
-                      'rmb': 'chinese renminbi',
-                      'usd': 'us dollar'}
-
-    @classmethod
-    def get_cnvtd_kws(cls):
-        kws = set()
-        for val in CurrencyConverter.CRRNCY_MAPPING.values():
-            kws.update(val.split(' '))
-        return list(kws)
-
-    def __call__(self, stream):
-        for token in stream:
-            if token.text in self.CRRNCY_MAPPING:
-                currency = self.CRRNCY_MAPPING[token.text].split(' ')
-                yield token
-                for c in currency:
-                    token.text = c
-                    yield token
-            else:
-                yield token
+# class CurrencyConverter(Filter):
+#     CRRNCY_MAPPING = {'ad': 'australian dollar',
+#                       'bp': 'british pound',
+#                       'cd': 'canadian dollar',
+#                       'ec': 'euro cross rate',
+#                       'efx': 'euro fx',
+#                       'jy': 'japanese yen',
+#                       'jpy': 'japanese yen',
+#                       'ne': 'new zealand dollar',
+#                       'nok': 'norwegian krone',
+#                       'sek': 'swedish krona',
+#                       'sf': 'swiss franc',
+#                       'skr': 'swedish krona',
+#                       'zar': 'south african rand',
+#                       'aud': 'australian dollar',
+#                       'cad': 'canadian dollar',
+#                       'eur': 'euro',
+#                       'gbp': 'british pound',
+#                       'pln': 'polish zloty',
+#                       'nkr': 'norwegian krone',
+#                       'inr': 'indian rupee',
+#                       'rmb': 'chinese renminbi',
+#                       'usd': 'us american dollar'}
+#
+#     @classmethod
+#     def get_cnvtd_kws(cls):
+#         kws = set()
+#         for val in CurrencyConverter.CRRNCY_MAPPING.values():
+#             kws.update(val.split(' '))
+#         return list(kws)
+#
+#     def __call__(self, stream):
+#         for token in stream:
+#             if token.text in self.CRRNCY_MAPPING:
+#                 currency = self.CRRNCY_MAPPING[token.text].split(' ')
+#                 yield token
+#                 for c in currency:
+#                     token.text = c
+#                     yield token
+#             else:
+#                 yield token
 
 
 class SplitFilter(Filter):
@@ -159,15 +159,31 @@ class SplitFilter(Filter):
             yield mobj.group()
 
 
+class SpecialWordFilter(Filter):
+    def __init__(self, worddict):
+        self.word_dict = worddict
+
+    def __call__(self, stream):
+        for token in stream:
+            if token.text in self.word_dict:
+                words = self.word_dict[token.text].split(' ')
+                yield token
+                for w in words:
+                    token.text = w
+                    yield token
+            else:
+                yield token
+
+
 STOP_LIST = ['and', 'is', 'it', 'an', 'as', 'at', 'have', 'in', 'yet', 'if', 'from', 'for', 'when',
                  'by', 'to', 'you', 'be', 'we', 'that', 'may', 'not', 'with', 'tbd', 'a', 'on', 'your',
                  'this', 'of', 'will', 'can', 'the', 'or', 'are']
 
 STD_ANA = StandardAnalyzer('[^\s/]+', stoplist=STOP_LIST, minsize=1)
 
-ana = STD_ANA | SplitFilter() | VowelFilter(CurrencyConverter.get_cnvtd_kws()) | CurrencyConverter()
+# ana = STD_ANA | SplitFilter(origin=False, mergewords=True, mergenums=True) | VowelFilter(CurrencyConverter.get_cnvtd_kws()) | CurrencyConverter()
 # ana = FancyAnalyzer()
 # print([t.text for t in ana('Premium-Quoted European Style on Australian Dollar/US Dollar  CHINESE RENMINBI (CNH) E-MICRO CAD/USD aud')])
 # print([t.text for t in ana(' E-MINI S&P500*30 ECapTotal5-3-city')])
-print([t.text for t in ana(' NASDAQ BIOTECH')])
+# print([t.text for t in ana('  E-MICRO AUD/USD')])
 
