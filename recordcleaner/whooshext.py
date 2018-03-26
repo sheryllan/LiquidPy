@@ -1,13 +1,37 @@
 import re
+import itertools
 
 from whoosh.analysis import *
 
 
-class VowelFilter(Filter):
+class CompositeFilter(Filter):
+    def __init__(self, *filters):
+        self.filters = []
+        for filter in filters:
+            if isinstance(filter, Filter):
+                self.filters.append(filter)
+            else:
+                raise TypeError('The input type must be a Filter/CompositeFilter')
+
+    def __and__(self, other):
+        if not isinstance(other, Filter):
+            raise TypeError('{} is not composable(and) with {}'.format(self, other))
+        return CompositeFilter(self, other)
+
+    def __call__(self, stream):
+        flts = self.filters
+        gen = stream
+        for f in flts:
+            gen = f(gen)
+        return gen
+
+
+class VowelFilter(CompositeFilter):
     VOWELS = ('a', 'e', 'i', 'o', 'u')
 
     def __init__(self, exclusions=list()):
         self.exclusions = exclusions
+        super().__init__(self)
 
     def __remove_vowels(self, string):
         if len(string) < 4:
@@ -32,51 +56,7 @@ class VowelFilter(Filter):
                 yield token
 
 
-
-# class CurrencyConverter(Filter):
-#     CRRNCY_MAPPING = {'ad': 'australian dollar',
-#                       'bp': 'british pound',
-#                       'cd': 'canadian dollar',
-#                       'ec': 'euro cross rate',
-#                       'efx': 'euro fx',
-#                       'jy': 'japanese yen',
-#                       'jpy': 'japanese yen',
-#                       'ne': 'new zealand dollar',
-#                       'nok': 'norwegian krone',
-#                       'sek': 'swedish krona',
-#                       'sf': 'swiss franc',
-#                       'skr': 'swedish krona',
-#                       'zar': 'south african rand',
-#                       'aud': 'australian dollar',
-#                       'cad': 'canadian dollar',
-#                       'eur': 'euro',
-#                       'gbp': 'british pound',
-#                       'pln': 'polish zloty',
-#                       'nkr': 'norwegian krone',
-#                       'inr': 'indian rupee',
-#                       'rmb': 'chinese renminbi',
-#                       'usd': 'us american dollar'}
-#
-#     @classmethod
-#     def get_cnvtd_kws(cls):
-#         kws = set()
-#         for val in CurrencyConverter.CRRNCY_MAPPING.values():
-#             kws.update(val.split(' '))
-#         return list(kws)
-#
-#     def __call__(self, stream):
-#         for token in stream:
-#             if token.text in self.CRRNCY_MAPPING:
-#                 currency = self.CRRNCY_MAPPING[token.text].split(' ')
-#                 yield token
-#                 for c in currency:
-#                     token.text = c
-#                     yield token
-#             else:
-#                 yield token
-
-
-class SplitFilter(Filter):
+class SplitFilter(CompositeFilter):
     PTN_SPLT_WRD = '([A-Z]+[^A-Z]*|[^A-Z]+)((?=[A-Z])|$)'
     PTN_SPLT_NUM = '[0-9]+((?=[^0-9])|$)|[^0-9]+((?=[0-9])|$)'
     PTN_SPLT_WRDNUM = '[0-9]+((?=[^0-9])|$)|([A-Z]+[^A-Z0-9]*|[^A-Z0-9]+)((?=[A-Z])|(?=[0-9])|$)'
@@ -89,6 +69,7 @@ class SplitFilter(Filter):
         self.origin = origin
         self.splt_ptn = None
         self.mrg_ptn = None
+        super().__init__(self)
 
         if mergewords and mergenums:
             self.mrg_ptn = '|'.join([self.PTN_MRG_WRD, self.PTN_MRG_NUM])
@@ -159,17 +140,22 @@ class SplitFilter(Filter):
             yield mobj.group()
 
 
-class SpecialWordFilter(Filter):
-    def __init__(self, worddict):
+class SpecialWordFilter(CompositeFilter):
+    def __init__(self, worddict, tokenizer=RegexTokenizer()):
         self.word_dict = worddict
+        if not isinstance(tokenizer, Tokenizer):
+            raise TypeError('Input is not a valid instance of Tokenizer')
+        self.tokenizer = tokenizer
+        super().__init__(self)
 
     def __call__(self, stream):
         for token in stream:
             if token.text in self.word_dict:
-                words = self.word_dict[token.text].split(' ')
-                yield token
-                for w in words:
-                    token.text = w
+                tks = self.tokenizer(self.word_dict[token.text][0])
+                if self.word_dict[token.text][1]:
+                    yield token
+                for t in tks:
+                    token.text = t.text
                     yield token
             else:
                 yield token

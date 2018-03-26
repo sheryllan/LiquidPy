@@ -27,30 +27,32 @@ def filter(df, col, exp):
     return df[col].map(exp)
 
 
-CRRNCY_MAPPING = {'ad': 'australian dollar',
-                  'bp': 'british pound',
-                  'cd': 'canadian dollar',
-                  'ec': 'euro cross rate',
-                  'efx': 'euro fx',
-                  'jy': 'japanese yen',
-                  'jpy': 'japanese yen',
-                  'ne': 'new zealand dollar',
-                  'nok': 'norwegian krone',
-                  'sek': 'swedish krona',
-                  'sf': 'swiss franc',
-                  'skr': 'swedish krona',
-                  'zar': 'south african rand',
-                  'aud': 'australian dollar',
-                  'cad': 'canadian dollar',
-                  'eur': 'euro',
-                  'gbp': 'british pound',
-                  'pln': 'polish zloty',
-                  'nkr': 'norwegian krone',
-                  'inr': 'indian rupee',
-                  'rmb': 'chinese renminbi',
-                  'usd': 'us american dollar'}
+CRRNCY_MAPPING = {'ad': ('australian dollar', False),
+                  'bp': ('british pound', False),
+                  'cd': ('canadian dollar', False),
+                  'ec': ('euro cross rate', False),
+                  'efx': ('euro fx', False),
+                  'jy': ('japanese yen', False),
+                  'jpy': ('japanese yen', False),
+                  'ne': ('new zealand dollar', False),
+                  'nok': ('norwegian krone', False),
+                  'sek': ('swedish krona', False),
+                  'sf': ('swiss franc', False),
+                  'skr': ('swedish krona', False),
+                  'zar': ('south african rand', False),
+                  'aud': ('australian dollar', False),
+                  'cad': ('canadian dollar', False),
+                  'chf': ('swiss franc', False),
+                  'eur': ('euro', False),
+                  'gbp': ('british pound', False),
+                  'pln': ('polish zloty', False),
+                  'nkr': ('norwegian krone', False),
+                  'inr': ('indian rupee', False),
+                  'rmb': ('chinese renminbi', False),
+                  'usd': ('us american dollar', False)}
 
-CRRNCY_KEYWORDS = list(set(dtsp.flatten_list([v.split(' ') for v in CRRNCY_MAPPING.values()], list())))
+CRRNCY_KEYWORDS = list(set(dtsp.flatten_list(
+    [[k.split(' '), v[0].split(' ')] for k, v in CRRNCY_MAPPING.items()], list())))
 
 
 class SearchHelper(object):
@@ -163,15 +165,14 @@ class CMEGMatcher(object):
                           'Options'): 'Premium Quoted European Style Options on Euro/US Dollar Futures',
                          ('JAPANESE YEN', 'FX',
                           'Options'): 'Premium Quoted European Style Options on Japanese Yen/US Dollar Futures',
-                         ('BDI', 'Equity Index', 'Futures'): 'CME Bloomberg Dollar Spot Index'}
-
-    CME_SPECIAL_MAPPING = {'midcurve': 'mc',
-                           'pqo': 'premium quoted european style options',
-                           'eow': 'weekly',
-                           'eom': 'monthly',
-                           'eu': 'european'}
-
-    CME_KEYWORD_MAPPING = {**CRRNCY_MAPPING, **CME_SPECIAL_MAPPING}
+                         ('SWISS FRANC', 'FX',
+                          'Options'): 'Premium Quoted European Style Options on Swiss Franc/US Dollar Futures',
+                         ('BDI', 'FX', 'Futures'): 'CME Bloomberg Dollar Spot Index',
+                         ('S.AFRICAN RAND', 'FX', 'Futures'): 'South African Rand',
+                         ('CHINESE RENMINBI (CNH)', 'FX', 'Futures'): 'Standard-Size USD/Offshore RMB (CNH)',
+                         ('CHF/USD PQO 2pm Fix', 'FX',
+                          'Options'): 'Weekly Premium Quoted European Style Options on Swiss Franc/US Dollar Futures - Wk'
+                         }
 
     CME_MULTI_MATCH = [('EURO MIDCURVE', 'Interest Rate', 'Options'),
                        ('AUD/USD PQO 2pm Fix', 'FX', 'Options'),
@@ -181,14 +182,28 @@ class CMEGMatcher(object):
                        ('CAD/USD PQO 2pm Fix', 'FX', 'Options'),
                        ('CHF/USD PQO 2pm Fix', 'FX', 'Options')]
 
-    KYWRD_EXCLU = CRRNCY_KEYWORDS + \
-                  ['nasdq', 'ibovespa', 'index', 'mini',
-                   'micro', 'nikkei', 'russell', 'ftse',
-                   'european', 'premium', 'quoted', 'style',
-                   'futures', 'options']
+    CME_SPECIAL_MAPPING = {'midcurve': ('mc', True),
+                           'pqo': ('premium quoted european style options', False),
+                           'eow': ('weekly wk', False),
+                           'eom': ('monthly', False),
+                           'eu': ('european', False),
+                           'usdzar': ('us dollar south african rand', False)}
 
-    CME_PDNM_ANA = STD_ANA | SplitFilter(origin=False, mergewords=True, mergenums=True) \
-                   | SpecialWordFilter(CME_KEYWORD_MAPPING) | VowelFilter(KYWRD_EXCLU)
+    CME_SPECIAL_KEYWORDS = list(set(dtsp.flatten_list(
+        [[k.split(' '), v[0].split(' ')] for k, v in CME_SPECIAL_MAPPING.items()], list())))
+
+    CME_KEYWORD_MAPPING = {**CRRNCY_MAPPING, **CME_SPECIAL_MAPPING}
+
+    CME_KYWRD_EXCLU = CRRNCY_KEYWORDS + CME_SPECIAL_KEYWORDS + \
+                      ['nasdaq', 'ibovespa', 'index', 'mini', 'emini',
+                       'micro', 'emicro', 'nikkei', 'russell', 'ftse',
+                       'european']
+
+    SPLT_FLT = SplitFilter(origin=False, mergewords=True, mergenums=True)
+    CME_SP_FLT = SpecialWordFilter(CME_KEYWORD_MAPPING)
+    CME_VW_FLT = VowelFilter(CME_KYWRD_EXCLU)
+
+    CME_PDNM_ANA = STD_ANA | SPLT_FLT | CME_SP_FLT | CME_VW_FLT
     INDEX_FIELDS_CME = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=CME_PDNM_ANA),
                         F_PRODUCT_GROUP: ID(stored=True),
                         F_CLEARED_AS: ID(stored=True, unique=True),
