@@ -284,8 +284,8 @@ class CMEGScraper(object):
 
     def __append_to_df(self, df, line, *args):
         line_parsed = self.__parse_line(line, extras=list(args))
-        df_tmp = pd.DataFrame([line_parsed], columns=list(df.columns))
-        return df.append(df_tmp, ignore_index=True)
+        df = df.append(pd.Series(line_parsed, index=df.columns), ignore_index=True)
+        return df
 
     def __text_to_num(self, values):
         pattern = '^-?[\d\.,]+%?$'
@@ -380,10 +380,10 @@ class OSEScraper(object):
         finally:
             f_pdf.close()
 
-download_path = os.getcwd()
-# download_path = '/home/slan/Documents/downloads/'
-cme = CMEGScraper(download_path)
-cme.run_scraper()
+# download_path = os.getcwd()
+# # download_path = '/home/slan/Documents/downloads/'
+# cme = CMEGScraper(download_path)
+# cme.run_scraper()
 # cme.download_to_xlsx_adv()
 
 

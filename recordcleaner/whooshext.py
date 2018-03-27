@@ -1,6 +1,7 @@
 import re
 import itertools
 import math
+from collections import namedtuple
 
 from whoosh.analysis import *
 
@@ -94,7 +95,7 @@ class SplitFilter(CompositeFilter):
             text = token.text
             if self.origin:
                 yield token
-            words = re.split(self.delims, text) if re.search(self.delims, text) else [text]
+            words = filter(None, re.split(self.delims, text)) if re.search(self.delims, text) else [text]
             for token in self.__split_merge(words, token):
                 if not (self.origin and token.text == text):
                     yield token
@@ -127,7 +128,8 @@ class SplitFilter(CompositeFilter):
                     mrg_stream = match.group()
                     yielded = True
 
-        if (self.mrg_ptn is not None) and (not yielded) and (mrg_stream not in splits):
+        if (self.mrg_ptn is not None) and (not yielded) \
+                and (mrg_stream and mrg_stream not in splits):
             token.text = mrg_stream
             yield token
 
@@ -168,44 +170,108 @@ class SpecialWordFilter(CompositeFilter):
 
 
 def min_dist_rslt(results, qstring, fieldname, field, minboost=1):
-    min_dist = math.inf
-    q_tokens = sorted([(token.text, token.boost) for token in field.analyzer(qstring) if token.boost >= minboost], key=lambda x: x[0])
-    qt_len = sum([token[1] for token in q_tokens])
-    best_result = results[0]
+    q_tokens = sorted([(token.text, token.boost) for token in field.analyzer(qstring) if token.boost >= minboost],
+                      key=lambda x: x[0])
+    results_srted = TreeMap()
+    head = None
     for r in results:
         field_value = r.fields()[fieldname]
-        r_tokens = sorted([(token.text, token.boost) for token in field.analyzer(field_value) if token.boost >= minboost], key=lambda x: x[0])
+        r_tokens = sorted(
+            [(token.text, token.boost) for token in field.analyzer(field_value) if token.boost >= minboost],
+            key=lambda x: x[0])
 
         iter_qt = iter(r_tokens)
         iter_rt = iter(q_tokens)
         next_qt = next(iter_qt, None)
         next_rt = next(iter_rt, None)
-        dist = sum([token[1] for token in r_tokens]) + qt_len
+        qt_len = sum([token[1] for token in q_tokens])
+        rt_len = sum([token[1] for token in r_tokens])
         while next_qt is not None:
             while next_rt is not None:
                 if next_qt[0] == next_rt[0]:
-                    dist -= (next_rt[1] + next_qt[1])
+                    qt_len -= next_qt[1]
+                    rt_len -= next_rt[1]
                     next_rt = next(iter_rt, None)
                     break
                 else:
                     next_rt = next(iter_rt, None)
             next_qt = next(iter_qt, None)
-        if dist < min_dist:
-            min_dist = dist
-            best_result = r
-    return best_result
+        head = results_srted.add(((qt_len, rt_len), r), head)
+        # if qt_len < min_qt_dist:
+        #     min_qt_dist = qt_len
+        #     min_rt_dist = rt_len
+        #     best_result = r
+        # elif qt_len == min_qt_dist:
+        #     if rt_len < min_rt_dist:
+        #         min_rt_dist = rt_len
+        #         best_result = r
+    return [r for _, r in results_srted.get_items(head)]
 
 
+class TreeMap(object):
+    class Node(object):
+        def __init__(self, data, left, right):
+            self.data = data
+            self.left = left
+            self.right = right
+            self.level = 1
 
+    def skew(self, node):
+        if node.left is None:
+            return node
+        if node.level == node.left.level:
+            left = node.left
+            node.left = left.right
+            left.right = node
+            return left
+        return node
 
+    def split(self, node):
+        if node.right is None or node.right.right is None:
+            return node
+        if node.level == node.right.right.level:
+            right = node.right
+            node.right = right.left
+            right.left = node
+            right.level += 1
+            return right
+        return node
 
+    def add(self, item, node=None):
+        if node is None:
+            return TreeMap.Node(item, None, None)
+        key, value = item
+        data = node.data
+        nkey, nval = data
 
+        if key < nkey:
+            node.left = self.add(item, node.left)
+        elif key == nkey:
+            node.right = TreeMap.Node(item, None, node.right)
+        else:
+            node.right = self.add(item, node.right)
+
+        node = self.skew(node)
+        node = self.split(node)
+        return node
+
+    def get_items(self, head):
+
+        def get_items_recursive(node, items):
+            if node is None:
+                return items
+            items = get_items_recursive(node.left, items)
+            items.append(node.data)
+            items = get_items_recursive(node.right, items)
+            return items
+
+        return get_items_recursive(head, [])
 
 
 
 STOP_LIST = ['and', 'is', 'it', 'an', 'as', 'at', 'have', 'in', 'yet', 'if', 'from', 'for', 'when',
-                 'by', 'to', 'you', 'be', 'we', 'that', 'may', 'not', 'with', 'tbd', 'a', 'on', 'your',
-                 'this', 'of', 'will', 'can', 'the', 'or', 'are']
+             'by', 'to', 'you', 'be', 'we', 'that', 'may', 'not', 'with', 'tbd', 'a', 'on', 'your',
+             'this', 'of', 'will', 'can', 'the', 'or', 'are']
 
 STD_ANA = StandardAnalyzer('[^\s/]+', stoplist=STOP_LIST, minsize=1)
 
@@ -214,4 +280,3 @@ STD_ANA = StandardAnalyzer('[^\s/]+', stoplist=STOP_LIST, minsize=1)
 # print([t.text for t in ana('Premium-Quoted European Style on Australian Dollar/US Dollar  CHINESE RENMINBI (CNH) E-MICRO CAD/USD aud')])
 # print([t.text for t in ana(' E-MINI S&P500*30 ECapTotal5-3-city')])
 # print([t.text for t in ana('  E-MICRO AUD/USD')])
-

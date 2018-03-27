@@ -152,9 +152,9 @@ class CMEGMatcher(object):
     F_SUB_GROUP = 'Sub_Group'
     F_EXCHANGE = EXCHANGE
 
-    CME_EXACT_MAPPING = {('NIKKEI 225 ($) STOCK', 'Equity Index', 'Futures'): 'Nikkei/USD',
-                         ('NIKKEI 225 (YEN) STOCK', 'Equity Index', 'Futures'): 'Nikkei/Yen',
-                         ('FT-SE 100', 'Equity Index', 'Futures'): 'FTSE 100 (GBP)',
+    CME_EXACT_MAPPING = {
+                         ('BDI', 'FX', 'Futures'): 'CME Bloomberg Dollar Spot Index',
+                         ('CHINESE RENMINBI (CNH)', 'FX', 'Futures'): 'Standard-Size USD/Offshore RMB (CNH)',
                          ('AUSTRALIAN DOLLAR', 'FX',
                           'Options'): 'Premium Quoted European Style Options on Australian Dollar/US Dollar Futures',
                          ('BRITISH POUND', 'FX',
@@ -167,9 +167,6 @@ class CMEGMatcher(object):
                           'Options'): 'Premium Quoted European Style Options on Japanese Yen/US Dollar Futures',
                          ('SWISS FRANC', 'FX',
                           'Options'): 'Premium Quoted European Style Options on Swiss Franc/US Dollar Futures',
-                         ('BDI', 'FX', 'Futures'): 'CME Bloomberg Dollar Spot Index',
-                         ('S.AFRICAN RAND', 'FX', 'Futures'): 'South African Rand',
-                         ('CHINESE RENMINBI (CNH)', 'FX', 'Futures'): 'Standard-Size USD/Offshore RMB (CNH)',
                          ('CHF/USD PQO 2pm Fix', 'FX',
                           'Options'): 'Weekly Premium Quoted European Style Options on Swiss Franc/US Dollar Futures - Wk'
                          }
@@ -188,20 +185,29 @@ class CMEGMatcher(object):
                            'eom': ('monthly', 1.2),
                            'usdzar': ('us dollar south african rand', 1.2),
                            'biotech': ('biotechnology', 1.2),
-                           'cross': ('cross', 0.6),
-                           'rates': ('rates', 0.6)}
+                           '$': ('us american dollar', 1.2),
+                           'sector': ('sector', 1.2)
+                           }
+
+    CME_COMMON_WORDS = {'cross': ('cross', 0.6),
+                        'rates': ('rates', 0.6),
+                        'rate': ('rate', 0.6),
+                        'futures': ('futures', 0),
+                        'options': ('options', 0),
+                        'index': ('index', 0),
+                        }
 
     CME_SPECIAL_KEYWORDS = list(set(dtsp.flatten_list(
         [[k.split(' '), v[0].split(' ')] for k, v in CME_SPECIAL_MAPPING.items()], list())))
 
-    CME_KEYWORD_MAPPING = {**CRRNCY_MAPPING, **CME_SPECIAL_MAPPING}
+    CME_KEYWORD_MAPPING = {**CRRNCY_MAPPING, **CME_SPECIAL_MAPPING, **CME_COMMON_WORDS}
 
     CME_KYWRD_EXCLU = CRRNCY_KEYWORDS + CME_SPECIAL_KEYWORDS + \
                       ['nasdaq', 'ibovespa', 'index', 'mini', 'emini',
                        'micro', 'emicro', 'nikkei', 'russell', 'ftse',
                        'european']
 
-    SPLT_FLT = SplitFilter(origin=False, mergewords=True, mergenums=True)
+    SPLT_FLT = SplitFilter(delims='[&/\(\)-]', origin=False, mergewords=True, mergenums=True)
     CME_SP_FLT = SpecialWordFilter(CME_KEYWORD_MAPPING)
     CME_VW_FLT = VowelFilter(CME_KYWRD_EXCLU)
 
@@ -270,7 +276,8 @@ class CMEGMatcher(object):
     def __clean_prod_name(self, row):
         product = row[self.PRODUCT_NAME]
         der_type = row[self.CLEARED_AS]
-        return product.replace(der_type, '') if last_word(product) == der_type else product
+        product = product.replace(der_type, '') if last_word(product) == der_type else product
+        return product.rstrip()
 
     def __groupby(self, df, cols):
         if not cols:
@@ -315,6 +322,9 @@ class CMEGMatcher(object):
                         query = self.__exact_or_query(self.F_PRODUCT_NAME, ix.schema, row[self.PRODUCT])
                         results = searcher.search(query, filter=grouping_q, limit=None)
                         if results:
+                            if one_or_all == 'one':
+                                results = min_dist_rslt(results, row[self.PRODUCT],
+                                                         self.F_PRODUCT_NAME, self.INDEX_FIELDS_CME[self.F_PRODUCT_NAME])
                             rows_matched = self.__join_results(results, row, how=one_or_all)
                         else:
                             rows_matched = row
@@ -343,7 +353,7 @@ class CMEGMatcher(object):
         # df_adv.reset_index(drop=0, inplace=True)
         return df
 
-    def __join_results(self, results, *dfs, how):
+    def __join_results(self, results, *dfs, how='one'):
         joined_dict = [results[0].fields()] if how == 'one' else [r.fields() for r in results]
         if dfs is not None:
             for df in dfs:
