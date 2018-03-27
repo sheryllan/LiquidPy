@@ -27,29 +27,29 @@ def filter(df, col, exp):
     return df[col].map(exp)
 
 
-CRRNCY_MAPPING = {'ad': ('australian dollar', False),
-                  'bp': ('british pound', False),
-                  'cd': ('canadian dollar', False),
-                  'ec': ('euro cross rate', False),
-                  'efx': ('euro fx', False),
-                  'jy': ('japanese yen', False),
-                  'jpy': ('japanese yen', False),
-                  'ne': ('new zealand dollar', False),
-                  'nok': ('norwegian krone', False),
-                  'sek': ('swedish krona', False),
-                  'sf': ('swiss franc', False),
-                  'skr': ('swedish krona', False),
-                  'zar': ('south african rand', False),
-                  'aud': ('australian dollar', False),
-                  'cad': ('canadian dollar', False),
-                  'chf': ('swiss franc', False),
-                  'eur': ('euro', False),
-                  'gbp': ('british pound', False),
-                  'pln': ('polish zloty', False),
-                  'nkr': ('norwegian krone', False),
-                  'inr': ('indian rupee', False),
-                  'rmb': ('chinese renminbi', False),
-                  'usd': ('us american dollar', False)}
+CRRNCY_MAPPING = {'ad': ('australian dollar', 1.2),
+                  'bp': ('british pound', 1.2),
+                  'cd': ('canadian dollar', 1.2),
+                  'ec': ('euro', 1.2),
+                  'efx': ('euro fx', 1.2),
+                  'jy': ('japanese yen', 1.2),
+                  'jpy': ('japanese yen', 1.2),
+                  'ne': ('new zealand dollar', 1.2),
+                  'nok': ('norwegian krone', 1.2),
+                  'sek': ('swedish krona', 1.2),
+                  'sf': ('swiss franc', 1.2),
+                  'skr': ('swedish krona', 1.2),
+                  'zar': ('south african rand', 1.2),
+                  'aud': ('australian dollar', 1.2),
+                  'cad': ('canadian dollar', 1.2),
+                  'chf': ('swiss franc', 1.2),
+                  'eur': ('euro', 1.2),
+                  'gbp': ('british pound', 1.2),
+                  'pln': ('polish zloty', 1.2),
+                  'nkr': ('norwegian krone', 1.2),
+                  'inr': ('indian rupee', 1.2),
+                  'rmb': ('chinese renminbi', 1.2),
+                  'usd': ('us american dollar', 1.2)}
 
 CRRNCY_KEYWORDS = list(set(dtsp.flatten_list(
     [[k.split(' '), v[0].split(' ')] for k, v in CRRNCY_MAPPING.items()], list())))
@@ -182,12 +182,14 @@ class CMEGMatcher(object):
                        ('CAD/USD PQO 2pm Fix', 'FX', 'Options'),
                        ('CHF/USD PQO 2pm Fix', 'FX', 'Options')]
 
-    CME_SPECIAL_MAPPING = {'midcurve': ('mc', True),
-                           'pqo': ('premium quoted european style options', False),
-                           'eow': ('weekly wk', False),
-                           'eom': ('monthly', False),
-                           'eu': ('european', False),
-                           'usdzar': ('us dollar south african rand', False)}
+    CME_SPECIAL_MAPPING = {'midcurve': ('midcurve mc', 1.2),
+                           'pqo': ('premium quoted european style options', 1.2),
+                           'eow': ('weekly wk', 1.2),
+                           'eom': ('monthly', 1.2),
+                           'usdzar': ('us dollar south african rand', 1.2),
+                           'biotech': ('biotechnology', 1.2),
+                           'cross': ('cross', 0.6),
+                           'rates': ('rates', 0.6)}
 
     CME_SPECIAL_KEYWORDS = list(set(dtsp.flatten_list(
         [[k.split(' '), v[0].split(' ')] for k, v in CME_SPECIAL_MAPPING.items()], list())))

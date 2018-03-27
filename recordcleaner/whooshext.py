@@ -1,5 +1,6 @@
 import re
 import itertools
+import math
 
 from whoosh.analysis import *
 
@@ -29,8 +30,9 @@ class CompositeFilter(Filter):
 class VowelFilter(CompositeFilter):
     VOWELS = ('a', 'e', 'i', 'o', 'u')
 
-    def __init__(self, exclusions=list()):
+    def __init__(self, exclusions=list(), boost=0.8):
         self.exclusions = exclusions
+        self.boost = boost
         super().__init__(self)
 
     def __remove_vowels(self, string):
@@ -49,6 +51,7 @@ class VowelFilter(CompositeFilter):
                 if txt_changed != token.text:
                     yield token
                     token.text = txt_changed
+                    token.boost = self.boost
                     yield token
                 else:
                     yield token
@@ -151,14 +154,53 @@ class SpecialWordFilter(CompositeFilter):
     def __call__(self, stream):
         for token in stream:
             if token.text in self.word_dict:
-                tks = self.tokenizer(self.word_dict[token.text][0])
-                if self.word_dict[token.text][1]:
-                    yield token
-                for t in tks:
-                    token.text = t.text
-                    yield token
+                values = self.word_dict[token.text]
+                if not isinstance(values, list):
+                    values = [values]
+                for val in values:
+                    tks = self.tokenizer(val[0])
+                    for t in tks:
+                        token.text = t.text
+                        token.boost = val[1]
+                        yield token
             else:
                 yield token
+
+
+def min_dist_rslt(results, qstring, fieldname, field, minboost=1):
+    min_dist = math.inf
+    q_tokens = sorted([(token.text, token.boost) for token in field.analyzer(qstring) if token.boost >= minboost], key=lambda x: x[0])
+    qt_len = sum([token[1] for token in q_tokens])
+    best_result = results[0]
+    for r in results:
+        field_value = r.fields()[fieldname]
+        r_tokens = sorted([(token.text, token.boost) for token in field.analyzer(field_value) if token.boost >= minboost], key=lambda x: x[0])
+
+        iter_qt = iter(r_tokens)
+        iter_rt = iter(q_tokens)
+        next_qt = next(iter_qt, None)
+        next_rt = next(iter_rt, None)
+        dist = sum([token[1] for token in r_tokens]) + qt_len
+        while next_qt is not None:
+            while next_rt is not None:
+                if next_qt[0] == next_rt[0]:
+                    dist -= (next_rt[1] + next_qt[1])
+                    next_rt = next(iter_rt, None)
+                    break
+                else:
+                    next_rt = next(iter_rt, None)
+            next_qt = next(iter_qt, None)
+        if dist < min_dist:
+            min_dist = dist
+            best_result = r
+    return best_result
+
+
+
+
+
+
+
 
 
 STOP_LIST = ['and', 'is', 'it', 'an', 'as', 'at', 'have', 'in', 'yet', 'if', 'from', 'for', 'when',
