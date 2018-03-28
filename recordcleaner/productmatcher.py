@@ -54,6 +54,10 @@ CRRNCY_MAPPING = {'ad': ('australian dollar', 1.2),
 CRRNCY_KEYWORDS = list(set(dtsp.flatten_list(
     [[k.split(' '), v[0].split(' ')] for k, v in CRRNCY_MAPPING.items()], list())))
 
+STOP_LIST = ['and', 'is', 'it', 'an', 'as', 'at', 'have', 'in', 'yet', 'if', 'from', 'for', 'when',
+             'by', 'to', 'you', 'be', 'we', 'that', 'may', 'not', 'with', 'tbd', 'a', 'on', 'your',
+             'this', 'of', 'will', 'can', 'the', 'or', 'are']
+
 
 class SearchHelper(object):
     vowels = ('a', 'e', 'i', 'o', 'u')
@@ -207,11 +211,14 @@ class CMEGMatcher(object):
                        'micro', 'emicro', 'nikkei', 'russell', 'ftse',
                        'european']
 
-    SPLT_FLT = SplitFilter(delims='[&/\(\)-]', origin=False, mergewords=True, mergenums=True)
+    REGEX_TKN = RegexTokenizer('[^\s/]+')
+    SPLT_FLT = SplitFilter(delims='[&/\(\)-]', origin=False, splitwords=False, splitnums=True, mergewords=True, mergenums=True)
+    LWRCS_FLT = LowercaseFilter()
+    STP_FLT = StopFilter(stoplist=STOP_LIST, minsize=1)
     CME_SP_FLT = SpecialWordFilter(CME_KEYWORD_MAPPING)
     CME_VW_FLT = VowelFilter(CME_KYWRD_EXCLU)
 
-    CME_PDNM_ANA = STD_ANA | SPLT_FLT | CME_SP_FLT | CME_VW_FLT
+    CME_PDNM_ANA = REGEX_TKN | SPLT_FLT | LWRCS_FLT | STP_FLT | CME_SP_FLT | CME_VW_FLT
     INDEX_FIELDS_CME = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=CME_PDNM_ANA),
                         F_PRODUCT_GROUP: ID(stored=True),
                         F_CLEARED_AS: ID(stored=True, unique=True),
@@ -220,7 +227,7 @@ class CMEGMatcher(object):
                         F_SUB_GROUP: TEXT(stored=True, analyzer=SimpleAnalyzer()),
                         F_EXCHANGE: ID}
 
-    INDEX_FIELDS_CBOT = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=STD_ANA),
+    INDEX_FIELDS_CBOT = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=CME_PDNM_ANA),
                          F_PRODUCT_GROUP: ID(stored=True),
                          F_CLEARED_AS: ID(stored=True, unique=True),
                          F_CLEARING: ID(stored=True, unique=True),

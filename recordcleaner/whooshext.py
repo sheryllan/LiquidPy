@@ -1,7 +1,7 @@
 import re
 import itertools
 import math
-from collections import namedtuple
+from collections import OrderedDict
 
 from whoosh.analysis import *
 
@@ -95,54 +95,32 @@ class SplitFilter(CompositeFilter):
             text = token.text
             if self.origin:
                 yield token
-            words = filter(None, re.split(self.delims, text)) if re.search(self.delims, text) else [text]
-            for token in self.__split_merge(words, token):
-                if not (self.origin and token.text == text):
+            words = re.split(self.delims, text) if re.search(self.delims, text) else [text]
+            for word in self.__split_merge(words):
+                if not (self.origin and word == text):
+                    token.text = word
                     yield token
 
-    def __split_merge(self, words, token):
-        mrg_stream = ''
-        yielded = False
-        splits = []
-        for word in words:
-            # yield splits
-            if self.splt_ptn is None:
-                continue
-            splits = list(self.__findall(self.splt_ptn, word))
-            for split in splits:
-                token.text = split
-                yield token
+    def __split_merge(self, words):
+        results = itertools.chain()
+        # process splits
+        if self.splt_ptn is not None:
+            for word in words:
+                results = itertools.chain(results, self.__findall(self.splt_ptn, word))
 
-            # yield merges
-            if self.mrg_ptn is None:
-                continue
-            mtchobjs = re.finditer(self.mrg_ptn, word)
-            for match in mtchobjs:
-                if self.__can_merge(mrg_stream, match):
-                    mrg_stream = mrg_stream + match.group()
-                    yielded = False
-                else:
-                    if not mrg_stream in splits:
-                        token.text = mrg_stream
-                        yield token
-                    mrg_stream = match.group()
-                    yielded = True
+        # process merges
+        if self.mrg_ptn is not None:
+            string = ''.join(words)
+            results = itertools.chain(results, self.__findall(self.mrg_ptn, string))
 
-        if (self.mrg_ptn is not None) and (not yielded) \
-                and (mrg_stream and mrg_stream not in splits):
-            token.text = mrg_stream
-            yield token
+        results = [key for key, _ in OrderedDict([(r, True) for r in results]).items()] if results else words
+        return results
 
-    def __are_same_type(self, s1, s2):
-        return (re.match(self.PTN_MRG_WRD, s1) and re.match(self.PTN_MRG_WRD, s2)) \
-               or (re.match(self.PTN_MRG_NUM, s1) and re.match(self.PTN_MRG_NUM, s2))
-
-    def __can_merge(self, string, mtchobj):
-        return (not string) or (self.__are_same_type(string, mtchobj.group()) and mtchobj.start() == 0)
 
     def __findall(self, pattern, word):
         for mobj in re.finditer(pattern, word):
-            yield mobj.group()
+            if mobj.group():
+                yield mobj.group()
 
 
 class SpecialWordFilter(CompositeFilter):
@@ -197,14 +175,6 @@ def min_dist_rslt(results, qstring, fieldname, field, minboost=1):
                     next_rt = next(iter_rt, None)
             next_qt = next(iter_qt, None)
         head = results_srted.add(((qt_len, rt_len), r), head)
-        # if qt_len < min_qt_dist:
-        #     min_qt_dist = qt_len
-        #     min_rt_dist = rt_len
-        #     best_result = r
-        # elif qt_len == min_qt_dist:
-        #     if rt_len < min_rt_dist:
-        #         min_rt_dist = rt_len
-        #         best_result = r
     return [r for _, r in results_srted.get_items(head)]
 
 
@@ -273,7 +243,7 @@ STOP_LIST = ['and', 'is', 'it', 'an', 'as', 'at', 'have', 'in', 'yet', 'if', 'fr
              'by', 'to', 'you', 'be', 'we', 'that', 'may', 'not', 'with', 'tbd', 'a', 'on', 'your',
              'this', 'of', 'will', 'can', 'the', 'or', 'are']
 
-STD_ANA = StandardAnalyzer('[^\s/]+', stoplist=STOP_LIST, minsize=1)
+# STD_ANA = StandardAnalyzer('[^\s/]+', stoplist=STOP_LIST, minsize=1)
 
 # ana = STD_ANA | SplitFilter(origin=False, mergewords=True, mergenums=True) | VowelFilter(CurrencyConverter.get_cnvtd_kws()) | CurrencyConverter()
 # ana = FancyAnalyzer()

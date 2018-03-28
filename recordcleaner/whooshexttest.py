@@ -65,41 +65,59 @@ class CMEAnalyzerTests(ut.TestCase):
                        'micro', 'emicro', 'nikkei', 'russell', 'ftse',
                        'european']
 
+    # def test_splt_filter(self):
+    #     spltflt = SplitFilter(delims='\W+', origin=False, mergewords=True, mergenums=True)
+    #     regex = RegexTokenizer('\S+')
+    #     testcase1 = 'ciEsta0-8-9 JiO890*9cityETO#MIOm'
+    #     actual1 = [t.text for t in spltflt(regex(testcase1))]
+    #     expected1 = ['ci', 'Esta', '0', '8', '9', 'ciEsta', ]
+    #     print(actual1)
+
     def test_analyzer(self):
-        spltflt = SplitFilter(delims='[&/\(\)-]', origin=False, mergewords=True, mergenums=True)
-        ana = STD_ANA | spltflt | SpecialWordFilter(self.CME_KEYWORD_MAPPING) | VowelFilter(self.CME_KYWRD_EXCLU)
+        REGEX_TKN = RegexTokenizer('[^\s/]+')
+        SPLT_FLT = SplitFilter(delims='[&/\(\)-]', origin=False, splitwords=False, splitnums=True, mergewords=True, mergenums=True)
+        LWRCS_FLT = LowercaseFilter()
+        STP_FLT = StopFilter(stoplist=STOP_LIST, minsize=1)
+        CME_SP_FLT = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
+        CME_VW_FLT = VowelFilter(self.CME_KYWRD_EXCLU)
+
+        # ana = REGEX_TKN | SPLT_FLT | LWRCS_FLT | STP_FLT | CME_SP_FLT | CME_VW_FLT
+        ana = REGEX_TKN | IntraWordFilter(mergewords=True)
 
         testcase1 = 'Nikkei/USD'
         testcase2 = ' EOW1 S&P 500'
         testcase3 = ' AUD/USD PQO 2pm Fix'
         testcase4 = 'E-mini NASDAQ Biotechnology Index'
         testcase5 = 'NIKKEI 225 ($) STOCK'
+        testcase6 = 'FT-SE 100'
 
-        result1 = [t.text for t in ana(testcase1)]
+        # result1 = [t.text for t in ana(testcase1)]
         # result2 = [t.text for t in ana(testcase2)]
         # result3 = [t.text for t in ana(testcase3)]
         # result4 = [t.text for t in ana(testcase4)]
         # result5 = [t.text for t in ana(testcase5)]
+        result6 = [t.text for t in ana(testcase6)]
 
+        print(result6)
         # print(result5)
-        print(result1)
+        # print(result1)
         # expected1 = ['e', 'micro', 'emicro', 'aud', 'australian', 'dollar', 'usd', 'us', 'american', 'dollar']
         # expected4 = ['e', 'mini', 'emini', 'nasdaq', 'biotechnology', 'btchnlgy', 'index']
         #
         # self.assertListEqual(expected1, result1)
         # self.assertListEqual(expected4, result4)
-
-    def test_composite_filter(self):
-        spltflt = SplitFilter(origin=False, mergewords=True, mergenums=True)
-        cf = SpecialWordFilter(self.CME_KEYWORD_MAPPING) & VowelFilter(self.CME_KYWRD_EXCLU)
-        ana = STD_ANA | spltflt | cf
-
-        testcase4 = 'E-mini NASDAQ Biotechnology Index'
-        result4 = [t.text for t in ana(testcase4)]
-
-        expected4 = ['e', 'mini', 'emini', 'nasdaq', 'biotechnology', 'index']
-
-        self.assertListEqual(expected4, result4)
+    #
+    # def test_composite_filter(self):
+    #     spltflt = SplitFilter(origin=False, mergewords=True, mergenums=True)
+    #     cf = SpecialWordFilter(self.CME_KEYWORD_MAPPING) & VowelFilter(self.CME_KYWRD_EXCLU)
+    #     ana = STD_ANA | spltflt | cf
+    #
+    #     testcase4 = 'E-mini NASDAQ Biotechnology Index'
+    #     result4 = [t.text for t in ana(testcase4)]
+    #
+    #     expected4 = ['e', 'mini', 'emini', 'nasdaq', 'biotechnology', 'index']
+    #
+    #     self.assertListEqual(expected4, result4)
 
 
     # def test_ana_query_mode(self):
