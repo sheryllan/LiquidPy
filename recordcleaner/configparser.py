@@ -29,15 +29,15 @@ class XlsxWriter(object):
         return openpyxl.load_workbook(filepath) if os.path.isfile(filepath) else openpyxl.Workbook()
 
     @staticmethod
-    def __config_xlwriter(wrt, wb):
-        wrt.book = wb
-        wrt.sheets = dict((ws.title, ws) for ws in wb.worksheets)
-        return wrt
-
-    @staticmethod
     def create_xlwriter(path, override=True):
         wrt = pd.ExcelWriter(path, engine='openpyxl')
-        return wrt if override else XlsxWriter.__config_xlwriter(wrt, XlsxWriter.load_xlsx(path))
+
+        def __config_xlwriter(wrt, wb):
+            wrt.book = wb
+            wrt.sheets = dict((ws.title, ws) for ws in wb.worksheets)
+            return wrt
+
+        return wrt if override else __config_xlwriter(wrt, XlsxWriter.load_xlsx(path))
 
     @staticmethod
     def to_xlsheet(data, wrt, sheet, columns=None):

@@ -1,9 +1,47 @@
+import os
 import re
+import pandas as pd
 import itertools
-import math
 from collections import OrderedDict
 
+from whoosh.fields import *
 from whoosh.analysis import *
+from whoosh.index import create_in
+from whoosh.index import open_dir
+from whoosh import writing
+
+
+def create_index(ix_path, fields, clean=False):
+    if (not clean) and os.path.exists(ix_path):
+        return open_dir(ix_path)
+    if not os.path.exists(ix_path):
+        os.mkdir(ix_path)
+    schema = Schema(**fields)
+    return create_in(ix_path, schema)
+
+
+def index_from_df(ix, df, clean=False):
+    wrt = ix.writer()
+    fields = ix.schema.names()
+    records = df[fields].to_dict('records')
+    for record in records:
+        record = {k: record[k] for k in record if not pd.isnull(record[k])}
+        if clean:
+            wrt.add_document(**record)
+        else:
+            wrt.update_document(**record)
+    wrt.commit()
+
+
+def setup_ix(fields, df, ix_path, clean=False):
+    ix = create_index(ix_path, fields, clean)
+    index_from_df(ix, df, clean)
+    return ix
+
+
+def clear_index(ix):
+    wrt = ix.writer()
+    wrt.commit(mergetype=writing.CLEAR)
 
 
 class CompositeFilter(Filter):
@@ -28,13 +66,12 @@ class CompositeFilter(Filter):
         return gen
 
 
-class VowelFilter(CompositeFilter):
+class VowelFilter(Filter):
     VOWELS = ('a', 'e', 'i', 'o', 'u')
 
     def __init__(self, exclusions=list(), boost=0.8):
         self.exclusions = exclusions
         self.boost = boost
-        super().__init__(self)
 
     def __remove_vowels(self, string):
         if len(string) < 4:
@@ -50,9 +87,10 @@ class VowelFilter(CompositeFilter):
             if token.text not in self.exclusions:
                 txt_changed = self.__remove_vowels(token.text)
                 if txt_changed != token.text:
+                    boost = token.boost
                     yield token
                     token.text = txt_changed
-                    token.boost = self.boost
+                    token.boost = self.boost * boost
                     yield token
                 else:
                     yield token
@@ -60,7 +98,7 @@ class VowelFilter(CompositeFilter):
                 yield token
 
 
-class SplitFilter(CompositeFilter):
+class SplitFilter(Filter):
     PTN_SPLT_WRD = '([A-Z]+[^A-Z]*|[^A-Z]+)((?=[A-Z])|$)'
     PTN_SPLT_NUM = '[0-9]+((?=[^0-9])|$)|[^0-9]+((?=[0-9])|$)'
     PTN_SPLT_WRDNUM = '[0-9]+((?=[^0-9])|$)|([A-Z]+[^A-Z0-9]*|[^A-Z0-9]+)((?=[A-Z])|(?=[0-9])|$)'
@@ -68,12 +106,12 @@ class SplitFilter(CompositeFilter):
     PTN_MRG_WRD = '[A-Za-z]+'
     PTN_MRG_NUM = '[0-9]+'
 
-    def __init__(self, delims='\W+', origin=True, splitwords=True, splitnums=True, mergewords=False, mergenums=False):
+    def __init__(self, delims='\W+', origin=False, splitwords=False, splitcase=False, splitnums=False, mergewords=False, mergenums=False):
         self.delims = delims
         self.origin = origin
         self.splt_ptn = None
         self.mrg_ptn = None
-        super().__init__(self)
+        self.splitwords = splitwords
 
         if mergewords and mergenums:
             self.mrg_ptn = '|'.join([self.PTN_MRG_WRD, self.PTN_MRG_NUM])
@@ -82,10 +120,10 @@ class SplitFilter(CompositeFilter):
         elif mergenums:
             self.mrg_ptn = self.PTN_MRG_NUM
 
-        if splitwords & splitnums:
+        if splitcase & splitnums:
             self.splt_ptn = self.PTN_SPLT_WRDNUM
         else:
-            if splitwords:
+            if splitcase:
                 self.splt_ptn = self.PTN_SPLT_WRD
             elif splitnums:
                 self.splt_ptn = self.PTN_SPLT_NUM
@@ -103,19 +141,22 @@ class SplitFilter(CompositeFilter):
 
     def __split_merge(self, words):
         results = itertools.chain()
+        words = words if self.splitwords else [''.join(words)]
+
+        splits = OrderedDict()
         # process splits
         if self.splt_ptn is not None:
             for word in words:
-                results = itertools.chain(results, self.__findall(self.splt_ptn, word))
+                splits.update({split: True for split in self.__findall(self.splt_ptn, word)})
+                results = itertools.chain(results, splits)
 
         # process merges
         if self.mrg_ptn is not None:
             string = ''.join(words)
-            results = itertools.chain(results, self.__findall(self.mrg_ptn, string))
+            merges = (merge for merge in self.__findall(self.mrg_ptn, string) if merge not in splits)
+            results = itertools.chain(results, merges)
 
-        results = [key for key, _ in OrderedDict([(r, True) for r in results]).items()] if results else words
         return results
-
 
     def __findall(self, pattern, word):
         for mobj in re.finditer(pattern, word):
@@ -123,13 +164,12 @@ class SplitFilter(CompositeFilter):
                 yield mobj.group()
 
 
-class SpecialWordFilter(CompositeFilter):
+class SpecialWordFilter(Filter):
     def __init__(self, worddict, tokenizer=RegexTokenizer()):
         self.word_dict = worddict
         if not isinstance(tokenizer, Tokenizer):
             raise TypeError('Input is not a valid instance of Tokenizer')
         self.tokenizer = tokenizer
-        super().__init__(self)
 
     def __call__(self, stream):
         for token in stream:
@@ -148,32 +188,29 @@ class SpecialWordFilter(CompositeFilter):
 
 
 def min_dist_rslt(results, qstring, fieldname, field, minboost=1):
-    q_tokens = sorted([(token.text, token.boost) for token in field.analyzer(qstring) if token.boost >= minboost],
+    ana = field.analyzer
+    q_tokens = sorted([(token.text, token.boost) for token in ana(qstring, mode='query') if token.boost >= minboost],
                       key=lambda x: x[0])
     results_srted = TreeMap()
     head = None
     for r in results:
         field_value = r.fields()[fieldname]
         r_tokens = sorted(
-            [(token.text, token.boost) for token in field.analyzer(field_value) if token.boost >= minboost],
+            [(token.text, token.boost) for token in ana(field_value, mode='index') if token.boost >= minboost],
             key=lambda x: x[0])
 
-        iter_qt = iter(r_tokens)
-        iter_rt = iter(q_tokens)
-        next_qt = next(iter_qt, None)
-        next_rt = next(iter_rt, None)
         qt_len = sum([token[1] for token in q_tokens])
         rt_len = sum([token[1] for token in r_tokens])
-        while next_qt is not None:
-            while next_rt is not None:
-                if next_qt[0] == next_rt[0]:
-                    qt_len -= next_qt[1]
-                    rt_len -= next_rt[1]
-                    next_rt = next(iter_rt, None)
+
+        midx = 0
+        for qt in q_tokens:
+            for i in range(midx, len(r_tokens)):
+                if qt[0] == r_tokens[i][0]:
+                    qt_len -= qt[1]
+                    rt_len -= r_tokens[i][1]
+                    midx = i + 1
                     break
-                else:
-                    next_rt = next(iter_rt, None)
-            next_qt = next(iter_qt, None)
+
         head = results_srted.add(((qt_len, rt_len), r), head)
     return [r for _, r in results_srted.get_items(head)]
 

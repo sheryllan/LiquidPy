@@ -165,21 +165,26 @@ class CMEGScraper(object):
     BASENAME_NYMEX_COMEX = rreplace(os.path.basename(URL_NYMEX_COMEX_ADV), PDF_SUFFIX, '', 1)
 
     URL_PRODSLATE = 'http://www.cmegroup.com/CmeWS/mvc/ProductSlate/V1/Download.xls'
-    XLS_PRODSLATE = 'Product_Slate.xls'
+    DFLT_PROD_SLATE = 'Product_Slate.xls'
 
     PRODUCT = 'Product'
     PRODUCT_GROUP = 'Product Group'
     CLEARED_AS = 'Cleared As'
     OUTPUT_COLUMNS = [PRODUCT, PRODUCT_GROUP, CLEARED_AS]
 
+    DFLT_DL_PATH = os.getcwd()
+    DFLT_CME_ADV_XLSX = os.path.join(DFLT_DL_PATH, BASENAME_CME + XLSX_SUFFIX)
+    DFLT_CBOT_ADV_XLSX = os.path.join(DFLT_DL_PATH, BASENAME_CBOT + XLSX_SUFFIX)
+    DFLT_NYCO_ADV_XLSX = os.path.join(DFLT_DL_PATH, BASENAME_NYMEX_COMEX + XLSX_SUFFIX)
+
     def __init__(self, download_path=None):
-        self.download_path = os.getcwd() if download_path is None else download_path
+        self.DFLT_DL_PATH = self.DFLT_DL_PATH if download_path is None else download_path
 
-        self.xlsx_cme_adv = os.path.join(self.download_path, self.BASENAME_CME + self.XLSX_SUFFIX)
-        self.xlsx_cbot_adv = os.path.join(self.download_path, self.BASENAME_CBOT + self.XLSX_SUFFIX)
-        self.xlsx_nymex_comex_adv = os.path.join(self.download_path, self.BASENAME_NYMEX_COMEX + self.XLSX_SUFFIX)
+        self.DFLT_CME_ADV_XLSX = os.path.join(self.DFLT_DL_PATH, self.DFLT_CME_ADV_XLSX)
+        self.DFLT_CBOT_ADV_XLSX = os.path.join(self.DFLT_DL_PATH, self.DFLT_CBOT_ADV_XLSX)
+        self.DFLT_NYCO_ADV_XLSX = os.path.join(self.DFLT_DL_PATH, self.DFLT_NYCO_ADV_XLSX)
 
-        self.xls_prodslate = os.path.join(self.download_path, self.XLS_PRODSLATE)
+        self.DFLT_PROD_SLATE = os.path.join(self.DFLT_DL_PATH, self.DFLT_PROD_SLATE)
         self.report_name = None
 
     # returns a dictionary with key: full group name, and value: (asset, instrument)
@@ -242,12 +247,12 @@ class CMEGScraper(object):
         return outpath
 
     def run_scraper(self):
-        with open(self.xls_prodslate, mode='wb') as ps:
+        with open(self.DFLT_PROD_SLATE, mode='wb') as ps:
             download(self.URL_PRODSLATE, ps)
 
-        paths = [(self.URL_CME_ADV, self.xlsx_cme_adv),
-                 (self.URL_CBOT_ADV, self.xlsx_cbot_adv),
-                 (self.URL_NYMEX_COMEX_ADV, self.xlsx_nymex_comex_adv)]
+        paths = [(self.URL_CME_ADV, self.DFLT_CME_ADV_XLSX),
+                 (self.URL_CBOT_ADV, self.DFLT_CBOT_ADV_XLSX),
+                 (self.URL_NYMEX_COMEX_ADV, self.DFLT_NYCO_ADV_XLSX)]
         return [self.download_to_xlsx_adv(url, outpath) for url, outpath in paths]
 
     def __get_output_headers(self, pdf_headers, pattern=None):

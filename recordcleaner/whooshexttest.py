@@ -9,6 +9,7 @@ from whoosh.query import *
 from whoosh import qparser
 
 import datascraper as dtsp
+from productmatcher import CMEGMatcher
 
 
 class CMEAnalyzerTests(ut.TestCase):
@@ -45,67 +46,80 @@ class CMEAnalyzerTests(ut.TestCase):
                            'eom': ('monthly', 1.2),
                            'usdzar': ('us dollar south african rand', 1.2),
                            'biotech': ('biotechnology', 1.2),
-                           '$': ('us dollar', 1.2)
+                           '$': ('us american dollar', 1.2),
+                           'sector': ('sector', 1.2)
                            }
 
-    CME_COMMON_WORDS = {'cross': ('cross', 0.6),
-                        'rates': ('rates', 0.6),
-                        'rate': ('rate', 0.6),
-                        'futures': ('futures', 0),
-                        'options': ('options', 0),
-                        'index': ('index', 0)}
+    CME_COMMON_WORDS = ['futures', 'options', 'index']
 
     CME_SPECIAL_KEYWORDS = list(set(dtsp.flatten_list(
         [[k.split(' '), v[0].split(' ')] for k, v in CME_SPECIAL_MAPPING.items()], list())))
 
-    CME_KEYWORD_MAPPING = {**CRRNCY_MAPPING, **CME_SPECIAL_MAPPING, **CME_COMMON_WORDS}
+    CME_KEYWORD_MAPPING = {**CRRNCY_MAPPING, **CME_SPECIAL_MAPPING}
 
     CME_KYWRD_EXCLU = CRRNCY_KEYWORDS + CME_SPECIAL_KEYWORDS + \
                       ['nasdaq', 'ibovespa', 'index', 'mini', 'emini',
                        'micro', 'emicro', 'nikkei', 'russell', 'ftse',
                        'european']
 
-    # def test_splt_filter(self):
-    #     spltflt = SplitFilter(delims='\W+', origin=False, mergewords=True, mergenums=True)
-    #     regex = RegexTokenizer('\S+')
-    #     testcase1 = 'ciEsta0-8-9 JiO890*9cityETO#MIOm'
-    #     actual1 = [t.text for t in spltflt(regex(testcase1))]
-    #     expected1 = ['ci', 'Esta', '0', '8', '9', 'ciEsta', ]
-    #     print(actual1)
-
-    def test_analyzer(self):
-        REGEX_TKN = RegexTokenizer('[^\s/]+')
-        SPLT_FLT = SplitFilter(delims='[&/\(\)-]', origin=False, splitwords=False, splitnums=True, mergewords=True, mergenums=True)
-        LWRCS_FLT = LowercaseFilter()
-        STP_FLT = StopFilter(stoplist=STOP_LIST, minsize=1)
-        CME_SP_FLT = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
-        CME_VW_FLT = VowelFilter(self.CME_KYWRD_EXCLU)
-
-        # ana = REGEX_TKN | SPLT_FLT | LWRCS_FLT | STP_FLT | CME_SP_FLT | CME_VW_FLT
-        ana = REGEX_TKN | IntraWordFilter(mergewords=True)
-
-        testcase1 = 'Nikkei/USD'
-        testcase2 = ' EOW1 S&P 500'
-        testcase3 = ' AUD/USD PQO 2pm Fix'
-        testcase4 = 'E-mini NASDAQ Biotechnology Index'
-        testcase5 = 'NIKKEI 225 ($) STOCK'
+    def test_splt_filter(self):
+        spltflt = SplitFilter(delims='[&/\(\)\.-]', splitcase=True, splitnums=True, mergewords=True, mergenums=True)
+        regex = RegexTokenizer('[^\s/]+')
+        testcase1 = 'ciEsta0-8-9 JiO890&9cityETO(MIOm'
+        testcase5 = 'U.S. Dollar/South African Rand'
         testcase6 = 'FT-SE 100'
 
-        # result1 = [t.text for t in ana(testcase1)]
-        # result2 = [t.text for t in ana(testcase2)]
-        # result3 = [t.text for t in ana(testcase3)]
-        # result4 = [t.text for t in ana(testcase4)]
-        # result5 = [t.text for t in ana(testcase5)]
-        result6 = [t.text for t in ana(testcase6)]
+        actual1 = [t.text for t in spltflt(regex(testcase1))]
+        actual5 = [t.text for t in spltflt(regex(testcase5))]
+        actual6 = [t.text for t in spltflt(regex(testcase6))]
 
-        print(result6)
-        # print(result5)
-        # print(result1)
-        # expected1 = ['e', 'micro', 'emicro', 'aud', 'australian', 'dollar', 'usd', 'us', 'american', 'dollar']
-        # expected4 = ['e', 'mini', 'emini', 'nasdaq', 'biotechnology', 'btchnlgy', 'index']
-        #
-        # self.assertListEqual(expected1, result1)
-        # self.assertListEqual(expected4, result4)
+        expected1 = ['ci', 'Esta', '089', 'ciEsta', 'Ji', 'O', '8909', 'city', 'ETOMIOm', 'JiO', 'cityETOMIOm']
+        expected6 = ['FTSE', '100']
+
+        print(actual1)
+        print(actual5)
+        print(actual6)
+        self.assertListEqual(expected1, actual1)
+        self.assertListEqual(expected6, actual6)
+    #
+    # def test_analyzer(self):
+    #     REGEX_TKN = RegexTokenizer('[^\s/]+')
+    #     SPLT_FLT_IDX = SplitFilter(delims='[&/\(\)\.-]', splitwords=True, splitcase=True, splitnums=True,
+    #                                mergewords=True, mergenums=True)
+    #     SPLT_FLT_QRY = SplitFilter(delims='[&/\(\)\.-]', splitcase=True,
+    #                                splitnums=True, mergewords=True, mergenums=True)
+    #     LWRCS_FLT = LowercaseFilter()
+    #     STP_FLT = StopFilter(stoplist=STOP_LIST + self.CME_COMMON_WORDS, minsize=1)
+    #     CME_SP_FLT = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
+    #     CME_VW_FLT = VowelFilter(self.CME_KYWRD_EXCLU)
+    #
+    #     ana = REGEX_TKN | MultiFilter(index=SPLT_FLT_IDX,
+    #                                   query=SPLT_FLT_QRY) | LWRCS_FLT | CME_SP_FLT | CME_VW_FLT | STP_FLT
+    #     # ana = REGEX_TKN | IntraWordFilter(mergewords=True)
+    #
+    #     testcase1 = 'Nikkei/USD'
+    #     testcase2 = ' EOW1 S&P 500'
+    #     testcase3 = ' AUD/USD PQO 2pm Fix'
+    #     testcase4 = 'E-mini NASDAQ Biotechnology Index'
+    #     testcase5 = 'NIKKEI 225 ($) STOCK'
+    #     testcase6 = 'S.AFRICAN RAND'
+    #
+    #     # result1 = [t.text for t in ana(testcase1)]
+    #     # result2 = [t.text for t in ana(testcase2)]
+    #     # result3 = [t.text for t in ana(testcase3)]
+    #     # result4 = [t.text for t in ana(testcase4)]
+    #     # result5 = [t.text for t in ana(testcase5)]
+    #     result6 = [t.text for t in ana(testcase6, mode='index')]
+    #
+    #     print(result6)
+    #     # print(result5)
+    #     # print(result1)
+    #     # expected1 = ['e', 'micro', 'emicro', 'aud', 'australian', 'dollar', 'usd', 'us', 'american', 'dollar']
+    #     # expected4 = ['e', 'mini', 'emini', 'nasdaq', 'biotechnology', 'btchnlgy', 'index']
+    #     #
+    #     # self.assertListEqual(expected1, result1)
+    #     # self.assertListEqual(expected4, result4)
+
     #
     # def test_composite_filter(self):
     #     spltflt = SplitFilter(origin=False, mergewords=True, mergenums=True)
@@ -118,7 +132,6 @@ class CMEAnalyzerTests(ut.TestCase):
     #     expected4 = ['e', 'mini', 'emini', 'nasdaq', 'biotechnology', 'index']
     #
     #     self.assertListEqual(expected4, result4)
-
 
     # def test_ana_query_mode(self):
     #     # SPLT_FLT = SplitFilter(origin=False, mergewords=True, mergenums=True)
@@ -138,7 +151,6 @@ class CMEAnalyzerTests(ut.TestCase):
     #     query = self.__exact_and_query(F_PRODUCT_NAME, ix.schema, pdnm)
     #     print()
 
-
     def __exact_and_query(self, field, schema, text):
         parser = qparser.QueryParser(field, schema=schema)
         return parser.parse(text)
@@ -147,15 +159,38 @@ class CMEAnalyzerTests(ut.TestCase):
         og = qparser.OrGroup.factory(0.9)
         parser = qparser.QueryParser(field, schema=schema, group=og)
         return parser.parse(text)
-    #
+
     # def test_min_dist_rslt(self):
-    #     ix = open_dir('CME_Product_Index')
-    #     qstring = 'EC/AD CROSS RATES'
     #     f_pn = 'Product_Name'
     #     f_pg = 'Product_Group'
     #     f_ca = 'Cleared_As'
+    #
+    #     cmeg = CMEGMatcher()
+    #     index_cme = cmeg.INDEX_CME
+    #     # cmeg.init_ix_cme_cbot(True)
+    #
+    #     ######## case 1 ##########
+    #     qstring = 'S&P MATERIALS SECTOR'
+    #     pdgp = 'Equity Index'
+    #     ca = 'Futures'
+    #
+    #     ix = open_dir(index_cme)
+    #     grouping_q = And([Term(f_pg, pdgp), Term(f_ca, ca)])
+    #     query = self.__exact_or_query(f_pn, ix.schema, qstring)
+    #     searcher = ix.searcher()
+    #     results = searcher.search(query, filter=grouping_q, limit=None)
+    #
+    #     fields = {x[0]: x[1] for x in ix.schema.items()}
+    #     best_result = min_dist_rslt(results, qstring, f_pn, fields[f_pn])
+    #     print(best_result.fields())
+    #     searcher.close()
+    #
+    #     ######## case 2 ##########
+    #     qstring = 'EC/AD CROSS RATES'
     #     pdgp = 'FX'
     #     ca = 'Futures'
+    #
+    #     ix = open_dir('CME_Product_Index')
     #     grouping_q = And([Term(f_pg, pdgp), Term(f_ca, ca)])
     #     query = self.__exact_or_query(f_pn, ix.schema, qstring)
     #     searcher = ix.searcher()
@@ -174,21 +209,18 @@ class CMEAnalyzerTests(ut.TestCase):
     #     self.assertEqual(expected, best_result.fields())
     #     searcher.close()
 
-
-    def test_treemap(self):
-        tm = TreeMap()
-        head = tm.add(((0, 1), 'jiowf'))
-        head = tm.add(((0, 0.5), 'kf2m2['), head)
-        head = tm.add(((6, 4), 'j2093vj'), head)
-        head = tm.add(((4, 9.65), 'jwuf0wu'), head)
-
-        items = tm.get_items(head)
-        expected = [((0, 0.5), 'kf2m2['),
-                    ((0, 1), 'jiowf'),
-                    ((4, 9.65), 'jwuf0wu'),
-                    ((6, 4), 'j2093vj')]
-
-        print(items)
-        self.assertListEqual(expected, items)
-
-
+    # def test_treemap(self):
+    #     tm = TreeMap()
+    #     head = tm.add(((0, 1), 'jiowf'))
+    #     head = tm.add(((0, 0.5), 'kf2m2['), head)
+    #     head = tm.add(((6, 4), 'j2093vj'), head)
+    #     head = tm.add(((4, 9.65), 'jwuf0wu'), head)
+    #
+    #     items = tm.get_items(head)
+    #     expected = [((0, 0.5), 'kf2m2['),
+    #                 ((0, 1), 'jiowf'),
+    #                 ((4, 9.65), 'jwuf0wu'),
+    #                 ((6, 4), 'j2093vj')]
+    #
+    #     print(items)
+    #     self.assertListEqual(expected, items)
