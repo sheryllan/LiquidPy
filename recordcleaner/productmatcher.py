@@ -26,29 +26,29 @@ def filter(df, col, exp):
     return df[col].map(exp)
 
 
-CRRNCY_MAPPING = {'ad': [('australian', 1), ('dollar', 0.6)],
-                  'bp': [('british', 0.8), ('pound', 0.8)],
-                  'cd': [('canadian', 1), ('dollar', 0.6)],
-                  'ec': [('euro', 1), ('cross', 0.1), ('rates', 0.1)],
-                  'efx': [('euro', 0.8), ('fx', 0.4)],
-                  'jy': [('japanese', 0.8), ('yen', 0.8)],
-                  'jpy': [('japanese', 0.8), ('yen', 0.8)],
-                  'ne': [('new', 0.6), ('zealand', 0.6), ('dollar', 0.6)],
-                  'nok': [('norwegian', 0.9), ('krone', 0.9)],
-                  'sek': [('swedish', 0.9), ('krona', 0.9)],
-                  'sf': [('swiss', 0.8), ('franc', 0.8)],
-                  'skr': [('swedish', 0.9), ('krona', 0.9)],
-                  'zar': [('south', 0.6), ('african', 0.6), ('rand', 0.6)],
-                  'aud': [('australian', 1), ('dollar', 0.6)],
-                  'cad': [('canadian', 1), ('dollar', 0.6)],
-                  'chf': [('swiss', 0.8), ('franc', 0.8)],
-                  'eur': [('euro', 1.2)],
-                  'gbp': [('british', 0.8), ('pound', 0.8)],
-                  'pln': [('polish', 0.8), ('zloty', 0.8)],
-                  'nkr': [('norwegian', 0.9), ('krone', 0.9)],
-                  'inr': [('indian', 0.8), ('rupee', 0,8)],
-                  'rmb': [('chinese', 0.8), ('renminbi', 0.8)],
-                  'usd': [('us', 0.5), ('american', 0.5), ('dollar', 0.2)]}
+CRRNCY_MAPPING = {'ad': [('australian', 1.5), ('dollar', 1)],
+                  'bp': [('british', 1.5), ('pound', 1.5)],
+                  'cd': [('canadian', 1.5), ('dollar', 1)],
+                  'ec': [('euro', 1.5), ('cross', 0.5), ('rates', 0.5)],
+                  'efx': [('euro', 1.5), ('fx', 0.8)],
+                  'jy': [('japanese', 1.5), ('yen', 1.5)],
+                  'jpy': [('japanese', 1.5), ('yen', 1.5)],
+                  'ne': [('new', 1.5), ('zealand', 1.5), ('dollar', 1)],
+                  'nok': [('norwegian', 1.5), ('krone', 1.5)],
+                  'sek': [('swedish', 1.5), ('krona', 1.5)],
+                  'sf': [('swiss', 1.5), ('franc', 1.5)],
+                  'skr': [('swedish', 1.5), ('krona', 1.5)],
+                  'zar': [('south', 1.5), ('african', 1.5), ('rand', 1.5)],
+                  'aud': [('australian', 1.5), ('dollar', 1)],
+                  'cad': [('canadian', 1.5), ('dollar', 1)],
+                  'chf': [('swiss', 1.5), ('franc', 1.5)],
+                  'eur': [('euro', 1.5)],
+                  'gbp': [('british', 1.5), ('pound', 1.5)],
+                  'pln': [('polish', 1.5), ('zloty', 1.5)],
+                  'nkr': [('norwegian', 1.5), ('krone', 1.5)],
+                  'inr': [('indian', 1.5), ('rupee', 1.5)],
+                  'rmb': [('chinese', 1.5), ('renminbi', 1.5)],
+                  'usd': [('us', 0.75), ('american', 0.75), ('dollar', 0.5)]}
 
 CRRNCY_KEYWORDS = list(set(dtsp.flatten_list(
     [k.split(' ') + [tp[0] for tp in v] for k, v in CRRNCY_MAPPING.items()], list())))
@@ -182,13 +182,13 @@ class CMEGMatcher(object):
                        ('CAD/USD PQO 2pm Fix', 'FX', 'Options'),
                        ('CHF/USD PQO 2pm Fix', 'FX', 'Options')]
 
-    CME_SPECIAL_MAPPING = {'midcurve': [('midcurve', 1), ('mc', 1.2)],
-                           'pqo': [('premium', 0.5), ('quoted', 0.5), ('european', 0.5), ('style', 0.5), ('options', 0.1)],
-                           'eow': [('weekly', 1.2), ('wk', 1.2)],
-                           'eom': [('monthly', 1.2)],
-                           'usdzar': [('us', 0.5), ('american', 0.5), ('dollar', 0.2), ('south', 0.6), ('african', 0.6), ('rand', 0.6)],
-                           'biotech': [('biotechnology', 1.2)],
-                           '$': [('us', 0.6), ('american', 0.6), ('dollar', 0.3)]}
+    CME_SPECIAL_MAPPING = {'midcurve': [('midcurve', 1), ('mc', 1.5)],
+                           'pqo': [('premium', 1), ('quoted', 1), ('european', 1), ('style', 1), ('options', 0.5)],
+                           'eow': [('weekly', 1), ('wk', 1)],
+                           'eom': [('monthly', 1)],
+                           'usdzar': [('us', 0.75), ('american', 0.75), ('dollar', 0.5), ('south', 1), ('african', 1), ('rand', 1)],
+                           'biotech': [('biotechnology', 1.5)],
+                           '$': [('us', 1), ('american', 1), ('dollar', 1)]}
 
     CME_COMMON_WORDS = ['futures', 'options', 'index', 'cross', 'rate', 'rates']
 

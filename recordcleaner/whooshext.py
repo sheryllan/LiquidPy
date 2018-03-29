@@ -153,7 +153,13 @@ class SplitFilter(Filter):
         # process merges
         if self.mrg_ptn is not None:
             string = ''.join(words)
-            merges = (merge for merge in self.__findall(self.mrg_ptn, string) if merge not in splits)
+            merges = [merge for merge in self.__findall(self.mrg_ptn, string) if merge not in splits]
+
+        if len(splits) != 0:
+            splits_boost = ((text, 1/(2 * len(splits))) for text in splits)
+            merges_boost = ((text, 1/len(splits)/ ) for text in merges)
+
+            
             results = itertools.chain(results, merges)
 
         return results
@@ -174,6 +180,7 @@ class SpecialWordFilter(Filter):
     def __call__(self, stream):
         for token in stream:
             if token.text in self.word_dict:
+                boost = token.boost
                 values = self.word_dict[token.text]
                 if not isinstance(values, list):
                     values = [values]
@@ -181,7 +188,7 @@ class SpecialWordFilter(Filter):
                     tks = self.tokenizer(val[0])
                     for t in tks:
                         token.text = t.text
-                        token.boost = val[1]
+                        token.boost = val[1] * boost
                         yield token
             else:
                 yield token
