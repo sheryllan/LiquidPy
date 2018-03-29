@@ -205,7 +205,7 @@ class CMEGMatcher(object):
     REGEX_TKN = RegexTokenizer('[^\s/]+')
     SPLT_FLT_IDX = SplitFilter(delims='[&/\(\)\.-]', splitwords=True, splitcase=True, splitnums=True,
                                mergewords=True, mergenums=True)
-    SPLT_FLT_QRY = SplitFilter(delims='[&/\(\)\.-]', splitcase=True,
+    SPLT_FLT_QRY = SplitFilter(delims='[&/\(\)\.-]', splitwords=True, splitcase=True,
                                splitnums=True, mergewords=True, mergenums=True)
     LWRCS_FLT = LowercaseFilter()
     STP_FLT = StopFilter(stoplist=STOP_LIST + CME_COMMON_WORDS, minsize=1)

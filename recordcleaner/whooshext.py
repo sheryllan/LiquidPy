@@ -130,37 +130,48 @@ class SplitFilter(Filter):
 
     def __call__(self, stream):
         for token in stream:
-            text = token.text
+            tk_text = token.text
+            tk_boost = token.boost
             if self.origin:
                 yield token
-            words = re.split(self.delims, text) if re.search(self.delims, text) else [text]
-            for word in self.__split_merge(words):
-                if not (self.origin and word == text):
-                    token.text = word
+            words = re.split(self.delims, tk_text) if re.search(self.delims, tk_text) else [tk_text]
+            for text, boost in self.__split_merge(words):
+                if not (self.origin and text == tk_text):
+                    token.text = text
+                    token.boost = tk_boost * boost
                     yield token
 
     def __split_merge(self, words):
-        results = itertools.chain()
         words = words if self.splitwords else [''.join(words)]
+        splits, merges = [], []
 
-        splits = OrderedDict()
         # process splits
         if self.splt_ptn is not None:
             for word in words:
-                splits.update({split: True for split in self.__findall(self.splt_ptn, word)})
-                results = itertools.chain(results, splits)
+                splits = itertools.chain(splits, (split for split in self.__findall(self.splt_ptn, word)))
+            splits = list(splits)
 
         # process merges
         if self.mrg_ptn is not None:
             string = ''.join(words)
-            merges = [merge for merge in self.__findall(self.mrg_ptn, string) if merge not in splits]
+            merges = [merge for merge in self.__findall(self.mrg_ptn, string)]
 
-        if len(splits) != 0:
-            splits_boost = ((text, 1/(2 * len(splits))) for text in splits)
-            merges_boost = ((text, 1/len(splits)/ ) for text in merges)
-
-            
-            results = itertools.chain(results, merges)
+        if len(splits) != 0 and len(merges) != 0:
+            s_boost = 1 / (2 * len(splits))
+            m_boost = 1 / (2 * len(merges))
+            word_boost = OrderedDict({text: s_boost for text in splits})
+            for text in merges:
+                if text not in word_boost:
+                    word_boost.update({text: m_boost})
+                else:
+                    word_boost.update({text: s_boost + m_boost})
+            results = word_boost.items()
+        elif len(splits) == 0:
+            results = ((text, 1/len(merges)) for text in merges)
+        elif len(merges) == 0:
+            results = ((text, 1/len(splits)) for text in splits)
+        else:
+            results = ((text, 1/len(words)) for text in words)
 
         return results
 
@@ -194,7 +205,7 @@ class SpecialWordFilter(Filter):
                 yield token
 
 
-def min_dist_rslt(results, qstring, fieldname, field, minboost=1):
+def min_dist_rslt(results, qstring, fieldname, field, minboost=0):
     ana = field.analyzer
     q_tokens = sorted([(token.text, token.boost) for token in ana(qstring, mode='query') if token.boost >= minboost],
                       key=lambda x: x[0])
