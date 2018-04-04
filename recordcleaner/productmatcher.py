@@ -156,6 +156,7 @@ class CMEGMatcher(object):
     F_EXCHANGE = EXCHANGE
 
     CME_EXACT_MAPPING = {
+        ('NIKKEI 225 (YEN) STOCK', 'Equity Index', 'Futures'): 'Nikkei/Yen Futures',
         ('BDI', 'FX', 'Futures'): 'CME Bloomberg Dollar Spot Index',
         ('CHINESE RENMINBI (CNH)', 'FX', 'Futures'): 'Standard-Size USD/Offshore RMB (CNH)',
         ('AUSTRALIAN DOLLAR', 'FX',
@@ -203,17 +204,18 @@ class CMEGMatcher(object):
                        'european']
 
     REGEX_TKN = RegexTokenizer('[^\s/]+')
-    SPLT_FLT_IDX = SplitFilter(delims='[&/\(\)\.-]', splitwords=True, splitcase=True, splitnums=True,
-                               mergewords=True, mergenums=True)
-    SPLT_FLT_QRY = SplitFilter(delims='[&/\(\)\.-]', splitwords=True, splitcase=True,
+    # SPLT_FLT_IDX = SplitFilter(delims='[&/\(\)\.-]', splitwords=True, splitcase=True, splitnums=True,
+    #                            mergewords=True, mergenums=True)
+    # SPLT_FLT_QRY = SplitFilter(delims='[&/\(\)\.-]', splitwords=True, splitcase=True,
+    #                            splitnums=True, mergewords=True, mergenums=True)
+    SPLT_FLT = SplitFilter(delims='[&/\(\)\.-]', splitwords=True, splitcase=True,
                                splitnums=True, mergewords=True, mergenums=True)
     LWRCS_FLT = LowercaseFilter()
     STP_FLT = StopFilter(stoplist=STOP_LIST + CME_COMMON_WORDS, minsize=1)
     CME_SP_FLT = SpecialWordFilter(CME_KEYWORD_MAPPING)
     CME_VW_FLT = VowelFilter(CME_KYWRD_EXCLU)
 
-    CME_PDNM_ANA = REGEX_TKN | MultiFilter(index=SPLT_FLT_IDX,
-                                           query=SPLT_FLT_QRY) | LWRCS_FLT | CME_SP_FLT | CME_VW_FLT | STP_FLT
+    CME_PDNM_ANA = REGEX_TKN | SPLT_FLT | LWRCS_FLT | CME_SP_FLT | STP_FLT | CME_VW_FLT | STP_FLT
     INDEX_FIELDS_CME = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=CME_PDNM_ANA),
                         F_PRODUCT_GROUP: ID(stored=True),
                         F_CLEARED_AS: ID(stored=True, unique=True),
@@ -319,23 +321,22 @@ class CMEGMatcher(object):
                 grouping_q = And([Term(self.F_PRODUCT_GROUP, pdgp), Term(self.F_CLEARED_AS, row[self.CLEARED_AS])])
                 query = self.__exact_and_query(self.F_PRODUCT_NAME, ix.schema, pdnm)
                 results = searcher.search(query, filter=grouping_q, limit=None)
-                if results:
-                    rows_matched = self.__join_results(results, row, how=one_or_all)
-                else:
-                    query = self.__fuzzy_and_query(self.F_PRODUCT_NAME, ix.schema, row[self.PRODUCT])
+                if not results:
+                    query = self.__fuzzy_and_query(self.F_PRODUCT_NAME, ix.schema, pdnm)
                     results = searcher.search(query, filter=grouping_q, limit=None)
-                    if results:
-                        rows_matched = self.__join_results(results, row, how=one_or_all)
-                    else:
+                    if not results:
                         query = self.__exact_or_query(self.F_PRODUCT_NAME, ix.schema, row[self.PRODUCT])
                         results = searcher.search(query, filter=grouping_q, limit=None)
-                        if results:
-                            if one_or_all == 'one':
-                                results = min_dist_rslt(results, row[self.PRODUCT],
-                                                        self.F_PRODUCT_NAME, self.INDEX_FIELDS_CME[self.F_PRODUCT_NAME], minboost=0.2)
-                            rows_matched = self.__join_results(results, row, how=one_or_all)
-                        else:
-                            rows_matched = row
+
+                if results:
+                    if one_or_all == 'one':
+                        results = min_dist_rslt(results, pdnm,
+                                                self.F_PRODUCT_NAME,
+                                                self.INDEX_FIELDS_CME[self.F_PRODUCT_NAME],
+                                                minboost=0.2)
+                    rows_matched = self.__join_results(results, row, how=one_or_all)
+                else:
+                    rows_matched = row
                 df_matched = df_matched.append(rows_matched, ignore_index=True)
                 if rows_matched is row:
                     print('Failed matching {}'.format(row[self.PRODUCT]))
@@ -361,7 +362,7 @@ class CMEGMatcher(object):
         parser = qparser.QueryParser(field, schema=schema)
         query = parser.parse(text)
         fuzzy_terms = And(
-            [FuzzyTerm(f, t, maxdist=maxdist, prefixlength=prefixlength) for f, t in query.iter_all_terms()])
+            [FuzzyTerm(f, t, maxdist=maxdist, prefixlength=prefixlength) for f, t in query.iter_all_terms() if len(t) > maxdist])
         return fuzzy_terms
 
     def __exact_or_query(self, field, schema, text):
