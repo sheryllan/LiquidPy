@@ -208,14 +208,13 @@ class CMEGMatcher(object):
     #                            mergewords=True, mergenums=True)
     # SPLT_FLT_QRY = SplitFilter(delims='[&/\(\)\.-]', splitwords=True, splitcase=True,
     #                            splitnums=True, mergewords=True, mergenums=True)
-    SPLT_FLT = SplitFilter(delims='[&/\(\)\.-]', splitwords=True, splitcase=True,
-                               splitnums=True, mergewords=True, mergenums=True)
+    SPLT_MRG_FLT = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True)
     LWRCS_FLT = LowercaseFilter()
     STP_FLT = StopFilter(stoplist=STOP_LIST + CME_COMMON_WORDS, minsize=1)
     CME_SP_FLT = SpecialWordFilter(CME_KEYWORD_MAPPING)
     CME_VW_FLT = VowelFilter(CME_KYWRD_EXCLU)
 
-    CME_PDNM_ANA = REGEX_TKN | SPLT_FLT | LWRCS_FLT | CME_SP_FLT | STP_FLT | CME_VW_FLT | STP_FLT
+    CME_PDNM_ANA = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_SP_FLT | STP_FLT | CME_VW_FLT | STP_FLT
     INDEX_FIELDS_CME = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=CME_PDNM_ANA),
                         F_PRODUCT_GROUP: ID(stored=True),
                         F_CLEARED_AS: ID(stored=True, unique=True),

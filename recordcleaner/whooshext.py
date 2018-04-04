@@ -98,20 +98,21 @@ class VowelFilter(Filter):
                 yield token
 
 
-class SplitFilter(Filter):
-    PTN_SPLT_WRD = '([A-Z]+[^A-Z]*|[^A-Z]+)((?=[A-Z])|$)'
-    PTN_SPLT_NUM = '[0-9]+((?=[^0-9])|$)|[^0-9]+((?=[0-9])|$)'
-    PTN_SPLT_WRDNUM = '[0-9]+((?=[^0-9])|$)|([A-Z]+[^A-Z0-9]*|[^A-Z0-9]+)((?=[A-Z])|(?=[0-9])|$)'
+class SplitMergeFilter(Filter):
+    PTN_SPLT_WRD = '[A-Z]*[^A-Z]*'
+    PTN_SPLT_NUM = '[0-9]+|[^0-9]+'
+    PTN_SPLT_WRDNUM = '[0-9]+|([A-Z]*[^A-Z0-9]*)'
 
     PTN_MRG_WRD = '[A-Za-z]+'
     PTN_MRG_NUM = '[0-9]+'
 
-    def __init__(self, delims='\W+', origin=False, splitwords=False, splitcase=False, splitnums=False, mergewords=False, mergenums=False):
-        self.delims = delims
+    def __init__(self, delims_splt='\W+', delims_mrg='\W+', min_spltlen=2, origin=False, splitcase=False, splitnums=False, mergewords=False, mergenums=False):
+        self.delims_splt = delims_splt
+        self.delims_mrg = delims_mrg
+        self.min_spltlen = min_spltlen
         self.origin = origin
         self.splt_ptn = None
         self.mrg_ptn = None
-        self.splitwords = splitwords
 
         if mergewords and mergenums:
             self.mrg_ptn = '|'.join([self.PTN_MRG_WRD, self.PTN_MRG_NUM])
@@ -134,27 +135,32 @@ class SplitFilter(Filter):
             tk_boost = token.boost
             if self.origin:
                 yield token
-            words = re.split(self.delims, tk_text) if re.search(self.delims, tk_text) else [tk_text]
-            for text, boost in self.__split_merge(words):
+            for text, boost in self.__split_merge(tk_text):
                 if not (self.origin and text == tk_text):
                     token.text = text
                     token.boost = tk_boost * boost
                     yield token
 
-    def __split_merge(self, words):
-        words = words if self.splitwords else [''.join(words)]
-        splits, merges = [], []
+    def __split(self, text):
+        words = self.__join_short_words(re.split(self.delims_splt, text), self.min_spltlen)
+        for word in words:
+            splits = self.__findall(self.splt_ptn, word) \
+                if self.splt_ptn is not None else [word]
+            for split in splits:
+                yield split
 
-        # process splits
-        if self.splt_ptn is not None:
-            for word in words:
-                splits = itertools.chain(splits, (split for split in self.__findall(self.splt_ptn, word)))
-            splits = list(splits)
-
-        # process merges
+    def __merge(self, text):
         if self.mrg_ptn is not None:
-            string = ''.join(words)
-            merges = [merge for merge in self.__findall(self.mrg_ptn, string)]
+            string = re.sub(self.delims_mrg, '', text)
+            merges = self.__findall(self.mrg_ptn, string)
+        else:
+            merges = re.split(self.delims_mrg, text)
+        for merge in merges:
+            yield merge
+
+    def __split_merge(self, text):
+        splits = list(self.__split(text))
+        merges = list(self.__merge(text))
 
         if len(splits) != 0 and len(merges) != 0:
             s_boost = 1 / (2 * len(splits))
@@ -171,14 +177,27 @@ class SplitFilter(Filter):
         elif len(merges) == 0:
             results = ((text, 1/len(splits)) for text in splits)
         else:
-            results = ((text, 1/len(words)) for text in words)
-
+            results = [text]
         return results
 
     def __findall(self, pattern, word):
         for mobj in re.finditer(pattern, word):
-            if mobj.group():
-                yield mobj.group()
+            text = mobj.group()
+            if text:
+                yield text
+
+    def __join_short_words(self, words, minlen=2):
+        result = ''
+        for w in words:
+            if len(w) < minlen:
+                result = result + w
+            else:
+                if result:
+                    yield result
+                    result = ''
+                yield w
+        if result:
+            yield result
 
 
 class SpecialWordFilter(Filter):
