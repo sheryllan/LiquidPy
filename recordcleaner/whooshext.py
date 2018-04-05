@@ -2,6 +2,7 @@ import os
 import re
 import pandas as pd
 import itertools
+from collections import namedtuple
 from collections import OrderedDict
 
 from whoosh.fields import *
@@ -9,6 +10,13 @@ from whoosh.analysis import *
 from whoosh.index import create_in
 from whoosh.index import open_dir
 from whoosh import writing
+
+
+STOP_LIST = ['and', 'is', 'it', 'an', 'as', 'at', 'have', 'in', 'yet', 'if', 'from', 'for', 'when',
+             'by', 'to', 'you', 'be', 'we', 'that', 'may', 'not', 'with', 'tbd', 'a', 'on', 'your',
+             'this', 'of', 'will', 'can', 'the', 'or', 'are']
+
+TokenSub = namedtuple('TokenSub', ['text', 'boost', 'ignored'])
 
 
 def create_index(ix_path, fields, clean=False):
@@ -44,6 +52,20 @@ def clear_index(ix):
     wrt.commit(mergetype=writing.CLEAR)
 
 
+def join_words(words, minlen=2):
+    result = ''
+    for w in words:
+        if len(w) < minlen:
+            result = result + w
+        else:
+            if result:
+                yield result
+                result = ''
+            yield w
+    if result:
+        yield result
+
+
 class CompositeFilter(Filter):
     def __init__(self, *filters):
         self.filters = []
@@ -69,9 +91,12 @@ class CompositeFilter(Filter):
 class VowelFilter(Filter):
     VOWELS = ('a', 'e', 'i', 'o', 'u')
 
-    def __init__(self, exclusions=list(), boost=0.8):
+    def __init__(self, exclusions=list(), boost=0.8, ignore=True, lift_ignore=True, original=True):
         self.exclusions = exclusions
         self.boost = boost
+        self.ignore = ignore
+        self.lift_ignore = lift_ignore
+        self.original = original
 
     def __remove_vowels(self, string):
         if len(string) < 4:
@@ -84,18 +109,29 @@ class VowelFilter(Filter):
 
     def __call__(self, stream):
         for token in stream:
-            if token.text not in self.exclusions:
-                txt_changed = self.__remove_vowels(token.text)
-                if txt_changed != token.text:
-                    boost = token.boost
-                    yield token
-                    token.text = txt_changed
-                    token.boost = self.boost * boost
-                    yield token
-                else:
-                    yield token
-            else:
+            token.ignored = token.ignored if hasattr(token, 'ignored') else False
+            tk_text, tk_boost, tk_ignored = token.text, token.boost, token.ignored
+            ignored = False if self.lift_ignore else tk_ignored
+
+            if tk_ignored or tk_text in self.exclusions:
+                token.ignored = ignored
                 yield token
+                continue
+
+            txt_changed = self.__remove_vowels(tk_text)
+            if txt_changed == tk_text:
+                token.ignored = ignored
+                yield token
+                continue
+
+            if self.original:
+                token.ignored = ignored
+                yield token
+
+            token.text = txt_changed
+            token.boost = self.boost * tk_boost
+            token.ignored = ignored
+            yield token
 
 
 class SplitMergeFilter(Filter):
@@ -106,11 +142,15 @@ class SplitMergeFilter(Filter):
     PTN_MRG_WRD = '[A-Za-z]+'
     PTN_MRG_NUM = '[0-9]+'
 
-    def __init__(self, delims_splt='\W+', delims_mrg='\W+', min_spltlen=2, origin=False, splitcase=False, splitnums=False, mergewords=False, mergenums=False):
+    def __init__(self, delims_splt='\W+', delims_mrg='\W+', min_spltlen=2, original=False,
+                 splitcase=False, splitnums=False, mergewords=False, mergenums=False,
+                 ignore_splt=False, ignore_mrg=True):
         self.delims_splt = delims_splt
         self.delims_mrg = delims_mrg
         self.min_spltlen = min_spltlen
-        self.origin = origin
+        self.original = original
+        self.ignore_splt = ignore_splt
+        self.ignore_mrg = ignore_mrg
         self.splt_ptn = None
         self.mrg_ptn = None
 
@@ -131,53 +171,58 @@ class SplitMergeFilter(Filter):
 
     def __call__(self, stream):
         for token in stream:
-            tk_text = token.text
-            tk_boost = token.boost
-            if self.origin:
+            token.ignored = token.ignored if hasattr(token, 'ignored') else False
+            tk_text, tk_boost, tk_ignored = token.text, token.boost, token.ignored
+            if self.original:
                 yield token
-            for text, boost in self.__split_merge(tk_text):
-                if not (self.origin and text == tk_text):
-                    token.text = text
-                    token.boost = tk_boost * boost
+            for tksub in self.__split_merge(tk_text):
+                if not (self.original and tksub.text == tk_text):
+                    token.text = tksub.text
+                    token.boost = tksub.boost * tk_boost
+                    token.ignored = tk_ignored or tksub.ignored
                     yield token
 
-    def __split(self, text):
-        words = self.__join_short_words(re.split(self.delims_splt, text), self.min_spltlen)
+    def __split(self, text, ignore=False):
+        words = [word for word in re.split(self.delims_splt, text) if len(word) >= self.min_spltlen]
         for word in words:
             splits = self.__findall(self.splt_ptn, word) \
                 if self.splt_ptn is not None else [word]
             for split in splits:
-                yield split
+                if len(split) >= self.min_spltlen:
+                    yield TokenSub(split, 1, split != word and ignore)
 
-    def __merge(self, text):
+    def __merge(self, text, ignore=True):
         if self.mrg_ptn is not None:
             string = re.sub(self.delims_mrg, '', text)
             merges = self.__findall(self.mrg_ptn, string)
         else:
             merges = re.split(self.delims_mrg, text)
         for merge in merges:
-            yield merge
+            yield TokenSub(merge, 1, merge != text and ignore)
 
     def __split_merge(self, text):
-        splits = list(self.__split(text))
-        merges = list(self.__merge(text))
+        splits = list(self.__split(text, self.ignore_splt))
+        merges = list(self.__merge(text, self.ignore_mrg))
 
         if len(splits) != 0 and len(merges) != 0:
             s_boost = 1 / (2 * len(splits))
             m_boost = 1 / (2 * len(merges))
-            word_boost = OrderedDict({text: s_boost for text in splits})
-            for text in merges:
-                if text not in word_boost:
-                    word_boost.update({text: m_boost})
+            word_boost = OrderedDict({split.text: TokenSub(
+                split.text, split.boost * s_boost, split.ignored)for split in splits})
+            for merge in merges:
+                if merge.text not in word_boost:
+                    word_boost.update({merge.text: TokenSub(merge.text, merge.boost * m_boost, merge.ignored)})
                 else:
-                    word_boost.update({text: s_boost + m_boost})
-            results = word_boost.items()
+                    ignored = word_boost[merge.text].ignored
+                    word_boost.update({merge.text: TokenSub(
+                        merge.text, merge.boost * (s_boost + m_boost), ignored or merge.ignored)})
+            results = word_boost.values()
         elif len(splits) == 0:
-            results = ((text, 1/len(merges)) for text in merges)
+            results = (TokenSub(merge.text, merge.boost * 1/len(merges), merge.ignored) for merge in merges)
         elif len(merges) == 0:
-            results = ((text, 1/len(splits)) for text in splits)
+            results = (TokenSub(split.text, split.boost * 1/len(splits), split.ignored) for split in splits)
         else:
-            results = [text]
+            results = [TokenSub(text, 1, False)]
         return results
 
     def __findall(self, pattern, word):
@@ -186,42 +231,35 @@ class SplitMergeFilter(Filter):
             if text:
                 yield text
 
-    def __join_short_words(self, words, minlen=2):
-        result = ''
-        for w in words:
-            if len(w) < minlen:
-                result = result + w
-            else:
-                if result:
-                    yield result
-                    result = ''
-                yield w
-        if result:
-            yield result
-
 
 class SpecialWordFilter(Filter):
-    def __init__(self, worddict, tokenizer=RegexTokenizer()):
+    def __init__(self, worddict, tokenizer=RegexTokenizer(), original=False):
         self.word_dict = worddict
         if not isinstance(tokenizer, Tokenizer):
             raise TypeError('Input is not a valid instance of Tokenizer')
         self.tokenizer = tokenizer
+        self.original = original
 
     def __call__(self, stream):
         for token in stream:
-            if token.text in self.word_dict:
-                boost = token.boost
-                values = self.word_dict[token.text]
-                if not isinstance(values, list):
-                    values = [values]
-                for val in values:
-                    tks = self.tokenizer(val[0])
-                    for t in tks:
-                        token.text = t.text
-                        token.boost = val[1] * boost
-                        yield token
-            else:
+            token.ignored = token.ignored if hasattr(token, 'ignored') else False
+            tk_text, tk_boost, tk_ignored = token.text, token.boost, token.ignored
+
+            if tk_text not in self.word_dict or self.original:
                 yield token
+                continue
+
+            values = self.word_dict[token.text]
+            if not isinstance(values, list):
+                values = [values]
+            for val in values:
+                tks = self.tokenizer(val.text)
+                for t in tks:
+                    token.text = t.text
+                    token.boost = val.boost * tk_boost
+                    token.ignored = val.ignored and tk_ignored
+                    yield token
+
 
 
 def min_dist_rslt(results, qstring, fieldname, field, minboost=0):
@@ -290,7 +328,7 @@ class TreeMap(object):
 
         if key < nkey:
             node.left = self.add(item, node.left)
-        elif key == nkey:
+        elif key == nkey:   # preserving the input order
             node.right = TreeMap.Node(item, None, node.right)
         else:
             node.right = self.add(item, node.right)
@@ -300,7 +338,6 @@ class TreeMap(object):
         return node
 
     def get_items(self, head):
-
         def get_items_recursive(node, items):
             if node is None:
                 return items
@@ -308,14 +345,8 @@ class TreeMap(object):
             items.append(node.data)
             items = get_items_recursive(node.right, items)
             return items
-
         return get_items_recursive(head, [])
 
-
-
-STOP_LIST = ['and', 'is', 'it', 'an', 'as', 'at', 'have', 'in', 'yet', 'if', 'from', 'for', 'when',
-             'by', 'to', 'you', 'be', 'we', 'that', 'may', 'not', 'with', 'tbd', 'a', 'on', 'your',
-             'this', 'of', 'will', 'can', 'the', 'or', 'are']
 
 # STD_ANA = StandardAnalyzer('[^\s/]+', stoplist=STOP_LIST, minsize=1)
 

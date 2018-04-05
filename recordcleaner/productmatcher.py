@@ -26,33 +26,6 @@ def filter(df, col, exp):
     return df[col].map(exp)
 
 
-CRRNCY_MAPPING = {'ad': [('australian', 1.5), ('dollar', 1)],
-                  'bp': [('british', 1.5), ('pound', 1.5)],
-                  'cd': [('canadian', 1.5), ('dollar', 1)],
-                  'ec': [('euro', 1.5), ('cross', 0.5), ('rates', 0.5)],
-                  'efx': [('euro', 1.5), ('fx', 0.8)],
-                  'jy': [('japanese', 1.5), ('yen', 1.5)],
-                  'jpy': [('japanese', 1.5), ('yen', 1.5)],
-                  'ne': [('new', 1.5), ('zealand', 1.5), ('dollar', 1)],
-                  'nok': [('norwegian', 1.5), ('krone', 1.5)],
-                  'sek': [('swedish', 1.5), ('krona', 1.5)],
-                  'sf': [('swiss', 1.5), ('franc', 1.5)],
-                  'skr': [('swedish', 1.5), ('krona', 1.5)],
-                  'zar': [('south', 1.5), ('african', 1.5), ('rand', 1.5)],
-                  'aud': [('australian', 1.5), ('dollar', 1)],
-                  'cad': [('canadian', 1.5), ('dollar', 1)],
-                  'chf': [('swiss', 1.5), ('franc', 1.5)],
-                  'eur': [('euro', 1.5)],
-                  'gbp': [('british', 1.5), ('pound', 1.5)],
-                  'pln': [('polish', 1.5), ('zloty', 1.5)],
-                  'nkr': [('norwegian', 1.5), ('krone', 1.5)],
-                  'inr': [('indian', 1.5), ('rupee', 1.5)],
-                  'rmb': [('chinese', 1.5), ('renminbi', 1.5)],
-                  'usd': [('us', 0.75), ('american', 0.75), ('dollar', 0.5)]}
-
-CRRNCY_KEYWORDS = list(set(dtsp.flatten_list(
-    [k.split(' ') + [tp[0] for tp in v] for k, v in CRRNCY_MAPPING.items()], list())))
-
 STOP_LIST = ['and', 'is', 'it', 'an', 'as', 'at', 'have', 'in', 'yet', 'if', 'from', 'for', 'when',
              'by', 'to', 'you', 'be', 'we', 'that', 'may', 'not', 'with', 'tbd', 'a', 'on', 'your',
              'this', 'of', 'will', 'can', 'the', 'or', 'are']
@@ -183,25 +156,56 @@ class CMEGMatcher(object):
                        ('CAD/USD PQO 2pm Fix', 'FX', 'Options'),
                        ('CHF/USD PQO 2pm Fix', 'FX', 'Options')]
 
-    CME_SPECIAL_MAPPING = {'midcurve': [('midcurve', 1), ('mc', 1.5)],
-                           'pqo': [('premium', 1), ('quoted', 1), ('european', 1), ('style', 1), ('options', 0.5)],
-                           'eow': [('weekly', 1), ('wk', 1)],
-                           'eom': [('monthly', 1)],
-                           'usdzar': [('us', 0.75), ('american', 0.75), ('dollar', 0.5), ('south', 1), ('african', 1), ('rand', 1)],
-                           'biotech': [('biotechnology', 1.5)],
-                           '$': [('us', 1), ('american', 1), ('dollar', 1)]}
+    CRRNCY_MAPPING = {'ad': [TokenSub('australian', 1.5, True), TokenSub('dollar', 1, True)],
+                      'bp': [TokenSub('british', 1.5, True), TokenSub('pound', 1.5, True)],
+                      'cd': [TokenSub('canadian', 1.5, True), TokenSub('dollar', 1, True)],
+                      'ec': [TokenSub('euro', 1.5, True), TokenSub('cross', 0.5, True),
+                             TokenSub('rates', 0.5, True)],
+                      'efx': [TokenSub('euro', 1.5, True), TokenSub('fx', 0.8, True)],
+                      'jy': [TokenSub('japanese', 1.5, True), TokenSub('yen', 1.5, True)],
+                      'jpy': [TokenSub('japanese', 1.5, True), TokenSub('yen', 1.5, True)],
+                      'ne': [TokenSub('new', 1.5, True), TokenSub('zealand', 1.5, True),
+                             TokenSub('dollar', 1, True)],
+                      'nok': [TokenSub('norwegian', 1.5, True), TokenSub('krone', 1.5, True)],
+                      'sek': [TokenSub('swedish', 1.5, True), TokenSub('krona', 1.5, True)],
+                      'sf': [TokenSub('swiss', 1.5, True), TokenSub('franc', 1.5, True)],
+                      'skr': [TokenSub('swedish', 1.5, True), TokenSub('krona', 1.5, True)],
+                      'zar': [TokenSub('south', 1.5, True), TokenSub('african', 1.5, True),
+                              TokenSub('rand', 1.5, True)],
+                      'aud': [TokenSub('australian', 1.5, True), TokenSub('dollar', 1, True)],
+                      'cad': [TokenSub('canadian', 1.5, True), TokenSub('dollar', 1, True)],
+                      'chf': [TokenSub('swiss', 1.5, True), TokenSub('franc', 1.5, True)],
+                      'eur': [TokenSub('euro', 1.5, True)],
+                      'gbp': [TokenSub('british', 1.5, True), TokenSub('pound', 1.5, True)],
+                      'pln': [TokenSub('polish', 1.5, True), TokenSub('zloty', 1.5, True)],
+                      'nkr': [TokenSub('norwegian', 1.5, True), TokenSub('krone', 1.5, True)],
+                      'inr': [TokenSub('indian', 1.5, True), TokenSub('rupee', 1.5, True)],
+                      'rmb': [TokenSub('chinese', 1.5, True), TokenSub('renminbi', 1.5, True)],
+                      'usd': [TokenSub('us', 0.75, True), TokenSub('american', 0.75, True),
+                              TokenSub('dollar', 0.5, True)]}
+
+    # CRRNCY_KEYWORDS = list(set(dtsp.flatten_list(
+    #     [k.split(' ') + [tp[0] for tp in v] for k, v in CRRNCY_MAPPING.items()], list())))
+
+    CME_SPECIAL_MAPPING = {'midcurve': [TokenSub('midcurve', 1, True), TokenSub('mc', 1.5, True)],
+                           'pqo': [TokenSub('premium', 1, True), TokenSub('quoted', 1, True), TokenSub('european', 1, True), TokenSub('style', 1, True), TokenSub('options', 0.5, True)],
+                           'eow': [TokenSub('weekly', 1, True), TokenSub('wk', 1, True)],
+                           'eom': [TokenSub('monthly', 1, True)],
+                           'usdzar': [TokenSub('us', 0.75, True), TokenSub('american', 0.75, True), TokenSub('dollar', 0.5, True), TokenSub('south', 1, True), TokenSub('african', 1, True), TokenSub('rand', 1, True)],
+                           'biotech': [TokenSub('biotechnology', 1.5, True)],
+                           '$': [TokenSub('us', 1, True), TokenSub('american', 1, True), TokenSub('dollar', 1, True)],
+                           'eu': [TokenSub('european', 1.5, True)]}
 
     CME_COMMON_WORDS = ['futures', 'options', 'index', 'cross', 'rate', 'rates']
 
-    CME_SPECIAL_KEYWORDS = list(set(dtsp.flatten_list(
-        [k.split(' ') + [tp[0] for tp in v] for k, v in CME_SPECIAL_MAPPING.items()], list())))
+    # CME_SPECIAL_KEYWORDS = list(set(dtsp.flatten_list(
+    #     [k.split(' ') + [tp[0] for tp in v] for k, v in CME_SPECIAL_MAPPING.items()], list())))
 
     CME_KEYWORD_MAPPING = {**CRRNCY_MAPPING, **CME_SPECIAL_MAPPING}
 
-    CME_KYWRD_EXCLU = CRRNCY_KEYWORDS + CME_SPECIAL_KEYWORDS + \
-                      ['nasdaq', 'ibovespa', 'index', 'mini', 'emini',
-                       'micro', 'emicro', 'nikkei', 'russell', 'ftse',
-                       'european']
+    CME_KYWRD_EXCLU = ['nasdaq', 'ibovespa', 'index', 'mini',
+                       'micro', 'nikkei', 'russell', 'ftse',
+                       ]
 
     REGEX_TKN = RegexTokenizer('[^\s/]+')
     # SPLT_FLT_IDX = SplitFilter(delims='[&/\(\)\.-]', splitwords=True, splitcase=True, splitnums=True,
@@ -214,7 +218,7 @@ class CMEGMatcher(object):
     CME_SP_FLT = SpecialWordFilter(CME_KEYWORD_MAPPING)
     CME_VW_FLT = VowelFilter(CME_KYWRD_EXCLU)
 
-    CME_PDNM_ANA = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_SP_FLT | STP_FLT | CME_VW_FLT | STP_FLT
+    CME_PDNM_ANA = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | STP_FLT | CME_SP_FLT | CME_VW_FLT
     INDEX_FIELDS_CME = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=CME_PDNM_ANA),
                         F_PRODUCT_GROUP: ID(stored=True),
                         F_CLEARED_AS: ID(stored=True, unique=True),
@@ -424,17 +428,17 @@ class CMEGMatcher(object):
         cp.XlsxWriter.save_sheets(outpath, {self.CME: mdf_cme, self.CBOT: mdf_cbot}, override=False)
 
 
-checked_path = os.getcwd()
-
-exchanges = ['asx', 'bloomberg', 'cme', 'cbot', 'nymex_comex', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
-report_fmtname = 'Web_ADV_Report_{}.xlsx'
-
-report_files = {e: report_fmtname.format(e.upper()) for e in exchanges}
-
-cme_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
-cme_adv_files = [os.path.join(checked_path, report_files['cme']),
-                 os.path.join(checked_path, report_files['cbot']),
-                 os.path.join(checked_path, report_files['nymex_comex'])]
-
-cme = CMEGMatcher(cme_adv_files, cme_prds_file, '2017')
-cme.run_pd_mtch(clean=True)
+# checked_path = os.getcwd()
+#
+# exchanges = ['asx', 'bloomberg', 'cme', 'cbot', 'nymex_comex', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
+# report_fmtname = 'Web_ADV_Report_{}.xlsx'
+#
+# report_files = {e: report_fmtname.format(e.upper()) for e in exchanges}
+#
+# cme_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
+# cme_adv_files = [os.path.join(checked_path, report_files['cme']),
+#                  os.path.join(checked_path, report_files['cbot']),
+#                  os.path.join(checked_path, report_files['nymex_comex'])]
+#
+# cme = CMEGMatcher(cme_adv_files, cme_prds_file, '2017')
+# cme.run_pd_mtch(clean=True)
