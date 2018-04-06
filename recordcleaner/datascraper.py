@@ -25,25 +25,32 @@ A_TAB = 'a'
 HREF_ATTR = 'href'
 
 
-def flatten_list(items, flat_list, level=None):
-    if isinstance(items, list):
-        for sublist in items:
-            if level is not None:
-                flatten_list(sublist, flat_list, level + 1)
-            else:
-                flatten_list(sublist, flat_list, None)
-    else:
-        if level is not None:
-            flat_list.append((level, items))
+def nonstr_iterable(arg):
+    return isinstance(arg, collections.Iterable) and not isinstance(arg, str)
+
+
+def flatten_iter(items, incl_level=False):
+
+    def flattern_iter_rcrs(items, flat_list, level):
+        if not items:
+            return flat_list
+
+        if nonstr_iterable(items) and list(items):
+            level = None if level is None else level + 1
+            for sublist in items:
+                flat_list = flattern_iter_rcrs(sublist, flat_list, level)
         else:
-            flat_list.append(items)
-    return flat_list
+            level_item = items if level is None else (level, items)
+            flat_list.append(level_item)
+        return flat_list
+
+    flat_list = list()
+    level = -1 if incl_level else None
+    return flattern_iter_rcrs(items, flat_list, level)
 
 
 def to_list(x):
-    if isinstance(x, str):
-        return [x]
-    return [x] if not isinstance(x, collections.Iterable) else list(x)
+    return [x] if not nonstr_iterable(x) else list(x)
 
 
 def find_first_n(arry, condition, n=1):
@@ -205,8 +212,8 @@ class CMEGScraper(object):
         with open(path, mode='rb') as fh:
             fr = PdfFileReader(fh)
             outlines = fr.getOutlines()
-            flat_outlines = flatten_list(outlines, list(), 0)
-            self.report_name = ' '.join([o.title for l, o in flat_outlines[0:2]]).replace('/', '-')
+            flat_outlines = flatten_iter(outlines, True)
+            self.report_name = ' '.join([o.title for _, o in flat_outlines[0:2]]).replace('/', '-')
             return self.get_pdf_product_groups([(l, o.title) for l, o in flat_outlines[2:]])
 
     def parse_from_txt(self, pdf_path, txt_path):
@@ -386,7 +393,7 @@ class OSEScraper(object):
             f_pdf.close()
 
 # download_path = os.getcwd()
-# # download_path = '/home/slan/Documents/downloads/'
+# # # download_path = '/home/slan/Documents/downloads/'
 # cme = CMEGScraper(download_path)
 # cme.run_scraper()
 # cme.download_to_xlsx_adv()

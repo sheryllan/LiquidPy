@@ -129,23 +129,10 @@ class CMEGMatcher(object):
     F_EXCHANGE = EXCHANGE
 
     CME_EXACT_MAPPING = {
+        ('NIKKEI 225 ($) STOCK', 'Equity Index', 'Futures'): 'Nikkei/USD Futures',
         ('NIKKEI 225 (YEN) STOCK', 'Equity Index', 'Futures'): 'Nikkei/Yen Futures',
         ('BDI', 'FX', 'Futures'): 'CME Bloomberg Dollar Spot Index',
-        ('CHINESE RENMINBI (CNH)', 'FX', 'Futures'): 'Standard-Size USD/Offshore RMB (CNH)',
-        ('AUSTRALIAN DOLLAR', 'FX',
-         'Options'): 'Premium Quoted European Style Options on Australian Dollar/US Dollar Futures',
-        ('BRITISH POUND', 'FX',
-         'Options'): 'Premium Quoted European Style Options on British Pound/US Dollar Futures',
-        ('CANADIAN DOLLAR', 'FX',
-         'Options'): 'Premium Quoted European Style Options on Canadian Dollar/US Dollar Futures',
-        ('EURO FX', 'FX',
-         'Options'): 'Premium Quoted European Style Options on Euro/US Dollar Futures',
-        ('JAPANESE YEN', 'FX',
-         'Options'): 'Premium Quoted European Style Options on Japanese Yen/US Dollar Futures',
-        ('SWISS FRANC', 'FX',
-         'Options'): 'Premium Quoted European Style Options on Swiss Franc/US Dollar Futures',
-        ('CHF/USD PQO 2pm Fix', 'FX',
-         'Options'): 'Weekly Premium Quoted European Style Options on Swiss Franc/US Dollar Futures - Wk'
+        ('CHINESE RENMINBI (CNH)', 'FX', 'Futures'): 'Standard-Size USD/Offshore RMB (CNH)'
     }
 
     CME_MULTI_MATCH = [('EURO MIDCURVE', 'Interest Rate', 'Options'),
@@ -182,10 +169,13 @@ class CMEGMatcher(object):
                       'inr': [TokenSub('indian', 1.5, True), TokenSub('rupee', 1.5, True)],
                       'rmb': [TokenSub('chinese', 1.5, True), TokenSub('renminbi', 1.5, True)],
                       'usd': [TokenSub('us', 0.75, True), TokenSub('american', 0.75, True),
-                              TokenSub('dollar', 0.5, True)]}
-
-    # CRRNCY_KEYWORDS = list(set(dtsp.flatten_list(
-    #     [k.split(' ') + [tp[0] for tp in v] for k, v in CRRNCY_MAPPING.items()], list())))
+                              TokenSub('dollar', 0.5, True)],
+                      'clp': [TokenSub('chilean', 1.5, True), TokenSub('peso', 1.5, True)],
+                      'nzd': [TokenSub('new', 1.5, True), TokenSub('zealand', 1.5, True), TokenSub('dollar', 0.5, True)],
+                      'mxn': [TokenSub('mexican', 1.5, True), TokenSub('peso', 1.5, True)],
+                      'brl': [TokenSub('brazilian', 1.5, True), TokenSub('real', 1.5, True)],
+                      'cnh': [TokenSub('chinese', 1.5, True), TokenSub('renminbi', 1.5, True)],
+                      'huf': [TokenSub('hungarian', 1.5, True), TokenSub('forint', 1.5, True)]}
 
     CME_SPECIAL_MAPPING = {'midcurve': [TokenSub('midcurve', 1, True), TokenSub('mc', 1.5, True)],
                            'pqo': [TokenSub('premium', 1, True), TokenSub('quoted', 1, True), TokenSub('european', 1, True), TokenSub('style', 1, True), TokenSub('options', 0.5, True)],
@@ -193,32 +183,36 @@ class CMEGMatcher(object):
                            'eom': [TokenSub('monthly', 1, True)],
                            'usdzar': [TokenSub('us', 0.75, True), TokenSub('american', 0.75, True), TokenSub('dollar', 0.5, True), TokenSub('south', 1, True), TokenSub('african', 1, True), TokenSub('rand', 1, True)],
                            'biotech': [TokenSub('biotechnology', 1.5, True)],
-                           '$': [TokenSub('us', 1, True), TokenSub('american', 1, True), TokenSub('dollar', 1, True)],
-                           'eu': [TokenSub('european', 1.5, True)]}
+                           'us': [TokenSub('us', 0.75, True), TokenSub('american', 0.75, True)],
+                           'eu': [TokenSub('european', 1.5, True)],
+                           'nfd': [TokenSub('non', 1.5, True), TokenSub('fat', 1.5, True), TokenSub('dry', 1.5, True)],
+                           'cs': [TokenSub('cash', 1.5, True), TokenSub('settled', 1.5, True)],
+                           'er': [TokenSub('excess', 1.5, True), TokenSub('return', 1.5, True)]}
 
     CME_COMMON_WORDS = ['futures', 'options', 'index', 'cross', 'rate', 'rates']
 
-    # CME_SPECIAL_KEYWORDS = list(set(dtsp.flatten_list(
-    #     [k.split(' ') + [tp[0] for tp in v] for k, v in CME_SPECIAL_MAPPING.items()], list())))
+    CRRNCY_KEYWORDS = set(dtsp.flatten_iter(
+        [k.split(' ') + [tp.text for tp in v] for k, v in CRRNCY_MAPPING.items()]))
+
+    CME_SPECIAL_KEYWORDS = set(dtsp.flatten_iter(
+        [k.split(' ') + [tp.text for tp in v] for k, v in CME_SPECIAL_MAPPING.items()]))
 
     CME_KEYWORD_MAPPING = {**CRRNCY_MAPPING, **CME_SPECIAL_MAPPING}
 
-    CME_KYWRD_EXCLU = ['nasdaq', 'ibovespa', 'index', 'mini',
-                       'micro', 'nikkei', 'russell', 'ftse',
-                       ]
+    CME_KYWRD_EXCLU = CRRNCY_KEYWORDS.union(CME_SPECIAL_KEYWORDS).union(
+        {'nasdaq', 'ibovespa', 'index', 'mini', 'micro', 'nikkei', 'russell', 'ftse', 'swap'})
 
     REGEX_TKN = RegexTokenizer('[^\s/]+')
-    # SPLT_FLT_IDX = SplitFilter(delims='[&/\(\)\.-]', splitwords=True, splitcase=True, splitnums=True,
-    #                            mergewords=True, mergenums=True)
-    # SPLT_FLT_QRY = SplitFilter(delims='[&/\(\)\.-]', splitwords=True, splitcase=True,
-    #                            splitnums=True, mergewords=True, mergenums=True)
+    TKATTR_FLT = TokenAttrFilter(ignored=False)
     SPLT_MRG_FLT = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True)
     LWRCS_FLT = LowercaseFilter()
-    STP_FLT = StopFilter(stoplist=STOP_LIST + CME_COMMON_WORDS, minsize=1)
+
+    CME_STP_FLT = StopFilter(stoplist=STOP_LIST + CME_COMMON_WORDS, minsize=1)
     CME_SP_FLT = SpecialWordFilter(CME_KEYWORD_MAPPING)
     CME_VW_FLT = VowelFilter(CME_KYWRD_EXCLU)
+    CME_MULT_FLT = MultiFilterFixed(index=CME_VW_FLT)
 
-    CME_PDNM_ANA = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | STP_FLT | CME_SP_FLT | CME_VW_FLT
+    CME_PDNM_ANA = REGEX_TKN | TKATTR_FLT | SPLT_MRG_FLT | LWRCS_FLT | CME_STP_FLT | CME_SP_FLT | CME_MULT_FLT
     INDEX_FIELDS_CME = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=CME_PDNM_ANA),
                         F_PRODUCT_GROUP: ID(stored=True),
                         F_CLEARED_AS: ID(stored=True, unique=True),
@@ -428,17 +422,17 @@ class CMEGMatcher(object):
         cp.XlsxWriter.save_sheets(outpath, {self.CME: mdf_cme, self.CBOT: mdf_cbot}, override=False)
 
 
-# checked_path = os.getcwd()
-#
-# exchanges = ['asx', 'bloomberg', 'cme', 'cbot', 'nymex_comex', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
-# report_fmtname = 'Web_ADV_Report_{}.xlsx'
-#
-# report_files = {e: report_fmtname.format(e.upper()) for e in exchanges}
-#
-# cme_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
-# cme_adv_files = [os.path.join(checked_path, report_files['cme']),
-#                  os.path.join(checked_path, report_files['cbot']),
-#                  os.path.join(checked_path, report_files['nymex_comex'])]
-#
-# cme = CMEGMatcher(cme_adv_files, cme_prds_file, '2017')
-# cme.run_pd_mtch(clean=True)
+checked_path = os.getcwd()
+
+exchanges = ['asx', 'bloomberg', 'cme', 'cbot', 'nymex_comex', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
+report_fmtname = 'Web_ADV_Report_{}.xlsx'
+
+report_files = {e: report_fmtname.format(e.upper()) for e in exchanges}
+
+cme_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
+cme_adv_files = [os.path.join(checked_path, report_files['cme']),
+                 os.path.join(checked_path, report_files['cbot']),
+                 os.path.join(checked_path, report_files['nymex_comex'])]
+
+cme = CMEGMatcher(cme_adv_files, cme_prds_file, '2017')
+cme.run_pd_mtch(clean=True)

@@ -12,10 +12,6 @@ from whoosh.index import open_dir
 from whoosh import writing
 
 
-STOP_LIST = ['and', 'is', 'it', 'an', 'as', 'at', 'have', 'in', 'yet', 'if', 'from', 'for', 'when',
-             'by', 'to', 'you', 'be', 'we', 'that', 'may', 'not', 'with', 'tbd', 'a', 'on', 'your',
-             'this', 'of', 'will', 'can', 'the', 'or', 'are']
-
 TokenSub = namedtuple('TokenSub', ['text', 'boost', 'ignored'])
 
 
@@ -109,7 +105,6 @@ class VowelFilter(Filter):
 
     def __call__(self, stream):
         for token in stream:
-            token.ignored = token.ignored if hasattr(token, 'ignored') else False
             tk_text, tk_boost, tk_ignored = token.text, token.boost, token.ignored
             ignored = False if self.lift_ignore else tk_ignored
 
@@ -171,7 +166,6 @@ class SplitMergeFilter(Filter):
 
     def __call__(self, stream):
         for token in stream:
-            token.ignored = token.ignored if hasattr(token, 'ignored') else False
             tk_text, tk_boost, tk_ignored = token.text, token.boost, token.ignored
             if self.original:
                 yield token
@@ -241,25 +235,69 @@ class SpecialWordFilter(Filter):
         self.original = original
 
     def __call__(self, stream):
+        memory = set()
         for token in stream:
-            token.ignored = token.ignored if hasattr(token, 'ignored') else False
             tk_text, tk_boost, tk_ignored = token.text, token.boost, token.ignored
 
-            if tk_text not in self.word_dict or self.original:
+            if tk_text not in self.word_dict:
+                memory.add(tk_text)
                 yield token
                 continue
+
+            if self.original:
+                memory.add(tk_text)
+                yield token
 
             values = self.word_dict[token.text]
             if not isinstance(values, list):
                 values = [values]
-            for val in values:
-                tks = self.tokenizer(val.text)
-                for t in tks:
-                    token.text = t.text
-                    token.boost = val.boost * tk_boost
-                    token.ignored = val.ignored and tk_ignored
-                    yield token
 
+            tks = [TokenSub(tk.text, val.boost, val.ignored) for val in values for tk in self.tokenizer(val.text)]
+            if all(t.text in memory for t in tks):
+                continue
+
+            for t in tks:
+                token.text = t.text
+                token.boost = t.boost * tk_boost
+                token.ignored = t.ignored and tk_ignored
+                memory.add(t.text)
+                yield token
+
+
+class TokenAttrFilter(Filter):
+    def __init__(self, **attrs):
+        self.attrs = attrs
+
+    def __call__(self, stream):
+        try:
+            token = next(stream)
+            token.__dict__.update(self.attrs)
+            yield token
+            for token in stream:
+                yield token
+        except StopIteration:
+            return iter('')
+
+
+class MultiFilterFixed(Filter):
+    default_filter = PassFilter()
+
+    def __init__(self, **kwargs):
+        self.filters = kwargs
+
+    def __eq__(self, other):
+        return (other
+                and self.__class__ is other.__class__
+                and self.filters == other.filters)
+
+    def __call__(self, tokens):
+        # Only selects on the first token
+        try:
+            t = next(tokens)
+            filter = self.filters.get(t.mode, self.default_filter)
+            return filter(chain([t], tokens))
+        except StopIteration:
+            return iter('')
 
 
 def min_dist_rslt(results, qstring, fieldname, field, minboost=0):
