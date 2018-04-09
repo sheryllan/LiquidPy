@@ -17,40 +17,58 @@ class CMEAnalyzerTests(ut.TestCase):
                  'by', 'to', 'you', 'be', 'we', 'that', 'may', 'not', 'with', 'tbd', 'a', 'on', 'your',
                  'this', 'of', 'will', 'can', 'the', 'or', 'are']
 
-    CRRNCY_MAPPING = {'ad': [TokenSub('australian', 1.5, True), TokenSub('dollar', 1, True)],
-                      'bp': [TokenSub('british', 1.5, True), TokenSub('pound', 1.5, True)],
-                      'cd': [TokenSub('canadian', 1.5, True), TokenSub('dollar', 1, True)],
-                      'ec': [TokenSub('euro', 1.5, True), TokenSub('cross', 0.5, True),
-                             TokenSub('rates', 0.5, True)],
-                      'efx': [TokenSub('euro', 1.5, True), TokenSub('fx', 0.8, True)],
-                      'jy': [TokenSub('japanese', 1.5, True), TokenSub('yen', 1.5, True)],
-                      'jpy': [TokenSub('japanese', 1.5, True), TokenSub('yen', 1.5, True)],
-                      'ne': [TokenSub('new', 1.5, True), TokenSub('zealand', 1.5, True),
-                             TokenSub('dollar', 1, True)],
-                      'nok': [TokenSub('norwegian', 1.5, True), TokenSub('krone', 1.5, True)],
-                      'sek': [TokenSub('swedish', 1.5, True), TokenSub('krona', 1.5, True)],
-                      'sf': [TokenSub('swiss', 1.5, True), TokenSub('franc', 1.5, True)],
-                      'skr': [TokenSub('swedish', 1.5, True), TokenSub('krona', 1.5, True)],
-                      'zar': [TokenSub('south', 1.5, True), TokenSub('african', 1.5, True),
-                              TokenSub('rand', 1.5, True)],
-                      'aud': [TokenSub('australian', 1.5, True), TokenSub('dollar', 1, True)],
-                      'cad': [TokenSub('canadian', 1.5, True), TokenSub('dollar', 1, True)],
-                      'chf': [TokenSub('swiss', 1.5, True), TokenSub('franc', 1.5, True)],
-                      'eur': [TokenSub('euro', 1.5, True)],
-                      'gbp': [TokenSub('british', 1.5, True), TokenSub('pound', 1.5, True)],
-                      'pln': [TokenSub('polish', 1.5, True), TokenSub('zloty', 1.5, True)],
-                      'nkr': [TokenSub('norwegian', 1.5, True), TokenSub('krone', 1.5, True)],
-                      'inr': [TokenSub('indian', 1.5, True), TokenSub('rupee', 1.5, True)],
-                      'rmb': [TokenSub('chinese', 1.5, True), TokenSub('renminbi', 1.5, True)],
-                      'usd': [TokenSub('us', 0.75, True), TokenSub('american', 0.75, True),
-                              TokenSub('dollar', 0.5, True)],
-                      'clp': [TokenSub('chilean', 1.5, True), TokenSub('peso', 1.5, True)],
-                      'nzd': [TokenSub('new', 1.5, True), TokenSub('zealand', 1.5, True),
-                              TokenSub('dollar', 0.5, True)],
-                      'mxn': [TokenSub('mexican', 1.5, True), TokenSub('peso', 1.5, True)],
-                      'brl': [TokenSub('brazilian', 1.5, True), TokenSub('real', 1.5, True)],
-                      'cnh': [TokenSub('chinese', 1.5, True), TokenSub('renminbi', 1.5, True)],
-                      'huf': [TokenSub('hungarian', 1.5, True), TokenSub('forint', 1.5, True)]}
+    CRRNCY_TOKENSUB = {'aud': [TokenSub('australian', 1.5, True), TokenSub('dollar', 1, True)],
+                       'gbp': [TokenSub('british', 1.5, True), TokenSub('pound', 1.5, True)],
+                       'cad': [TokenSub('canadian', 1.5, True), TokenSub('dollar', 1, True)],
+                       'euro': [TokenSub('euro', 1.5, True)],
+                       'jpy': [TokenSub('japanese', 1.5, True), TokenSub('yen', 1.5, True)],
+                       'nzd': [TokenSub('new', 1.5, True), TokenSub('zealand', 1.5, True),
+                               TokenSub('dollar', 1, True)],
+                       'nkr': [TokenSub('norwegian', 1.5, True), TokenSub('krone', 1.5, True)],
+                       'sek': [TokenSub('swedish', 1.5, True), TokenSub('krona', 1.5, True)],
+                       'chf': [TokenSub('swiss', 1.5, True), TokenSub('franc', 1.5, True)],
+                       'zar': [TokenSub('south', 1.5, True), TokenSub('african', 1.5, True),
+                               TokenSub('rand', 1.5, True)],
+                       'pln': [TokenSub('polish', 1.5, True), TokenSub('zloty', 1.5, True)],
+                       'inr': [TokenSub('indian', 1.5, True), TokenSub('rupee', 1.5, True)],
+                       'rmb': [TokenSub('chinese', 1.5, True), TokenSub('renminbi', 1.5, True)],
+                       'usd': [TokenSub('us', 0.75, True), TokenSub('american', 0.75, True),
+                               TokenSub('dollar', 0.5, True)],
+                       'clp': [TokenSub('chilean', 1.5, True), TokenSub('peso', 1.5, True)],
+                       'mxn': [TokenSub('mexican', 1.5, True), TokenSub('peso', 1.5, True)],
+                       'brl': [TokenSub('brazilian', 1.5, True), TokenSub('real', 1.5, True)],
+                       'huf': [TokenSub('hungarian', 1.5, True), TokenSub('forint', 1.5, True)]
+                       }
+
+    CRRNCY_MAPPING = {'ad': CRRNCY_TOKENSUB['aud'],
+                      'bp': CRRNCY_TOKENSUB['gbp'],
+                      'cd': CRRNCY_TOKENSUB['cad'],
+                      'ec': CRRNCY_TOKENSUB['euro'] + [TokenSub('cross', 0.5, True), TokenSub('rates', 0.5, True)],
+                      'efx': CRRNCY_TOKENSUB['euro'] + [TokenSub('fx', 0.8, True)],
+                      'jy': CRRNCY_TOKENSUB['jpy'],
+                      'jpy': CRRNCY_TOKENSUB['jpy'],
+                      'ne': CRRNCY_TOKENSUB['nzd'],
+                      'nok': CRRNCY_TOKENSUB['nkr'],
+                      'sek': CRRNCY_TOKENSUB['sek'],
+                      'sf': CRRNCY_TOKENSUB['chf'],
+                      'skr': CRRNCY_TOKENSUB['sek'],
+                      'zar': CRRNCY_TOKENSUB['zar'],
+                      'aud': CRRNCY_TOKENSUB['aud'],
+                      'cad': CRRNCY_TOKENSUB['cad'],
+                      'chf': CRRNCY_TOKENSUB['chf'],
+                      'eur': CRRNCY_TOKENSUB['euro'],
+                      'gbp': CRRNCY_TOKENSUB['gbp'],
+                      'pln': CRRNCY_TOKENSUB['pln'],
+                      'nkr': CRRNCY_TOKENSUB['nkr'],
+                      'inr': CRRNCY_TOKENSUB['inr'],
+                      'rmb': CRRNCY_TOKENSUB['rmb'],
+                      'usd': CRRNCY_TOKENSUB['usd'],
+                      'clp': CRRNCY_TOKENSUB['clp'],
+                      'nzd': CRRNCY_TOKENSUB['nzd'],
+                      'mxn': CRRNCY_TOKENSUB['mxn'],
+                      'brl': CRRNCY_TOKENSUB['brl'],
+                      'cnh': CRRNCY_TOKENSUB['rmb'],
+                      'huf': CRRNCY_TOKENSUB['huf']}
 
     CME_SPECIAL_MAPPING = {'midcurve': [TokenSub('midcurve', 1, True), TokenSub('mc', 1.5, True)],
                            'pqo': [TokenSub('premium', 1, True), TokenSub('quoted', 1, True),
@@ -81,6 +99,11 @@ class CMEAnalyzerTests(ut.TestCase):
     CME_KYWRD_EXCLU = CRRNCY_KEYWORDS.union(CME_SPECIAL_KEYWORDS).union(
         {'nasdaq', 'ibovespa', 'index', 'mini', 'micro', 'nikkei', 'russell', 'ftse', 'swap'})
 
+
+    def test_spflt(self):
+        spflt = SpecialWordFilter(self.CRRNCY_MAPPING)
+        r = spflt.groupby(self.CRRNCY_MAPPING.values())
+
     # def test_splt_mrg_filter(self):
     #     spltmrgflt = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True)
     #     regex = RegexTokenizer('[^\s/]+')
@@ -103,47 +126,47 @@ class CMEAnalyzerTests(ut.TestCase):
     #     self.assertListEqual(expected6, actual6)
 
 
-    def test_analyzer(self):
-        REGEX_TKN = RegexTokenizer('[^\s/]+')
-        TKATTR_FLT = TokenAttrFilter(ignored=False)
-        SPLT_MRG_FLT = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True)
-        LWRCS_FLT = LowercaseFilter()
-
-        CME_STP_FLT = StopFilter(stoplist=self.STOP_LIST + self.CME_COMMON_WORDS, minsize=1)
-        CME_SP_FLT = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
-        CME_VW_FLT = VowelFilter(self.CME_KYWRD_EXCLU)
-        CME_MULT_FLT =  MultiFilterFixed(index=CME_VW_FLT)
-
-        ana = REGEX_TKN | TKATTR_FLT | SPLT_MRG_FLT | LWRCS_FLT | CME_STP_FLT | CME_SP_FLT | CME_MULT_FLT
-        # ana = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_SP_FLT | CME_VW_FLT | STP_FLT
-        # ana = REGEX_TKN | IntraWordFilter(mergewords=True)
-
-        testcase1 = 'Nikkei/USD'
-        testcase2 = ' EOW1 S&P 500'
-        testcase3 = ' AUD/USD PQO 2pm Fix'
-        testcase4 = 'E-mini NASDAQ Biotechnology Index'
-        testcase5 = 'Nikkei/USD Futures'
-        testcase6 = 'S.AFRICAN RAND'
-        testcase7 = 'Chilean Peso/US Dollar (CLP/USD) Futures'
-
-        # result1 = [t.text for t in ana(testcase1)]
-        # result2 = [t.text for t in ana(testcase2)]
-        # result3 = [t.text for t in ana(testcase3)]
-        # result4 = [t.text for t in ana(testcase4, mode='index')]
-        # result5 = [t.text for t in ana(testcase5, mode='index')]
-        # result6 = [t.text for t in ana(testcase6, mode='index')]
-        result7 = [t.text for t in ana(testcase7, mode='index')]
-
-
-        # print(result6)
-        # print(result5)
-        print(result7)
-        # print(result4)
-        # expected1 = ['e', 'micro', 'emicro', 'aud', 'australian', 'dollar', 'usd', 'us', 'american', 'dollar']
-        # expected4 = ['e', 'mini', 'emini', 'nasdaq', 'biotechnology', 'btchnlgy', 'index']
-        #
-        # self.assertListEqual(expected1, result1)
-        # self.assertListEqual(expected4, result4)
+    # def test_analyzer(self):
+    #     REGEX_TKN = RegexTokenizer('[^\s/]+')
+    #     TKATTR_FLT = TokenAttrFilter(ignored=False)
+    #     SPLT_MRG_FLT = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True)
+    #     LWRCS_FLT = LowercaseFilter()
+    #
+    #     CME_STP_FLT = StopFilter(stoplist=self.STOP_LIST + self.CME_COMMON_WORDS, minsize=1)
+    #     CME_SP_FLT = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
+    #     CME_VW_FLT = VowelFilter(self.CME_KYWRD_EXCLU)
+    #     CME_MULT_FLT =  MultiFilterFixed(index=CME_VW_FLT)
+    #
+    #     ana = REGEX_TKN | TKATTR_FLT | SPLT_MRG_FLT | LWRCS_FLT | CME_STP_FLT | CME_SP_FLT | CME_MULT_FLT
+    #     # ana = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_SP_FLT | CME_VW_FLT | STP_FLT
+    #     # ana = REGEX_TKN | IntraWordFilter(mergewords=True)
+    #
+    #     testcase1 = 'Nikkei/USD'
+    #     testcase2 = ' EOW1 S&P 500'
+    #     testcase3 = ' AUD/USD PQO 2pm Fix'
+    #     testcase4 = 'E-mini NASDAQ Biotechnology Index'
+    #     testcase5 = 'Nikkei/USD Futures'
+    #     testcase6 = 'S.AFRICAN RAND'
+    #     testcase7 = 'Chilean Peso/US Dollar (CLP/USD) Futures'
+    #
+    #     # result1 = [t.text for t in ana(testcase1)]
+    #     # result2 = [t.text for t in ana(testcase2)]
+    #     # result3 = [t.text for t in ana(testcase3)]
+    #     # result4 = [t.text for t in ana(testcase4, mode='index')]
+    #     # result5 = [t.text for t in ana(testcase5, mode='index')]
+    #     # result6 = [t.text for t in ana(testcase6, mode='index')]
+    #     result7 = [t.text for t in ana(testcase7, mode='index')]
+    #
+    #
+    #     # print(result6)
+    #     # print(result5)
+    #     print(result7)
+    #     # print(result4)
+    #     # expected1 = ['e', 'micro', 'emicro', 'aud', 'australian', 'dollar', 'usd', 'us', 'american', 'dollar']
+    #     # expected4 = ['e', 'mini', 'emini', 'nasdaq', 'biotechnology', 'btchnlgy', 'index']
+    #     #
+    #     # self.assertListEqual(expected1, result1)
+    #     # self.assertListEqual(expected4, result4)
 
 
     # def test_composite_filter(self):
@@ -249,3 +272,7 @@ class CMEAnalyzerTests(ut.TestCase):
     #
     #     print(items)
     #     self.assertListEqual(expected, items)
+
+
+
+

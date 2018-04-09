@@ -132,8 +132,17 @@ class CMEGMatcher(object):
         ('NIKKEI 225 ($) STOCK', 'Equity Index', 'Futures'): 'Nikkei/USD Futures',
         ('NIKKEI 225 (YEN) STOCK', 'Equity Index', 'Futures'): 'Nikkei/Yen Futures',
         ('BDI', 'FX', 'Futures'): 'CME Bloomberg Dollar Spot Index',
-        ('CHINESE RENMINBI (CNH)', 'FX', 'Futures'): 'Standard-Size USD/Offshore RMB (CNH)'
+        ('CHINESE RENMINBI (CNH)', 'FX', 'Futures'): 'Standard-Size USD/Offshore RMB (CNH)',
+        ('MILK', 'Ag Products', 'Futures'): 'Class III Milk Futures',
+        ('MILK', 'Ag Products', 'Options'): 'Class III Milk Options'
     }
+
+    CME_NOTFOUND_PRODS = {('AUSTRALIAN DOLLAR', 'FX', 'Options'),
+                          ('BRITISH POUND', 'FX', 'Options'),
+                          ('CANADIAN DOLLAR', 'FX', 'Options'),
+                          ('EURO FX', 'FX', 'Options'),
+                          ('JAPANESE YEN', 'FX', 'Options'),
+                          ('MLK MID', 'Ag Products', 'Futures')}
 
     CME_MULTI_MATCH = [('EURO MIDCURVE', 'Interest Rate', 'Options'),
                        ('AUD/USD PQO 2pm Fix', 'FX', 'Options'),
@@ -143,47 +152,68 @@ class CMEGMatcher(object):
                        ('CAD/USD PQO 2pm Fix', 'FX', 'Options'),
                        ('CHF/USD PQO 2pm Fix', 'FX', 'Options')]
 
-    CRRNCY_MAPPING = {'ad': [TokenSub('australian', 1.5, True), TokenSub('dollar', 1, True)],
-                      'bp': [TokenSub('british', 1.5, True), TokenSub('pound', 1.5, True)],
-                      'cd': [TokenSub('canadian', 1.5, True), TokenSub('dollar', 1, True)],
-                      'ec': [TokenSub('euro', 1.5, True), TokenSub('cross', 0.5, True),
-                             TokenSub('rates', 0.5, True)],
-                      'efx': [TokenSub('euro', 1.5, True), TokenSub('fx', 0.8, True)],
-                      'jy': [TokenSub('japanese', 1.5, True), TokenSub('yen', 1.5, True)],
-                      'jpy': [TokenSub('japanese', 1.5, True), TokenSub('yen', 1.5, True)],
-                      'ne': [TokenSub('new', 1.5, True), TokenSub('zealand', 1.5, True),
+    CRRNCY_TOKENSUB = {'aud': [TokenSub('australian', 1.5, True), TokenSub('dollar', 1, True)],
+                       'gbp': [TokenSub('british', 1.5, True), TokenSub('pound', 1.5, True)],
+                       'cad': [TokenSub('canadian', 1.5, True), TokenSub('dollar', 1, True)],
+                       'euro': [TokenSub('euro', 1.5, True)],
+                       'jpy': [TokenSub('japanese', 1.5, True), TokenSub('yen', 1.5, True)],
+                       'nzd': [TokenSub('new', 1.5, True), TokenSub('zealand', 1.5, True),
                              TokenSub('dollar', 1, True)],
-                      'nok': [TokenSub('norwegian', 1.5, True), TokenSub('krone', 1.5, True)],
-                      'sek': [TokenSub('swedish', 1.5, True), TokenSub('krona', 1.5, True)],
-                      'sf': [TokenSub('swiss', 1.5, True), TokenSub('franc', 1.5, True)],
-                      'skr': [TokenSub('swedish', 1.5, True), TokenSub('krona', 1.5, True)],
-                      'zar': [TokenSub('south', 1.5, True), TokenSub('african', 1.5, True),
+                       'nkr': [TokenSub('norwegian', 1.5, True), TokenSub('krone', 1.5, True)],
+                       'sek': [TokenSub('swedish', 1.5, True), TokenSub('krona', 1.5, True)],
+                       'chf': [TokenSub('swiss', 1.5, True), TokenSub('franc', 1.5, True)],
+                       'zar': [TokenSub('south', 1.5, True), TokenSub('african', 1.5, True),
                               TokenSub('rand', 1.5, True)],
-                      'aud': [TokenSub('australian', 1.5, True), TokenSub('dollar', 1, True)],
-                      'cad': [TokenSub('canadian', 1.5, True), TokenSub('dollar', 1, True)],
-                      'chf': [TokenSub('swiss', 1.5, True), TokenSub('franc', 1.5, True)],
-                      'eur': [TokenSub('euro', 1.5, True)],
-                      'gbp': [TokenSub('british', 1.5, True), TokenSub('pound', 1.5, True)],
-                      'pln': [TokenSub('polish', 1.5, True), TokenSub('zloty', 1.5, True)],
-                      'nkr': [TokenSub('norwegian', 1.5, True), TokenSub('krone', 1.5, True)],
-                      'inr': [TokenSub('indian', 1.5, True), TokenSub('rupee', 1.5, True)],
-                      'rmb': [TokenSub('chinese', 1.5, True), TokenSub('renminbi', 1.5, True)],
-                      'usd': [TokenSub('us', 0.75, True), TokenSub('american', 0.75, True),
+                       'pln': [TokenSub('polish', 1.5, True), TokenSub('zloty', 1.5, True)],
+                       'inr': [TokenSub('indian', 1.5, True), TokenSub('rupee', 1.5, True)],
+                       'rmb': [TokenSub('chinese', 1.5, True), TokenSub('renminbi', 1.5, True)],
+                       'usd': [TokenSub('us', 0.75, True), TokenSub('american', 0.75, True),
                               TokenSub('dollar', 0.5, True)],
-                      'clp': [TokenSub('chilean', 1.5, True), TokenSub('peso', 1.5, True)],
-                      'nzd': [TokenSub('new', 1.5, True), TokenSub('zealand', 1.5, True), TokenSub('dollar', 0.5, True)],
-                      'mxn': [TokenSub('mexican', 1.5, True), TokenSub('peso', 1.5, True)],
-                      'brl': [TokenSub('brazilian', 1.5, True), TokenSub('real', 1.5, True)],
-                      'cnh': [TokenSub('chinese', 1.5, True), TokenSub('renminbi', 1.5, True)],
-                      'huf': [TokenSub('hungarian', 1.5, True), TokenSub('forint', 1.5, True)]}
+                       'clp': [TokenSub('chilean', 1.5, True), TokenSub('peso', 1.5, True)],
+                       'mxn': [TokenSub('mexican', 1.5, True), TokenSub('peso', 1.5, True)],
+                       'brl': [TokenSub('brazilian', 1.5, True), TokenSub('real', 1.5, True)],
+                       'huf': [TokenSub('hungarian', 1.5, True), TokenSub('forint', 1.5, True)]
+                       }
+
+    CRRNCY_MAPPING = {'ad': CRRNCY_TOKENSUB['aud'],
+                      'bp': CRRNCY_TOKENSUB['gbp'],
+                      'cd': CRRNCY_TOKENSUB['cad'],
+                      'ec': CRRNCY_TOKENSUB['euro'] + [TokenSub('cross', 0.5, True), TokenSub('rates', 0.5, True)],
+                      'efx': CRRNCY_TOKENSUB['euro'] + [TokenSub('fx', 0.8, True)],
+                      'jy': CRRNCY_TOKENSUB['jpy'],
+                      'jpy': CRRNCY_TOKENSUB['jpy'],
+                      'ne': CRRNCY_TOKENSUB['nzd'],
+                      'nok': CRRNCY_TOKENSUB['nkr'],
+                      'sek': CRRNCY_TOKENSUB['sek'],
+                      'sf': CRRNCY_TOKENSUB['chf'],
+                      'skr': CRRNCY_TOKENSUB['sek'],
+                      'zar': CRRNCY_TOKENSUB['zar'],
+                      'aud': CRRNCY_TOKENSUB['aud'],
+                      'cad': CRRNCY_TOKENSUB['cad'],
+                      'chf': CRRNCY_TOKENSUB['chf'],
+                      'eur': CRRNCY_TOKENSUB['euro'],
+                      'gbp': CRRNCY_TOKENSUB['gbp'],
+                      'pln': CRRNCY_TOKENSUB['pln'],
+                      'nkr': CRRNCY_TOKENSUB['nkr'],
+                      'inr': CRRNCY_TOKENSUB['inr'],
+                      'rmb': CRRNCY_TOKENSUB['rmb'],
+                      'usd': CRRNCY_TOKENSUB['usd'],
+                      'clp': CRRNCY_TOKENSUB['clp'],
+                      'nzd': CRRNCY_TOKENSUB['nzd'],
+                      'mxn': CRRNCY_TOKENSUB['mxn'],
+                      'brl': CRRNCY_TOKENSUB['brl'],
+                      'cnh': CRRNCY_TOKENSUB['rmb'],
+                      'huf': CRRNCY_TOKENSUB['huf']}
 
     CME_SPECIAL_MAPPING = {'midcurve': [TokenSub('midcurve', 1, True), TokenSub('mc', 1.5, True)],
-                           'pqo': [TokenSub('premium', 1, True), TokenSub('quoted', 1, True), TokenSub('european', 1, True), TokenSub('style', 1, True), TokenSub('options', 0.5, True)],
+                           'pqo': [TokenSub('premium', 1, True), TokenSub('quoted', 1, True),
+                                   TokenSub('european', 1, True), TokenSub('style', 1, True),
+                                   TokenSub('options', 0.5, True)],
                            'eow': [TokenSub('weekly', 1, True), TokenSub('wk', 1, True)],
                            'eom': [TokenSub('monthly', 1, True)],
-                           'usdzar': [TokenSub('us', 0.75, True), TokenSub('american', 0.75, True), TokenSub('dollar', 0.5, True), TokenSub('south', 1, True), TokenSub('african', 1, True), TokenSub('rand', 1, True)],
+                           'usdzar': CRRNCY_TOKENSUB['usd'] + CRRNCY_TOKENSUB['zar'],
                            'biotech': [TokenSub('biotechnology', 1.5, True)],
-                           'us': [TokenSub('us', 0.75, True), TokenSub('american', 0.75, True)],
+                           'us': CRRNCY_TOKENSUB['usd'][0:2],
                            'eu': [TokenSub('european', 1.5, True)],
                            'nfd': [TokenSub('non', 1.5, True), TokenSub('fat', 1.5, True), TokenSub('dry', 1.5, True)],
                            'cs': [TokenSub('cash', 1.5, True), TokenSub('settled', 1.5, True)],
@@ -203,7 +233,7 @@ class CMEGMatcher(object):
         {'nasdaq', 'ibovespa', 'index', 'mini', 'micro', 'nikkei', 'russell', 'ftse', 'swap'})
 
     REGEX_TKN = RegexTokenizer('[^\s/]+')
-    TKATTR_FLT = TokenAttrFilter(ignored=False)
+    TKATTR_FLT = TokenAttrFilter(ignored=False, required=False)
     SPLT_MRG_FLT = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True)
     LWRCS_FLT = LowercaseFilter()
 
@@ -237,7 +267,8 @@ class CMEGMatcher(object):
                  SUB_GROUP: F_SUB_GROUP,
                  EXCHANGE: F_EXCHANGE}
 
-    def __init__(self, adv_files=None, prods_file=None, year=(datetime.datetime.now() - relativedelta(years=1)).year, out_path=None):
+    def __init__(self, adv_files=None, prods_file=None, year=(datetime.datetime.now() - relativedelta(years=1)).year,
+                 out_path=None):
         dflt_inpath = os.getcwd()
         self.year = year
         adv_files = [os.path.join(dflt_inpath, dtsp.CMEGScraper.DFLT_CME_ADV_XLSX),
@@ -307,23 +338,44 @@ class CMEGMatcher(object):
             return s1 == s2 or SearchHelper.match_any_word(s1, s2) \
                    or SearchHelper.match_initials(s1, s2) or SearchHelper.match_first_n(s1, s2)
 
-    def match_prod_code(self, df_adv, prods_pdgps, ix):
+    def __find_clearedas(self, guess, indexed):
+        guess = guess.lower()
+        p = inflect.engine()
+        for idx in indexed:
+            matched = any(i in guess if len(i) < 3 else i in guess or p.plural(i) in guess
+                          for i in SearchHelper.get_words(idx.lower()))
+            if matched:
+                return idx
+        return None
+
+    def __verify_clearedas(self, prodname, row_clras, clras_set):
+        clras = SearchHelper.get_words(prodname)[-1]
+        found_clras = self.__find_clearedas(clras, clras_set)
+        return found_clras if found_clras is not None else row_clras
+
+    def match_prod_code(self, df_adv, ix, encoding='UTF-8'):
         df_matched = pd.DataFrame(columns=list(df_adv.columns) + ix.schema.names())
         with ix.searcher() as searcher:
+            prods_pdgps = {s.decode(encoding) for s in searcher.lexicon(self.F_PRODUCT_GROUP)}
+            prods_clras = {s.decode(encoding) for s in searcher.lexicon(self.F_CLEARED_AS)}
+
             for i, row in df_adv.iterrows():
                 pd_id = (row[self.PRODUCT], row[self.PRODUCT_GROUP], row[self.CLEARED_AS])
-                one_or_all = 'all' if pd_id in self.CME_MULTI_MATCH else 'one'
-                pdnm = self.CME_EXACT_MAPPING[pd_id] if pd_id in self.CME_EXACT_MAPPING else row[self.PRODUCT]
-                pdgp = dtsp.find_first_n(prods_pdgps, lambda x: self.__match_pdgp(x, row[self.PRODUCT_GROUP]))
-                grouping_q = And([Term(self.F_PRODUCT_GROUP, pdgp), Term(self.F_CLEARED_AS, row[self.CLEARED_AS])])
-                query = self.__exact_and_query(self.F_PRODUCT_NAME, ix.schema, pdnm)
-                results = searcher.search(query, filter=grouping_q, limit=None)
-                if not results:
-                    query = self.__fuzzy_and_query(self.F_PRODUCT_NAME, ix.schema, pdnm)
+                results = None
+                if pd_id not in self.CME_NOTFOUND_PRODS:
+                    one_or_all = 'all' if pd_id in self.CME_MULTI_MATCH else 'one'
+                    pdnm = self.CME_EXACT_MAPPING[pd_id] if pd_id in self.CME_EXACT_MAPPING else row[self.PRODUCT]
+                    pdgp = dtsp.find_first_n(prods_pdgps, lambda x: self.__match_pdgp(x, row[self.PRODUCT_GROUP]))
+                    clras = self.__verify_clearedas(pdnm, row[self.CLEARED_AS], prods_clras)
+                    grouping_q = And([Term(self.F_PRODUCT_GROUP, pdgp), Term(self.F_CLEARED_AS, clras)])
+                    query = self.__exact_and_query(self.F_PRODUCT_NAME, ix.schema, pdnm)
                     results = searcher.search(query, filter=grouping_q, limit=None)
                     if not results:
-                        query = self.__exact_or_query(self.F_PRODUCT_NAME, ix.schema, row[self.PRODUCT])
+                        query = self.__fuzzy_and_query(self.F_PRODUCT_NAME, ix.schema, pdnm)
                         results = searcher.search(query, filter=grouping_q, limit=None)
+                        if not results:
+                            query = self.__exact_or_query(self.F_PRODUCT_NAME, ix.schema, row[self.PRODUCT])
+                            results = searcher.search(query, filter=grouping_q, limit=None)
 
                 if results:
                     if one_or_all == 'one':
@@ -359,7 +411,8 @@ class CMEGMatcher(object):
         parser = qparser.QueryParser(field, schema=schema)
         query = parser.parse(text)
         fuzzy_terms = And(
-            [FuzzyTerm(f, t, maxdist=maxdist, prefixlength=prefixlength) for f, t in query.iter_all_terms() if len(t) > maxdist])
+            [FuzzyTerm(f, t, maxdist=maxdist, prefixlength=prefixlength) for f, t in query.iter_all_terms() if
+             len(t) > maxdist])
         return fuzzy_terms
 
     def __exact_or_query(self, field, schema, text):
@@ -413,26 +466,26 @@ class CMEGMatcher(object):
         ix_cme, ix_cbot, gdf_exch = self.init_ix_cme_cbot(clean)
         self.match_nymex_comex(dfs_adv[self.NYMEX], gdf_exch)
 
-        pdgp_cme = set(gdf_exch[self.CME][self.COL2FIELD[self.PRODUCT_GROUP]])
-        mdf_cme = self.match_prod_code(dfs_adv[self.CME], pdgp_cme, ix_cme)
-        pdgp_cbot = set(gdf_exch[self.CBOT][self.COL2FIELD[self.PRODUCT_GROUP]])
-        mdf_cbot = self.match_prod_code(dfs_adv[self.CBOT], pdgp_cbot, ix_cbot)
+        # pdgp_cme = set(gdf_exch[self.CME][self.COL2FIELD[self.PRODUCT_GROUP]])
+        mdf_cme = self.match_prod_code(dfs_adv[self.CME], ix_cme)
+        # pdgp_cbot = set(gdf_exch[self.CBOT][self.COL2FIELD[self.PRODUCT_GROUP]])
+        mdf_cbot = self.match_prod_code(dfs_adv[self.CBOT], ix_cbot)
 
         outpath = self.matched_file if outpath is None else outpath
         cp.XlsxWriter.save_sheets(outpath, {self.CME: mdf_cme, self.CBOT: mdf_cbot}, override=False)
 
 
-checked_path = os.getcwd()
-
-exchanges = ['asx', 'bloomberg', 'cme', 'cbot', 'nymex_comex', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
-report_fmtname = 'Web_ADV_Report_{}.xlsx'
-
-report_files = {e: report_fmtname.format(e.upper()) for e in exchanges}
-
-cme_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
-cme_adv_files = [os.path.join(checked_path, report_files['cme']),
-                 os.path.join(checked_path, report_files['cbot']),
-                 os.path.join(checked_path, report_files['nymex_comex'])]
-
-cme = CMEGMatcher(cme_adv_files, cme_prds_file, '2017')
-cme.run_pd_mtch(clean=True)
+# checked_path = os.getcwd()
+#
+# exchanges = ['asx', 'bloomberg', 'cme', 'cbot', 'nymex_comex', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
+# report_fmtname = 'Web_ADV_Report_{}.xlsx'
+#
+# report_files = {e: report_fmtname.format(e.upper()) for e in exchanges}
+#
+# cme_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
+# cme_adv_files = [os.path.join(checked_path, report_files['cme']),
+#                  os.path.join(checked_path, report_files['cbot']),
+#                  os.path.join(checked_path, report_files['nymex_comex'])]
+#
+# cme = CMEGMatcher(cme_adv_files, cme_prds_file, '2017')
+# cme.run_pd_mtch(clean=True)

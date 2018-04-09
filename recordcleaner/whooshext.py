@@ -87,9 +87,9 @@ class CompositeFilter(Filter):
 class VowelFilter(Filter):
     VOWELS = ('a', 'e', 'i', 'o', 'u')
 
-    def __init__(self, exclusions=list(), boost=0.8, ignore=True, lift_ignore=True, original=True):
+    def __init__(self, exclusions=list(), weight=0.2, ignore=True, lift_ignore=True, original=True):
         self.exclusions = exclusions
-        self.boost = boost
+        self.weight = weight
         self.ignore = ignore
         self.lift_ignore = lift_ignore
         self.original = original
@@ -120,11 +120,12 @@ class VowelFilter(Filter):
                 continue
 
             if self.original:
+                token.boost = (1 - self.weight) * tk_boost
                 token.ignored = ignored
                 yield token
 
             token.text = txt_changed
-            token.boost = self.boost * tk_boost
+            token.boost = self.weight * tk_boost
             token.ignored = ignored
             yield token
 
@@ -227,8 +228,8 @@ class SplitMergeFilter(Filter):
 
 
 class SpecialWordFilter(Filter):
-    def __init__(self, worddict, tokenizer=RegexTokenizer(), original=False):
-        self.word_dict = worddict
+    def __init__(self, word_dict, tokenizer=RegexTokenizer(), original=False):
+        self.word_dict = word_dict
         if not isinstance(tokenizer, Tokenizer):
             raise TypeError('Input is not a valid instance of Tokenizer')
         self.tokenizer = tokenizer
@@ -237,7 +238,8 @@ class SpecialWordFilter(Filter):
     def __call__(self, stream):
         memory = set()
         for token in stream:
-            tk_text, tk_boost, tk_ignored = token.text, token.boost, token.ignored
+            tk_text, tk_boost, tk_ignored, tk_required = \
+                token.text, token.boost, token.ignored, token.required
 
             if tk_text not in self.word_dict:
                 memory.add(tk_text)
@@ -262,6 +264,25 @@ class SpecialWordFilter(Filter):
                 token.ignored = t.ignored and tk_ignored
                 memory.add(t.text)
                 yield token
+
+    def groupby(self, items):
+
+        def keyfunc(items, idx):
+            return items[idx].text
+
+        def groupby_rcrs(items, key_idx, results):
+            if key_idx == len(items) - 1 and isinstance(items[key_idx], TokenSub):
+                results.update({keyfunc(items, key_idx): items})
+                return results
+
+            for item in items:
+                key = keyfunc(item, key_idx)
+                val = results[key] if key in results else dict()
+                results.update({key: groupby_rcrs(item, key_idx + 1, val)})
+            return results
+
+        return groupby_rcrs(items, 0, dict())
+
 
 
 class TokenAttrFilter(Filter):
