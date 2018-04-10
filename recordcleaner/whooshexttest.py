@@ -2,6 +2,7 @@ import re
 from whoosh.analysis import *
 import unittest as ut
 import pandas as pd
+import itertools
 
 from whooshext import *
 from whoosh.index import open_dir
@@ -17,34 +18,35 @@ class CMEAnalyzerTests(ut.TestCase):
                  'by', 'to', 'you', 'be', 'we', 'that', 'may', 'not', 'with', 'tbd', 'a', 'on', 'your',
                  'this', 'of', 'will', 'can', 'the', 'or', 'are']
 
-    CRRNCY_TOKENSUB = {'aud': [TokenSub('australian', 1.5, True), TokenSub('dollar', 1, True)],
-                       'gbp': [TokenSub('british', 1.5, True), TokenSub('pound', 1.5, True)],
-                       'cad': [TokenSub('canadian', 1.5, True), TokenSub('dollar', 1, True)],
-                       'euro': [TokenSub('euro', 1.5, True)],
-                       'jpy': [TokenSub('japanese', 1.5, True), TokenSub('yen', 1.5, True)],
-                       'nzd': [TokenSub('new', 1.5, True), TokenSub('zealand', 1.5, True),
-                               TokenSub('dollar', 1, True)],
-                       'nkr': [TokenSub('norwegian', 1.5, True), TokenSub('krone', 1.5, True)],
-                       'sek': [TokenSub('swedish', 1.5, True), TokenSub('krona', 1.5, True)],
-                       'chf': [TokenSub('swiss', 1.5, True), TokenSub('franc', 1.5, True)],
-                       'zar': [TokenSub('south', 1.5, True), TokenSub('african', 1.5, True),
-                               TokenSub('rand', 1.5, True)],
-                       'pln': [TokenSub('polish', 1.5, True), TokenSub('zloty', 1.5, True)],
-                       'inr': [TokenSub('indian', 1.5, True), TokenSub('rupee', 1.5, True)],
-                       'rmb': [TokenSub('chinese', 1.5, True), TokenSub('renminbi', 1.5, True)],
-                       'usd': [TokenSub('us', 0.75, True), TokenSub('american', 0.75, True),
-                               TokenSub('dollar', 0.5, True)],
-                       'clp': [TokenSub('chilean', 1.5, True), TokenSub('peso', 1.5, True)],
-                       'mxn': [TokenSub('mexican', 1.5, True), TokenSub('peso', 1.5, True)],
-                       'brl': [TokenSub('brazilian', 1.5, True), TokenSub('real', 1.5, True)],
-                       'huf': [TokenSub('hungarian', 1.5, True), TokenSub('forint', 1.5, True)]
+    CRRNCY_TOKENSUB = {'aud': [TokenSub('australian', 1.5, True, True), TokenSub('dollar', 1, True, True)],
+                       'gbp': [TokenSub('british', 1.5, True, True), TokenSub('pound', 1.5, True, True)],
+                       'cad': [TokenSub('canadian', 1.5, True, True), TokenSub('dollar', 1, True, True)],
+                       'euro': [TokenSub('euro', 1.5, True, False)],
+                       'jpy': [TokenSub('japanese', 1.5, True, True), TokenSub('yen', 1.5, True, True)],
+                       'nzd': [TokenSub('new', 1.5, True, True), TokenSub('zealand', 1.5, True, True),
+                               TokenSub('dollar', 1, True, True)],
+                       'nkr': [TokenSub('norwegian', 1.5, True, True), TokenSub('krone', 1.5, True, True)],
+                       'sek': [TokenSub('swedish', 1.5, True, True), TokenSub('krona', 1.5, True, True)],
+                       'chf': [TokenSub('swiss', 1.5, True, True), TokenSub('franc', 1.5, True, True)],
+                       'zar': [TokenSub('south', 1.5, True, True), TokenSub('african', 1.5, True, True),
+                               TokenSub('rand', 1.5, True, True)],
+                       'pln': [TokenSub('polish', 1.5, True, True), TokenSub('zloty', 1.5, True, True)],
+                       'inr': [TokenSub('indian', 1.5, True, True), TokenSub('rupee', 1.5, True, True)],
+                       'rmb': [TokenSub('chinese', 1.5, True, True), TokenSub('renminbi', 1.5, True, True)],
+                       'usd': [TokenSub('us', 0.75, True, False), TokenSub('american', 0.75, True, False),
+                               TokenSub('dollar', 0.5, True, False)],
+                       'clp': [TokenSub('chilean', 1.5, True, True), TokenSub('peso', 1.5, True, True)],
+                       'mxn': [TokenSub('mexican', 1.5, True, True), TokenSub('peso', 1.5, True, True)],
+                       'brl': [TokenSub('brazilian', 1.5, True, True), TokenSub('real', 1.5, True, True)],
+                       'huf': [TokenSub('hungarian', 1.5, True, True), TokenSub('forint', 1.5, True, True)]
                        }
 
     CRRNCY_MAPPING = {'ad': CRRNCY_TOKENSUB['aud'],
                       'bp': CRRNCY_TOKENSUB['gbp'],
                       'cd': CRRNCY_TOKENSUB['cad'],
-                      'ec': CRRNCY_TOKENSUB['euro'] + [TokenSub('cross', 0.5, True), TokenSub('rates', 0.5, True)],
-                      'efx': CRRNCY_TOKENSUB['euro'] + [TokenSub('fx', 0.8, True)],
+                      'ec': CRRNCY_TOKENSUB['euro'] + [TokenSub('cross', 0.5, True, False),
+                                                       TokenSub('rates', 0.5, True, False)],
+                      'efx': CRRNCY_TOKENSUB['euro'] + [TokenSub('fx', 0.8, True, False)],
                       'jy': CRRNCY_TOKENSUB['jpy'],
                       'jpy': CRRNCY_TOKENSUB['jpy'],
                       'ne': CRRNCY_TOKENSUB['nzd'],
@@ -70,21 +72,21 @@ class CMEAnalyzerTests(ut.TestCase):
                       'cnh': CRRNCY_TOKENSUB['rmb'],
                       'huf': CRRNCY_TOKENSUB['huf']}
 
-    CME_SPECIAL_MAPPING = {'midcurve': [TokenSub('midcurve', 1, True), TokenSub('mc', 1.5, True)],
-                           'pqo': [TokenSub('premium', 1, True), TokenSub('quoted', 1, True),
-                                   TokenSub('european', 1, True), TokenSub('style', 1, True),
-                                   TokenSub('options', 0.5, True)],
-                           'eow': [TokenSub('weekly', 1, True), TokenSub('wk', 1, True)],
-                           'eom': [TokenSub('monthly', 1, True)],
-                           'usdzar': [TokenSub('us', 0.75, True), TokenSub('american', 0.75, True),
-                                      TokenSub('dollar', 0.5, True), TokenSub('south', 1, True),
-                                      TokenSub('african', 1, True), TokenSub('rand', 1, True)],
-                           'biotech': [TokenSub('biotechnology', 1.5, True)],
-                           'eu': [TokenSub('european', 1.5, True)],
-                           'us': [TokenSub('us', 0.75, True), TokenSub('american', 0.75, True)],
-                           'nfd': [TokenSub('non', 1.5, True), TokenSub('fat', 1.5, True), TokenSub('dry', 1.5, True)],
-                           'cs': [TokenSub('cash', 1.5, True), TokenSub('settled', 1.5, True)],
-                           'er': [TokenSub('excess', 1.5, True), TokenSub('return', 1.5, True)]}
+    CME_SPECIAL_MAPPING = {'midcurve': [TokenSub('midcurve', 1, True, False), TokenSub('mc', 1.5, True, True)],
+                           'pqo': [TokenSub('premium', 1, True, True), TokenSub('quoted', 1, True, True),
+                                   TokenSub('european', 1, True, True), TokenSub('style', 1, True, True),
+                                   TokenSub('options', 0.5, True, True)],
+                           'eow': [TokenSub('weekly', 1, True, True), TokenSub('wk', 1, True, False)],
+                           'eom': [TokenSub('monthly', 1, True, True)],
+                           'usdzar': CRRNCY_TOKENSUB['usd'] + CRRNCY_TOKENSUB['zar'],
+                           'biotech': [TokenSub('biotechnology', 1.5, True, True)],
+                           'us': CRRNCY_TOKENSUB['usd'][0:2],
+                           'eu': [TokenSub('european', 1.5, True, True)],
+                           'nfd': [TokenSub('non', 1.5, True, True), TokenSub('fat', 1.5, True, True),
+                                   TokenSub('dry', 1.5, True, True)],
+                           'cs': [TokenSub('cash', 1.5, True, True), TokenSub('settled', 1.5, True, True)],
+                           'er': [TokenSub('excess', 1.5, True, True), TokenSub('return', 1.5, True, True)]}
+
 
     CME_COMMON_WORDS = ['futures', 'options', 'index', 'cross', 'rate', 'rates']
 
@@ -101,8 +103,17 @@ class CMEAnalyzerTests(ut.TestCase):
 
 
     def test_spflt(self):
-        spflt = SpecialWordFilter(self.CRRNCY_MAPPING)
-        r = spflt.groupby(self.CRRNCY_MAPPING.values())
+        regex = RegexTokenizer('[^\s/]+')
+        attrflt = TokenAttrFilter(ignored=False, required=False)
+        lwrflt = LowercaseFilter()
+        spflt = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
+        ana = regex | attrflt | lwrflt | spflt
+
+        testcase1 = 'CHF/USD PQO 2pm Fix'
+
+        actual1 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase1)]
+        print(actual1)
+
 
     # def test_splt_mrg_filter(self):
     #     spltmrgflt = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True)

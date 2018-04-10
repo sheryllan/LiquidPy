@@ -11,8 +11,10 @@ from whoosh.index import create_in
 from whoosh.index import open_dir
 from whoosh import writing
 
+import datascraper as dtsp
 
-TokenSub = namedtuple('TokenSub', ['text', 'boost', 'ignored'])
+
+TokenSub = namedtuple('TokenSub', ['text', 'boost', 'ignored', 'required'])
 
 
 def create_index(ix_path, fields, clean=False):
@@ -82,6 +84,7 @@ class CompositeFilter(Filter):
         for f in flts:
             gen = f(gen)
         return gen
+
 
 
 class VowelFilter(Filter):
@@ -184,7 +187,7 @@ class SplitMergeFilter(Filter):
                 if self.splt_ptn is not None else [word]
             for split in splits:
                 if len(split) >= self.min_spltlen:
-                    yield TokenSub(split, 1, split != word and ignore)
+                    yield TokenSub(split, 1, split != word and ignore, False)
 
     def __merge(self, text, ignore=True):
         if self.mrg_ptn is not None:
@@ -193,7 +196,7 @@ class SplitMergeFilter(Filter):
         else:
             merges = re.split(self.delims_mrg, text)
         for merge in merges:
-            yield TokenSub(merge, 1, merge != text and ignore)
+            yield TokenSub(merge, 1, merge != text and ignore, False)
 
     def __split_merge(self, text):
         splits = list(self.__split(text, self.ignore_splt))
@@ -203,21 +206,21 @@ class SplitMergeFilter(Filter):
             s_boost = 1 / (2 * len(splits))
             m_boost = 1 / (2 * len(merges))
             word_boost = OrderedDict({split.text: TokenSub(
-                split.text, split.boost * s_boost, split.ignored)for split in splits})
+                split.text, split.boost * s_boost, split.ignored, False)for split in splits})
             for merge in merges:
                 if merge.text not in word_boost:
-                    word_boost.update({merge.text: TokenSub(merge.text, merge.boost * m_boost, merge.ignored)})
+                    word_boost.update({merge.text: TokenSub(merge.text, merge.boost * m_boost, merge.ignored, False)})
                 else:
                     ignored = word_boost[merge.text].ignored
                     word_boost.update({merge.text: TokenSub(
-                        merge.text, merge.boost * (s_boost + m_boost), ignored or merge.ignored)})
+                        merge.text, merge.boost * (s_boost + m_boost), ignored or merge.ignored, False)})
             results = word_boost.values()
         elif len(splits) == 0:
-            results = (TokenSub(merge.text, merge.boost * 1/len(merges), merge.ignored) for merge in merges)
+            results = (TokenSub(merge.text, merge.boost * 1/len(merges), merge.ignored, False) for merge in merges)
         elif len(merges) == 0:
-            results = (TokenSub(split.text, split.boost * 1/len(splits), split.ignored) for split in splits)
+            results = (TokenSub(split.text, split.boost * 1/len(splits), split.ignored, False) for split in splits)
         else:
-            results = [TokenSub(text, 1, False)]
+            results = [TokenSub(text, 1, False, False)]
         return results
 
     def __findall(self, pattern, word):
@@ -234,54 +237,83 @@ class SpecialWordFilter(Filter):
             raise TypeError('Input is not a valid instance of Tokenizer')
         self.tokenizer = tokenizer
         self.original = original
+        self.end = 'n/a'
+        self.mapped_kws = self.__groupby(word_dict.values())
 
     def __call__(self, stream):
         memory = set()
+        prev_kws = list()
+        next_group = self.mapped_kws
         for token in stream:
-            tk_text, tk_boost, tk_ignored, tk_required = \
-                token.text, token.boost, token.ignored, token.required
-
-            if tk_text not in self.word_dict:
-                memory.add(tk_text)
-                yield token
-                continue
+            tk_cpy = TokenSub(token.text, token.boost, token.ignored, token.required)
 
             if self.original:
-                memory.add(tk_text)
+                memory.add(tk_cpy.text)
                 yield token
 
-            values = self.word_dict[token.text]
-            if not isinstance(values, list):
-                values = [values]
+            if tk_cpy.text not in self.word_dict:
+                if tk_cpy.text not in next_group and not self.original:
+                    memory.add(tk_cpy.text)
+                    yield token
+                elif tk_cpy.text in next_group:
+                    prev_kws.append(tk_cpy)
+                    next_group = next_group[tk_cpy.text]
+                continue
 
-            tks = [TokenSub(tk.text, val.boost, val.ignored) for val in values for tk in self.tokenizer(val.text)]
+            if isinstance(next_group, dict) and self.end not in next_group:
+                trans_tokens = prev_kws
+            else:
+                trans_tokens = next_group[self.end] if self.end in next_group else next_group
+            for tk in self.__gen_tokens(token, trans_tokens, memory):
+                yield tk
+            prev_kws = list()
+            next_group = self.mapped_kws
+
+            values = dtsp.to_list(self.word_dict[token.text])
+            tks = [TokenSub(tk.text, val.boost, val.ignored, val.required)
+                   for val in values for tk in self.tokenizer(val.text)]
             if all(t.text in memory for t in tks):
                 continue
 
             for t in tks:
-                token.text = t.text
-                token.boost = t.boost * tk_boost
-                token.ignored = t.ignored and tk_ignored
                 memory.add(t.text)
-                yield token
+                yield self.__set_token(token, text=t.text, boost=t.boost * tk_cpy.boost,
+                                       ignored=t.ignored or tk_cpy.ignored, required=t.required or tk_cpy.required)
+            self.__set_token(token, **tk_cpy._asdict())
 
-    def groupby(self, items):
+    def __gen_tokens(self, token, trans_tokens, memory=None):
+        trans_tokens = dtsp.to_list(trans_tokens)
+        for ts_tk in trans_tokens:
+            if memory is not None:
+                memory.add(ts_tk.text)
+            yield self.__set_token(token, **ts_tk._asdict())
+
+    def __set_token(self, token, **kwargs):
+        for k, v in kwargs.items():
+            setattr(token, k, v)
+        return token
+
+    def __groupby(self, items):
 
         def keyfunc(items, idx):
             return items[idx].text
 
-        def groupby_rcrs(items, key_idx, results):
-            if key_idx == len(items) - 1 and isinstance(items[key_idx], TokenSub):
-                results.update({keyfunc(items, key_idx): items})
-                return results
-
-            for item in items:
-                key = keyfunc(item, key_idx)
-                val = results[key] if key in results else dict()
-                results.update({key: groupby_rcrs(item, key_idx + 1, val)})
+        def item_todict(item, key_idx, results, end):
+            if key_idx >= len(item):
+                return item
+            key = keyfunc(item, key_idx)
+            if key in results:
+                val = results[key] if isinstance(results[key], dict) else {end: results[key]}
+            else:
+                val = dict()
+            results.update({key: item_todict(item, key_idx + 1, val, end)})
             return results
 
-        return groupby_rcrs(items, 0, dict())
+        groups = dict()
+        for item in items:
+            groups = item_todict(item, 0, groups, self.end)
+
+        return groups
 
 
 
