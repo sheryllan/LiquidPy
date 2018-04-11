@@ -4,6 +4,7 @@ import pandas as pd
 import itertools
 from collections import namedtuple
 from collections import OrderedDict
+from collections import Mapping
 
 from whoosh.fields import *
 from whoosh.analysis import *
@@ -14,7 +15,18 @@ from whoosh import writing
 import datascraper as dtsp
 
 
-TokenSub = namedtuple('TokenSub', ['text', 'boost', 'ignored', 'required'])
+def namedtuple_with_defaults(typename, field_names, default_values=()):
+    T = namedtuple(typename, field_names)
+    T.__new__.__defaults__ = (None,) * len(T._fields)
+    if isinstance(default_values, Mapping):
+        prototype = T(**default_values)
+    else:
+        prototype = T(*default_values)
+    T.__new__.__defaults__ = tuple(prototype)
+    return T
+
+
+TokenSub = namedtuple_with_defaults('TokenSub', ['text', 'boost', 'ignored', 'required'], [None, 1, False, False])
 
 
 def create_index(ix_path, fields, clean=False):
@@ -64,6 +76,21 @@ def join_words(words, minlen=2):
         yield result
 
 
+def combine_iters(*args):
+    for items in zip(*args):
+        yielded = set()
+        for item in items:
+            if item not in yielded:
+                yielded.add(item)
+                yield item
+
+
+def set_token(token, **kwargs):
+    for k, v in kwargs.items():
+        setattr(token, k, v)
+    return token
+
+
 class CompositeFilter(Filter):
     def __init__(self, *filters):
         self.filters = []
@@ -84,7 +111,6 @@ class CompositeFilter(Filter):
         for f in flts:
             gen = f(gen)
         return gen
-
 
 
 class VowelFilter(Filter):
@@ -112,25 +138,20 @@ class VowelFilter(Filter):
             ignored = False if self.lift_ignore else tk_ignored
 
             if tk_ignored or tk_text in self.exclusions:
-                token.ignored = ignored
-                yield token
+                yield set_token(token, ignored=ignored)
                 continue
 
             txt_changed = self.__remove_vowels(tk_text)
             if txt_changed == tk_text:
-                token.ignored = ignored
-                yield token
+                yield set_token(token, ignored=ignored)
                 continue
 
             if self.original:
-                token.boost = (1 - self.weight) * tk_boost
-                token.ignored = ignored
-                yield token
+                yield set_token(token,
+                                boost=(1 - self.weight) * tk_boost,
+                                ignored=ignored)
 
-            token.text = txt_changed
-            token.boost = self.weight * tk_boost
-            token.ignored = ignored
-            yield token
+            yield set_token(token, text=txt_changed, boost=self.weight * tk_boost, ignored=ignored)
 
 
 class SplitMergeFilter(Filter):
@@ -175,10 +196,9 @@ class SplitMergeFilter(Filter):
                 yield token
             for tksub in self.__split_merge(tk_text):
                 if not (self.original and tksub.text == tk_text):
-                    token.text = tksub.text
-                    token.boost = tksub.boost * tk_boost
-                    token.ignored = tk_ignored or tksub.ignored
-                    yield token
+                    yield set_token(token, text=tksub.text,
+                                    boost=tksub.boost * tk_boost,
+                                    ignored=tk_ignored or tksub.ignored)
 
     def __split(self, text, ignore=False):
         words = [word for word in re.split(self.delims_splt, text) if len(word) >= self.min_spltlen]
@@ -187,7 +207,7 @@ class SplitMergeFilter(Filter):
                 if self.splt_ptn is not None else [word]
             for split in splits:
                 if len(split) >= self.min_spltlen:
-                    yield TokenSub(split, 1, split != word and ignore, False)
+                    yield TokenSub(split, 1, split != word and ignore)
 
     def __merge(self, text, ignore=True):
         if self.mrg_ptn is not None:
@@ -196,7 +216,7 @@ class SplitMergeFilter(Filter):
         else:
             merges = re.split(self.delims_mrg, text)
         for merge in merges:
-            yield TokenSub(merge, 1, merge != text and ignore, False)
+            yield TokenSub(merge, 1, merge != text and ignore)
 
     def __split_merge(self, text):
         splits = list(self.__split(text, self.ignore_splt))
@@ -206,21 +226,21 @@ class SplitMergeFilter(Filter):
             s_boost = 1 / (2 * len(splits))
             m_boost = 1 / (2 * len(merges))
             word_boost = OrderedDict({split.text: TokenSub(
-                split.text, split.boost * s_boost, split.ignored, False)for split in splits})
+                split.text, split.boost * s_boost, split.ignored) for split in splits})
             for merge in merges:
                 if merge.text not in word_boost:
-                    word_boost.update({merge.text: TokenSub(merge.text, merge.boost * m_boost, merge.ignored, False)})
+                    word_boost.update({merge.text: TokenSub(merge.text, merge.boost * m_boost, merge.ignored)})
                 else:
                     ignored = word_boost[merge.text].ignored
                     word_boost.update({merge.text: TokenSub(
-                        merge.text, merge.boost * (s_boost + m_boost), ignored or merge.ignored, False)})
+                        merge.text, merge.boost * (s_boost + m_boost), ignored or merge.ignored)})
             results = word_boost.values()
         elif len(splits) == 0:
-            results = (TokenSub(merge.text, merge.boost * 1/len(merges), merge.ignored, False) for merge in merges)
+            results = (TokenSub(merge.text, merge.boost * 1 / len(merges), merge.ignored) for merge in merges)
         elif len(merges) == 0:
-            results = (TokenSub(split.text, split.boost * 1/len(splits), split.ignored, False) for split in splits)
+            results = (TokenSub(split.text, split.boost * 1 / len(splits), split.ignored) for split in splits)
         else:
-            results = [TokenSub(text, 1, False, False)]
+            results = [TokenSub(text)]
         return results
 
     def __findall(self, pattern, word):
@@ -237,99 +257,79 @@ class SpecialWordFilter(Filter):
             raise TypeError('Input is not a valid instance of Tokenizer')
         self.tokenizer = tokenizer
         self.original = original
-        self.end = 'n/a'
         self.mapped_kws = self.__groupby(word_dict.values())
 
     def __call__(self, stream):
         memory = set()
         prev_kws = list()
         next_group = self.mapped_kws
+        token = None
         for token in stream:
             tk_cpy = TokenSub(token.text, token.boost, token.ignored, token.required)
 
-            if self.original:
-                memory.add(tk_cpy.text)
-                yield token
+            if prev_kws and next_group != self.mapped_kws and tk_cpy.text not in next_group:
+                trans_tokens, prev_kws, next_group = self.__cleanup(prev_kws, next_group)
+                for tk in self.__gen_tokens(token, trans_tokens, memory):
+                    yield tk
 
             if tk_cpy.text not in self.word_dict:
-                if tk_cpy.text not in next_group and not self.original:
-                    memory.add(tk_cpy.text)
-                    yield token
-                elif tk_cpy.text in next_group:
+                if tk_cpy.text in next_group:
                     prev_kws.append(tk_cpy)
                     next_group = next_group[tk_cpy.text]
-                continue
-
-            if isinstance(next_group, dict) and self.end not in next_group:
-                trans_tokens = prev_kws
+                elif tk_cpy in next_group:
+                    prev_kws.append(tk_cpy)
+                else:
+                    yield set_token(token, **tk_cpy._asdict())
             else:
-                trans_tokens = next_group[self.end] if self.end in next_group else next_group
+                if self.original:
+                    memory.add((tk_cpy.text, tk_cpy.boost))
+                    yield token
+
+                values = dtsp.to_list(self.word_dict[tk_cpy.text])
+                tks = [TokenSub(tk.text, val.boost * tk_cpy.boost,
+                                val.ignored or tk_cpy.ignored,
+                                val.required or tk_cpy.required)
+                       for val in values for tk in self.tokenizer(val.text)]
+
+                if any((t.text, t.boost) not in memory for t in tks):
+                    for t in self.__gen_tokens(token, tks, memory):
+                        yield t
+
+        if prev_kws and next_group != self.mapped_kws and token is not None:
+            trans_tokens, prev_kws, next_group = self.__cleanup(prev_kws, next_group)
             for tk in self.__gen_tokens(token, trans_tokens, memory):
                 yield tk
-            prev_kws = list()
-            next_group = self.mapped_kws
 
-            values = dtsp.to_list(self.word_dict[token.text])
-            tks = [TokenSub(tk.text, val.boost, val.ignored, val.required)
-                   for val in values for tk in self.tokenizer(val.text)]
-            if all(t.text in memory for t in tks):
-                continue
-
-            for t in tks:
-                memory.add(t.text)
-                yield self.__set_token(token, text=t.text, boost=t.boost * tk_cpy.boost,
-                                       ignored=t.ignored or tk_cpy.ignored, required=t.required or tk_cpy.required)
-            self.__set_token(token, **tk_cpy._asdict())
+    def __cleanup(self, prev_kws, next_group):
+        trans_tokens = prev_kws if None not in next_group \
+            else (combine_iters(prev_kws, next_group[None]) if self.original else next_group[None])
+        return trans_tokens, list(), self.mapped_kws
 
     def __gen_tokens(self, token, trans_tokens, memory=None):
-        trans_tokens = dtsp.to_list(trans_tokens)
-        for ts_tk in trans_tokens:
+        for ts_tk in dtsp.to_list(trans_tokens):
             if memory is not None:
-                memory.add(ts_tk.text)
-            yield self.__set_token(token, **ts_tk._asdict())
-
-    def __set_token(self, token, **kwargs):
-        for k, v in kwargs.items():
-            setattr(token, k, v)
-        return token
+                memory.add((ts_tk.text, ts_tk.boost))
+            yield set_token(token, **ts_tk._asdict())
 
     def __groupby(self, items):
 
         def keyfunc(items, idx):
-            return items[idx].text
+            return items[idx].text if idx < len(items) else None
 
-        def item_todict(item, key_idx, results, end):
-            if key_idx >= len(item):
-                return item
+        def item_todict(item, key_idx, results):
             key = keyfunc(item, key_idx)
-            if key in results:
-                val = results[key] if isinstance(results[key], dict) else {end: results[key]}
-            else:
-                val = dict()
-            results.update({key: item_todict(item, key_idx + 1, val, end)})
+            if key_idx >= len(item):
+                return {key: item}
+
+            val = results[key] if key in results else dict()
+            val.update(item_todict(item, key_idx + 1, val))
+            results.update({key: val})
             return results
 
         groups = dict()
         for item in items:
-            groups = item_todict(item, 0, groups, self.end)
-
+            groups = item_todict(item, 0, groups)
         return groups
-
-
-
-class TokenAttrFilter(Filter):
-    def __init__(self, **attrs):
-        self.attrs = attrs
-
-    def __call__(self, stream):
-        try:
-            token = next(stream)
-            token.__dict__.update(self.attrs)
-            yield token
-            for token in stream:
-                yield token
-        except StopIteration:
-            return iter('')
 
 
 class MultiFilterFixed(Filter):
@@ -351,6 +351,36 @@ class MultiFilterFixed(Filter):
             return filter(chain([t], tokens))
         except StopIteration:
             return iter('')
+
+
+class RegexTokenizerExtra(RegexTokenizer):
+    def __init__(self, expression=default_pattern, gaps=False, **attrs):
+        super().__init__(expression, gaps)
+        self.attrs = attrs
+
+    def __call__(self, value, positions=False, chars=False, keeporiginal=False,
+                 removestops=True, start_pos=0, start_char=0, tokenize=True,
+                 mode='', **kwargs):
+        stream = super().__call__(value, positions, chars, keeporiginal, removestops,
+                                  start_pos, start_char, tokenize, mode, **kwargs)
+
+        for token in stream:
+            yield set_token(token, **self.attrs)
+
+
+# class TokenAttrFilter(Filter):
+#     def __init__(self, **attrs):
+#         self.attrs = attrs
+#
+#     def __call__(self, stream):
+#         try:
+#             token = next(stream)
+#             token.__dict__.update(self.attrs)
+#             yield token
+#             for token in stream:
+#                 yield token
+#         except StopIteration:
+#             return iter('')
 
 
 def min_dist_rslt(results, qstring, fieldname, field, minboost=0):
@@ -379,6 +409,16 @@ def min_dist_rslt(results, qstring, fieldname, field, minboost=0):
 
         head = results_srted.add(((qt_len, rt_len), r), head)
     return [r for _, r in results_srted.get_items(head)]
+
+
+class Tree(object):
+    class Node(object):
+        def __init__(self, data=None, children=None):
+            self.data = data
+            self.children = children
+
+    # def __init__(self, head=Node()):
+    #     self.head = head
 
 
 class TreeMap(object):
@@ -419,7 +459,7 @@ class TreeMap(object):
 
         if key < nkey:
             node.left = self.add(item, node.left)
-        elif key == nkey:   # preserving the input order
+        elif key == nkey:  # preserving the input order
             node.right = TreeMap.Node(item, None, node.right)
         else:
             node.right = self.add(item, node.right)
@@ -436,8 +476,8 @@ class TreeMap(object):
             items.append(node.data)
             items = get_items_recursive(node.right, items)
             return items
-        return get_items_recursive(head, [])
 
+        return get_items_recursive(head, [])
 
 # STD_ANA = StandardAnalyzer('[^\s/]+', stoplist=STOP_LIST, minsize=1)
 

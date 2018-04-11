@@ -98,21 +98,25 @@ class CMEAnalyzerTests(ut.TestCase):
 
     CME_KEYWORD_MAPPING = {**CRRNCY_MAPPING, **CME_SPECIAL_MAPPING}
 
-    CME_KYWRD_EXCLU = CRRNCY_KEYWORDS.union(CME_SPECIAL_KEYWORDS).union(
-        {'nasdaq', 'ibovespa', 'index', 'mini', 'micro', 'nikkei', 'russell', 'ftse', 'swap'})
+    # CME_KYWRD_EXCLU = CRRNCY_KEYWORDS.union(CME_SPECIAL_KEYWORDS).union(
+    #     {'nasdaq', 'ibovespa', 'index', 'mini', 'micro', 'nikkei', 'russell', 'ftse', 'swap'})
+    CME_KYWRD_EXCLU = {'nasdaq', 'ibovespa', 'index', 'mini', 'micro', 'nikkei', 'russell', 'ftse', 'swap'}
 
 
-    def test_spflt(self):
-        regex = RegexTokenizer('[^\s/]+')
-        attrflt = TokenAttrFilter(ignored=False, required=False)
-        lwrflt = LowercaseFilter()
-        spflt = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
-        ana = regex | attrflt | lwrflt | spflt
-
-        testcase1 = 'CHF/USD PQO 2pm Fix'
-
-        actual1 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase1)]
-        print(actual1)
+    # def test_spflt(self):
+    #     # regex = RegexTokenizer('[^\s/]+')
+    #     regex = RegexTokenizerExtra('[^\s/]+', ignored=False, required=False)
+    #     # attrflt = TokenAttrFilter(ignored=False, required=False)
+    #     lwrflt = LowercaseFilter()
+    #     spflt = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
+    #     vwflt = VowelFilter(self.CME_KYWRD_EXCLU)
+    #     ana = regex | lwrflt | spflt
+    #
+    #     testcase1 = 'Swiss Franc CHF/USD PQO 2pm Fix'
+    #
+    #     # out_regex = [(t.text, t.boost, t.ignored, t.required) for t in regex(testcase1, ignored=False, required=False)]
+    #     actual1 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase1)]
+    #     print(actual1)
 
 
     # def test_splt_mrg_filter(self):
@@ -137,47 +141,46 @@ class CMEAnalyzerTests(ut.TestCase):
     #     self.assertListEqual(expected6, actual6)
 
 
-    # def test_analyzer(self):
-    #     REGEX_TKN = RegexTokenizer('[^\s/]+')
-    #     TKATTR_FLT = TokenAttrFilter(ignored=False)
-    #     SPLT_MRG_FLT = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True)
-    #     LWRCS_FLT = LowercaseFilter()
-    #
-    #     CME_STP_FLT = StopFilter(stoplist=self.STOP_LIST + self.CME_COMMON_WORDS, minsize=1)
-    #     CME_SP_FLT = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
-    #     CME_VW_FLT = VowelFilter(self.CME_KYWRD_EXCLU)
-    #     CME_MULT_FLT =  MultiFilterFixed(index=CME_VW_FLT)
-    #
-    #     ana = REGEX_TKN | TKATTR_FLT | SPLT_MRG_FLT | LWRCS_FLT | CME_STP_FLT | CME_SP_FLT | CME_MULT_FLT
-    #     # ana = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_SP_FLT | CME_VW_FLT | STP_FLT
-    #     # ana = REGEX_TKN | IntraWordFilter(mergewords=True)
-    #
-    #     testcase1 = 'Nikkei/USD'
-    #     testcase2 = ' EOW1 S&P 500'
-    #     testcase3 = ' AUD/USD PQO 2pm Fix'
-    #     testcase4 = 'E-mini NASDAQ Biotechnology Index'
-    #     testcase5 = 'Nikkei/USD Futures'
-    #     testcase6 = 'S.AFRICAN RAND'
-    #     testcase7 = 'Chilean Peso/US Dollar (CLP/USD) Futures'
-    #
-    #     # result1 = [t.text for t in ana(testcase1)]
-    #     # result2 = [t.text for t in ana(testcase2)]
-    #     # result3 = [t.text for t in ana(testcase3)]
-    #     # result4 = [t.text for t in ana(testcase4, mode='index')]
-    #     # result5 = [t.text for t in ana(testcase5, mode='index')]
-    #     # result6 = [t.text for t in ana(testcase6, mode='index')]
-    #     result7 = [t.text for t in ana(testcase7, mode='index')]
-    #
-    #
-    #     # print(result6)
-    #     # print(result5)
-    #     print(result7)
-    #     # print(result4)
-    #     # expected1 = ['e', 'micro', 'emicro', 'aud', 'australian', 'dollar', 'usd', 'us', 'american', 'dollar']
-    #     # expected4 = ['e', 'mini', 'emini', 'nasdaq', 'biotechnology', 'btchnlgy', 'index']
-    #     #
-    #     # self.assertListEqual(expected1, result1)
-    #     # self.assertListEqual(expected4, result4)
+    def test_analyzer(self):
+        REGEX_TKN = RegexTokenizerExtra('[^\s/]+', ignored=False, required=False)
+        SPLT_MRG_FLT = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True)
+        LWRCS_FLT = LowercaseFilter()
+
+        CME_STP_FLT = StopFilter(stoplist=self.STOP_LIST + self.CME_COMMON_WORDS, minsize=1)
+        CME_SP_FLT = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
+        CME_VW_FLT = VowelFilter(self.CME_KYWRD_EXCLU)
+        CME_MULT_FLT = MultiFilterFixed(index=CME_VW_FLT)
+
+        ana = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_STP_FLT | CME_SP_FLT | CME_MULT_FLT
+        # ana = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_SP_FLT | CME_VW_FLT | STP_FLT
+        # ana = REGEX_TKN | IntraWordFilter(mergewords=True)
+
+        testcase1 = 'Nikkei/USD'
+        testcase2 = ' EOW1 S&P 500'
+        testcase3 = ' AUD/USD PQO 2pm Fix'
+        testcase4 = 'E-mini NASDAQ Biotechnology Index'
+        testcase5 = 'Nikkei/USD Futures'
+        testcase6 = 'S.AFRICAN RAND'
+        testcase7 = 'Chilean Peso/US Dollar (CLP/USD) Futures'
+
+        # result1 = [t.text for t in ana(testcase1)]
+        # result2 = [t.text for t in ana(testcase2)]
+        # result3 = [t.text for t in ana(testcase3)]
+        # result4 = [t.text for t in ana(testcase4, mode='index')]
+        # result5 = [t.text for t in ana(testcase5, mode='index')]
+        # result6 = [t.text for t in ana(testcase6, mode='index')]
+        result7 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase7, mode='index')]
+
+
+        # print(result6)
+        # print(result5)
+        print(result7)
+        # print(result4)
+        # expected1 = ['e', 'micro', 'emicro', 'aud', 'australian', 'dollar', 'usd', 'us', 'american', 'dollar']
+        # expected4 = ['e', 'mini', 'emini', 'nasdaq', 'biotechnology', 'btchnlgy', 'index']
+        #
+        # self.assertListEqual(expected1, result1)
+        # self.assertListEqual(expected4, result4)
 
 
     # def test_composite_filter(self):

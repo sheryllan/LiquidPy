@@ -233,8 +233,7 @@ class CMEGMatcher(object):
     CME_KYWRD_EXCLU = CRRNCY_KEYWORDS.union(CME_SPECIAL_KEYWORDS).union(
         {'nasdaq', 'ibovespa', 'index', 'mini', 'micro', 'nikkei', 'russell', 'ftse', 'swap'})
 
-    REGEX_TKN = RegexTokenizer('[^\s/]+')
-    TKATTR_FLT = TokenAttrFilter(ignored=False, required=False)
+    REGEX_TKN = RegexTokenizerExtra('[^\s/]+', ignored=False, required=False)
     SPLT_MRG_FLT = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True)
     LWRCS_FLT = LowercaseFilter()
 
@@ -243,7 +242,7 @@ class CMEGMatcher(object):
     CME_VW_FLT = VowelFilter(CME_KYWRD_EXCLU)
     CME_MULT_FLT = MultiFilterFixed(index=CME_VW_FLT)
 
-    CME_PDNM_ANA = REGEX_TKN | TKATTR_FLT | SPLT_MRG_FLT | LWRCS_FLT | CME_STP_FLT | CME_SP_FLT | CME_MULT_FLT
+    CME_PDNM_ANA = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_STP_FLT | CME_SP_FLT | CME_MULT_FLT
     INDEX_FIELDS_CME = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=CME_PDNM_ANA),
                         F_PRODUCT_GROUP: ID(stored=True),
                         F_CLEARED_AS: ID(stored=True, unique=True),
