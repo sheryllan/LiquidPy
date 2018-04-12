@@ -33,8 +33,7 @@ class CMEAnalyzerTests(ut.TestCase):
                        'pln': [TokenSub('polish', 1.5, True, True), TokenSub('zloty', 1.5, True, True)],
                        'inr': [TokenSub('indian', 1.5, True, True), TokenSub('rupee', 1.5, True, True)],
                        'rmb': [TokenSub('chinese', 1.5, True, True), TokenSub('renminbi', 1.5, True, True)],
-                       'usd': [TokenSub('us', 0.75, True, False), TokenSub('american', 0.75, True, False),
-                               TokenSub('dollar', 0.5, True, False)],
+                       'usd': [TokenSub('us', 1, True, False), TokenSub('dollar', 1, True, False)],
                        'clp': [TokenSub('chilean', 1.5, True, True), TokenSub('peso', 1.5, True, True)],
                        'mxn': [TokenSub('mexican', 1.5, True, True), TokenSub('peso', 1.5, True, True)],
                        'brl': [TokenSub('brazilian', 1.5, True, True), TokenSub('real', 1.5, True, True)],
@@ -80,7 +79,7 @@ class CMEAnalyzerTests(ut.TestCase):
                            'eom': [TokenSub('monthly', 1, True, True)],
                            'usdzar': CRRNCY_TOKENSUB['usd'] + CRRNCY_TOKENSUB['zar'],
                            'biotech': [TokenSub('biotechnology', 1.5, True, True)],
-                           'us': CRRNCY_TOKENSUB['usd'][0:2],
+                           'american': [TokenSub('us', 1, True, False)],
                            'eu': [TokenSub('european', 1.5, True, True)],
                            'nfd': [TokenSub('non', 1.5, True, True), TokenSub('fat', 1.5, True, True),
                                    TokenSub('dry', 1.5, True, True)],
@@ -161,7 +160,7 @@ class CMEAnalyzerTests(ut.TestCase):
         testcase4 = 'E-mini NASDAQ Biotechnology Index'
         testcase5 = 'Nikkei/USD Futures'
         testcase6 = 'S.AFRICAN RAND'
-        testcase7 = 'Chilean Peso/US Dollar (CLP/USD) Futures'
+        testcase7 = 'Chilean Peso/US Dollar (CLP/American Dollar) Futures'
 
         # result1 = [t.text for t in ana(testcase1)]
         # result2 = [t.text for t in ana(testcase2)]

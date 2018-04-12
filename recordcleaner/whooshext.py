@@ -15,20 +15,6 @@ from whoosh import writing
 import datascraper as dtsp
 
 
-def namedtuple_with_defaults(typename, field_names, default_values=()):
-    T = namedtuple(typename, field_names)
-    T.__new__.__defaults__ = (None,) * len(T._fields)
-    if isinstance(default_values, Mapping):
-        prototype = T(**default_values)
-    else:
-        prototype = T(*default_values)
-    T.__new__.__defaults__ = tuple(prototype)
-    return T
-
-
-TokenSub = namedtuple_with_defaults('TokenSub', ['text', 'boost', 'ignored', 'required'], [None, 1, False, False])
-
-
 def create_index(ix_path, fields, clean=False):
     if (not clean) and os.path.exists(ix_path):
         return open_dir(ix_path)
@@ -76,7 +62,10 @@ def join_words(words, minlen=2):
         yield result
 
 
-def combine_iters(*args):
+def merge_iters(*args):
+    len_iter = len(args[0])
+    if any(len(arg) != len_iter for arg in args):
+        print('Warning: ')
     for items in zip(*args):
         yielded = set()
         for item in items:
@@ -91,26 +80,55 @@ def set_token(token, **kwargs):
     return token
 
 
-class CompositeFilter(Filter):
-    def __init__(self, *filters):
-        self.filters = []
-        for filter in filters:
-            if isinstance(filter, Filter):
-                self.filters.append(filter)
-            else:
-                raise TypeError('The input type must be a Filter/CompositeFilter')
+def last_indexof(items, target):
+    j = None
+    for i in range(len(items) - 1, -1, -1):
+        if items[i] == target:
+            j = i
+            break
+    return j
 
-    def __and__(self, other):
-        if not isinstance(other, Filter):
-            raise TypeError('{} is not composable(and) with {}'.format(self, other))
-        return CompositeFilter(self, other)
 
-    def __call__(self, stream):
-        flts = self.filters
-        gen = stream
-        for f in flts:
-            gen = f(gen)
-        return gen
+def min_dist_rslt(results, qstring, fieldname, field, minboost=0):
+    ana = field.analyzer
+    q_tokens = sorted([(token.text, token.boost) for token in ana(qstring, mode='query') if token.boost >= minboost],
+                      key=lambda x: x[0])
+    results_srted = TreeMap()
+    head = None
+    for r in results:
+        field_value = r.fields()[fieldname]
+        r_tokens = sorted(
+            [(token.text, token.boost) for token in ana(field_value, mode='index') if token.boost >= minboost],
+            key=lambda x: x[0])
+
+        qt_len = sum([token[1] for token in q_tokens])
+        rt_len = sum([token[1] for token in r_tokens])
+
+        midx = 0
+        for qt in q_tokens:
+            for i in range(midx, len(r_tokens)):
+                if qt[0] == r_tokens[i][0]:
+                    qt_len -= qt[1]
+                    rt_len -= r_tokens[i][1]
+                    midx = i + 1
+                    break
+
+        head = results_srted.add(((qt_len, rt_len), r), head)
+    return [r for _, r in results_srted.get_items(head)]
+
+
+def namedtuple_with_defaults(typename, field_names, default_values=()):
+    T = namedtuple(typename, field_names)
+    T.__new__.__defaults__ = (None,) * len(T._fields)
+    if isinstance(default_values, Mapping):
+        prototype = T(**default_values)
+    else:
+        prototype = T(*default_values)
+    T.__new__.__defaults__ = tuple(prototype)
+    return T
+
+
+TokenSub = namedtuple_with_defaults('TokenSub', ['text', 'boost', 'ignored', 'required'], [None, 1, False, False])
 
 
 class VowelFilter(Filter):
@@ -257,59 +275,115 @@ class SpecialWordFilter(Filter):
             raise TypeError('Input is not a valid instance of Tokenizer')
         self.tokenizer = tokenizer
         self.original = original
-        self.mapped_kws = self.__groupby(word_dict.values())
+        self.kws_treedict = self.__groupby(word_dict.values())
 
     def __call__(self, stream):
-        memory = set()
+        memory = dict()
         prev_kws = list()
-        next_group = self.mapped_kws
+        next_group = self.kws_treedict
         token = None
         for token in stream:
             tk_cpy = TokenSub(token.text, token.boost, token.ignored, token.required)
 
-            if prev_kws and next_group != self.mapped_kws and tk_cpy.text not in next_group:
-                trans_tokens, prev_kws, next_group = self.__cleanup(prev_kws, next_group)
-                for tk in self.__gen_tokens(token, trans_tokens, memory):
-                    yield tk
+            if tk_cpy.text in next_group:
+                prev_kws, next_group = self.__move_down(prev_kws, next_group, tk_cpy)
 
-            if tk_cpy.text not in self.word_dict:
-                if tk_cpy.text in next_group:
-                    prev_kws.append(tk_cpy)
-                    next_group = next_group[tk_cpy.text]
-                elif tk_cpy in next_group:
-                    prev_kws.append(tk_cpy)
-                else:
-                    yield set_token(token, **tk_cpy._asdict())
             else:
-                if self.original:
-                    memory.add((tk_cpy.text, tk_cpy.boost))
-                    yield token
+                if prev_kws and next_group != self.kws_treedict:
+                    trans_tokens = self.__prev_tokens(prev_kws, next_group)
+                    for tk in self.__gen_tokens(token, trans_tokens, memory):
+                        yield tk
+                    prev_kws, next_group = self.__clear()
 
-                values = dtsp.to_list(self.word_dict[tk_cpy.text])
-                tks = [TokenSub(tk.text, val.boost * tk_cpy.boost,
-                                val.ignored or tk_cpy.ignored,
-                                val.required or tk_cpy.required)
-                       for val in values for tk in self.tokenizer(val.text)]
+                if tk_cpy.text in next_group:
+                    prev_kws, next_group = self.__move_down(prev_kws, next_group, tk_cpy)
+                elif tk_cpy.text not in self.word_dict:
+                    for tk in self.__gen_tokens(token, [tk_cpy], memory):
+                        yield tk
+                else:
+                    if self.original:
+                        for tk in self.__gen_tokens(token, [tk_cpy], memory):
+                            yield tk
 
-                if any((t.text, t.boost) not in memory for t in tks):
-                    for t in self.__gen_tokens(token, tks, memory):
-                        yield t
+                    values = dtsp.to_list(self.word_dict[tk_cpy.text])
+                    tks = [TokenSub(tk.text, val.boost * tk_cpy.boost,
+                                    val.ignored or tk_cpy.ignored,
+                                    val.required or tk_cpy.required)
+                           for val in values for tk in self.tokenizer(val.text)]
+                    for tk in self.__gen_tokens(token, tks, memory, True):
+                        yield tk
 
-        if prev_kws and next_group != self.mapped_kws and token is not None:
-            trans_tokens, prev_kws, next_group = self.__cleanup(prev_kws, next_group)
+        if prev_kws and next_group != self.kws_treedict and token is not None:
+            trans_tokens = self.__prev_tokens(prev_kws, next_group)
             for tk in self.__gen_tokens(token, trans_tokens, memory):
                 yield tk
 
-    def __cleanup(self, prev_kws, next_group):
-        trans_tokens = prev_kws if None not in next_group \
-            else (combine_iters(prev_kws, next_group[None]) if self.original else next_group[None])
-        return trans_tokens, list(), self.mapped_kws
+    def __move_down(self, prev_kws, next_group, token):
+        if None in next_group:
+            prev_kws.append(None)
+        prev_kws.append(token)
+        next_group = next_group[token.text]
+        return prev_kws, next_group
 
-    def __gen_tokens(self, token, trans_tokens, memory=None):
-        for ts_tk in dtsp.to_list(trans_tokens):
-            if memory is not None:
-                memory.add((ts_tk.text, ts_tk.boost))
-            yield set_token(token, **ts_tk._asdict())
+    def __prev_tokens(self, prev_kws, next_group):
+        if not prev_kws:
+            return prev_kws
+        if None not in next_group:
+            last_idx = last_indexof(prev_kws, None)
+            trans_tokens = prev_kws
+            if last_idx is not None:
+                longest_kwtokens = merge_iters(self.__longest_kwtokens(prev_kws[0: last_idx], True)) \
+                    if self.original else self.__longest_kwtokens(prev_kws[0: last_idx])
+                trans_tokens = longest_kwtokens + prev_kws[last_idx + 1:]
+        else:
+            trans_tokens = merge_iters((kw for kw in prev_kws if kw is not None), next_group[None]) \
+                if self.original else next_group[None]
+        return trans_tokens
+
+    def __clear(self):
+        return list(), self.kws_treedict
+
+    def __longest_kwtokens(self, tokens, keeporigs=False):
+        next_dict = self.kws_treedict
+        orig_tokens = list()
+        for token in tokens:
+            if token.text is None:
+                continue
+            orig_tokens.append(token)
+            next_dict = next_dict[token.text]
+        if None not in next_dict:
+            raise ValueError('None not in kws_treedict: the recorded items not consistent with the tree dict')
+        return orig_tokens, next_dict[None] if keeporigs else next_dict[None]
+
+    def __gen_tokens(self, token, trans_tokens, memory=None, ismapped=False):
+        if memory is not None:
+            all_in, all_mapped, all_notmapped = True, True, True
+            trans_tokens = dtsp.to_list(trans_tokens)
+            for ts_tk in trans_tokens:
+                record = (ts_tk.text, ts_tk.boost)
+                if record not in memory:
+                    all_in = all_in and False
+                else:
+                    all_notmapped = all_notmapped and not memory[record]
+                    all_mapped = all_mapped and memory[record]
+
+            if all_in:
+                if all_mapped and not ismapped:
+                    for ts_tk in trans_tokens:
+                        memory[(ts_tk.text, ts_tk.boost)] = ismapped
+                        return iter('')
+                elif all_notmapped and not ismapped:
+                    for ts_tk in trans_tokens:
+                        yield set_token(token, **ts_tk._asdict())
+                else:
+                    return iter('')
+            else:
+                for ts_tk in dtsp.to_list(trans_tokens):
+                    memory.update({(ts_tk.text, ts_tk.boost): ismapped})
+                    yield set_token(token, **ts_tk._asdict())
+        else:
+            for ts_tk in dtsp.to_list(trans_tokens):
+                yield set_token(token, **ts_tk._asdict())
 
     def __groupby(self, items):
 
@@ -366,59 +440,6 @@ class RegexTokenizerExtra(RegexTokenizer):
 
         for token in stream:
             yield set_token(token, **self.attrs)
-
-
-# class TokenAttrFilter(Filter):
-#     def __init__(self, **attrs):
-#         self.attrs = attrs
-#
-#     def __call__(self, stream):
-#         try:
-#             token = next(stream)
-#             token.__dict__.update(self.attrs)
-#             yield token
-#             for token in stream:
-#                 yield token
-#         except StopIteration:
-#             return iter('')
-
-
-def min_dist_rslt(results, qstring, fieldname, field, minboost=0):
-    ana = field.analyzer
-    q_tokens = sorted([(token.text, token.boost) for token in ana(qstring, mode='query') if token.boost >= minboost],
-                      key=lambda x: x[0])
-    results_srted = TreeMap()
-    head = None
-    for r in results:
-        field_value = r.fields()[fieldname]
-        r_tokens = sorted(
-            [(token.text, token.boost) for token in ana(field_value, mode='index') if token.boost >= minboost],
-            key=lambda x: x[0])
-
-        qt_len = sum([token[1] for token in q_tokens])
-        rt_len = sum([token[1] for token in r_tokens])
-
-        midx = 0
-        for qt in q_tokens:
-            for i in range(midx, len(r_tokens)):
-                if qt[0] == r_tokens[i][0]:
-                    qt_len -= qt[1]
-                    rt_len -= r_tokens[i][1]
-                    midx = i + 1
-                    break
-
-        head = results_srted.add(((qt_len, rt_len), r), head)
-    return [r for _, r in results_srted.get_items(head)]
-
-
-class Tree(object):
-    class Node(object):
-        def __init__(self, data=None, children=None):
-            self.data = data
-            self.children = children
-
-    # def __init__(self, head=Node()):
-    #     self.head = head
 
 
 class TreeMap(object):
@@ -478,6 +499,51 @@ class TreeMap(object):
             return items
 
         return get_items_recursive(head, [])
+
+# region unused codes
+
+# class CompositeFilter(Filter):
+#     def __init__(self, *filters):
+#         self.filters = []
+#         for filter in filters:
+#             if isinstance(filter, Filter):
+#                 self.filters.append(filter)
+#             else:
+#                 raise TypeError('The input type must be a Filter/CompositeFilter')
+#
+#     def __and__(self, other):
+#         if not isinstance(other, Filter):
+#             raise TypeError('{} is not composable(and) with {}'.format(self, other))
+#         return CompositeFilter(self, other)
+#
+#     def __call__(self, stream):
+#         flts = self.filters
+#         gen = stream
+#         for f in flts:
+#             gen = f(gen)
+#         return gen
+
+# class TokenAttrFilter(Filter):
+#     def __init__(self, **attrs):
+#         self.attrs = attrs
+#
+#     def __call__(self, stream):
+#         try:
+#             token = next(stream)
+#             token.__dict__.update(self.attrs)
+#             yield token
+#             for token in stream:
+#                 yield token
+#         except StopIteration:
+#             return iter('')
+
+# class Tree(object):
+#     class Node(object):
+#         def __init__(self, data=None, children=None):
+#             self.data = data
+#             self.children = children
+
+# endregion
 
 # STD_ANA = StandardAnalyzer('[^\s/]+', stoplist=STOP_LIST, minsize=1)
 
