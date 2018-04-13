@@ -33,7 +33,7 @@ class CMEAnalyzerTests(ut.TestCase):
                        'pln': [TokenSub('polish', 1.5, True, True), TokenSub('zloty', 1.5, True, True)],
                        'inr': [TokenSub('indian', 1.5, True, True), TokenSub('rupee', 1.5, True, True)],
                        'rmb': [TokenSub('chinese', 1.5, True, True), TokenSub('renminbi', 1.5, True, True)],
-                       'usd': [TokenSub('us', 1, True, False), TokenSub('dollar', 1, True, False)],
+                       'usd': [TokenSub('american', 1, True, False), TokenSub('dollar', 1, True, False)],
                        'clp': [TokenSub('chilean', 1.5, True, True), TokenSub('peso', 1.5, True, True)],
                        'mxn': [TokenSub('mexican', 1.5, True, True), TokenSub('peso', 1.5, True, True)],
                        'brl': [TokenSub('brazilian', 1.5, True, True), TokenSub('real', 1.5, True, True)],
@@ -79,13 +79,12 @@ class CMEAnalyzerTests(ut.TestCase):
                            'eom': [TokenSub('monthly', 1, True, True)],
                            'usdzar': CRRNCY_TOKENSUB['usd'] + CRRNCY_TOKENSUB['zar'],
                            'biotech': [TokenSub('biotechnology', 1.5, True, True)],
-                           'american': [TokenSub('us', 1, True, False)],
+                           'us': [TokenSub('american', 1, True, False)],
                            'eu': [TokenSub('european', 1.5, True, True)],
                            'nfd': [TokenSub('non', 1.5, True, True), TokenSub('fat', 1.5, True, True),
                                    TokenSub('dry', 1.5, True, True)],
                            'cs': [TokenSub('cash', 1.5, True, True), TokenSub('settled', 1.5, True, True)],
                            'er': [TokenSub('excess', 1.5, True, True), TokenSub('return', 1.5, True, True)]}
-
 
     CME_COMMON_WORDS = ['futures', 'options', 'index', 'cross', 'rate', 'rates']
 
@@ -101,10 +100,12 @@ class CMEAnalyzerTests(ut.TestCase):
     #     {'nasdaq', 'ibovespa', 'index', 'mini', 'micro', 'nikkei', 'russell', 'ftse', 'swap'})
     CME_KYWRD_EXCLU = {'nasdaq', 'ibovespa', 'index', 'mini', 'micro', 'nikkei', 'russell', 'ftse', 'swap'}
 
+    REGTK_EXP = '[^\s/\(\)]+'
+
 
     # def test_spflt(self):
-    #     # regex = RegexTokenizer('[^\s/]+')
-    #     regex = RegexTokenizerExtra('[^\s/]+', ignored=False, required=False)
+    #     # regex = RegexTokenizer(self.REGTK_EXP)
+    #     regex = RegexTokenizerExtra(self.REGTK_EXP, ignored=False, required=False)
     #     # attrflt = TokenAttrFilter(ignored=False, required=False)
     #     lwrflt = LowercaseFilter()
     #     spflt = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
@@ -120,7 +121,7 @@ class CMEAnalyzerTests(ut.TestCase):
 
     # def test_splt_mrg_filter(self):
     #     spltmrgflt = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True)
-    #     regex = RegexTokenizer('[^\s/]+')
+    #     regex = RegexTokenizer(self.REGTK_EXP)
     #     ana = regex | spltmrgflt
     #     testcase1 = 'ciEsta0-8-9 JiO890&9cityETO(MIOm'
     #     testcase5 = 'U.S. Dollar/S.African Rand'
@@ -141,7 +142,7 @@ class CMEAnalyzerTests(ut.TestCase):
 
 
     def test_analyzer(self):
-        REGEX_TKN = RegexTokenizerExtra('[^\s/]+', ignored=False, required=False)
+        REGEX_TKN = RegexTokenizerExtra(self.REGTK_EXP, ignored=False, required=False)
         SPLT_MRG_FLT = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True)
         LWRCS_FLT = LowercaseFilter()
 
@@ -150,7 +151,8 @@ class CMEAnalyzerTests(ut.TestCase):
         CME_VW_FLT = VowelFilter(self.CME_KYWRD_EXCLU)
         CME_MULT_FLT = MultiFilterFixed(index=CME_VW_FLT)
 
-        ana = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_STP_FLT | CME_SP_FLT | CME_MULT_FLT
+        ana = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_STP_FLT | CME_SP_FLT
+        # ana = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_STP_FLT | CME_SP_FLT | CME_MULT_FLT
         # ana = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_SP_FLT | CME_VW_FLT | STP_FLT
         # ana = REGEX_TKN | IntraWordFilter(mergewords=True)
 
@@ -161,6 +163,7 @@ class CMEAnalyzerTests(ut.TestCase):
         testcase5 = 'Nikkei/USD Futures'
         testcase6 = 'S.AFRICAN RAND'
         testcase7 = 'Chilean Peso/US Dollar (CLP/American Dollar) Futures'
+        testcase8 = '(CLP/USD) Chilean Peso/US Dollar American'
 
         # result1 = [t.text for t in ana(testcase1)]
         # result2 = [t.text for t in ana(testcase2)]
@@ -168,12 +171,14 @@ class CMEAnalyzerTests(ut.TestCase):
         # result4 = [t.text for t in ana(testcase4, mode='index')]
         # result5 = [t.text for t in ana(testcase5, mode='index')]
         # result6 = [t.text for t in ana(testcase6, mode='index')]
-        result7 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase7, mode='index')]
+        # result7 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase7, mode='index')]
+        result8 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase8, mode='index')]
 
 
         # print(result6)
         # print(result5)
-        print(result7)
+        # print(result7)
+        print(result8)
         # print(result4)
         # expected1 = ['e', 'micro', 'emicro', 'aud', 'australian', 'dollar', 'usd', 'us', 'american', 'dollar']
         # expected4 = ['e', 'mini', 'emini', 'nasdaq', 'biotechnology', 'btchnlgy', 'index']

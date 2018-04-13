@@ -167,7 +167,7 @@ class CMEGMatcher(object):
                        'pln': [TokenSub('polish', 1.5, True, True), TokenSub('zloty', 1.5, True, True)],
                        'inr': [TokenSub('indian', 1.5, True, True), TokenSub('rupee', 1.5, True, True)],
                        'rmb': [TokenSub('chinese', 1.5, True, True), TokenSub('renminbi', 1.5, True, True)],
-                       'usd': [TokenSub('us', 1, True, False), TokenSub('dollar', 1, True, False)],
+                       'usd': [TokenSub('american', 1, True, False), TokenSub('dollar', 1, True, False)],
                        'clp': [TokenSub('chilean', 1.5, True, True), TokenSub('peso', 1.5, True, True)],
                        'mxn': [TokenSub('mexican', 1.5, True, True), TokenSub('peso', 1.5, True, True)],
                        'brl': [TokenSub('brazilian', 1.5, True, True), TokenSub('real', 1.5, True, True)],
@@ -212,7 +212,7 @@ class CMEGMatcher(object):
                            'eom': [TokenSub('monthly', 1, True, True)],
                            'usdzar': CRRNCY_TOKENSUB['usd'] + CRRNCY_TOKENSUB['zar'],
                            'biotech': [TokenSub('biotechnology', 1.5, True, True)],
-                           'american': [TokenSub('us', 1, True, False)],
+                           'us': [TokenSub('american', 1, True, False)],
                            'eu': [TokenSub('european', 1.5, True, True)],
                            'nfd': [TokenSub('non', 1.5, True, True), TokenSub('fat', 1.5, True, True),
                                    TokenSub('dry', 1.5, True, True)],
@@ -232,7 +232,9 @@ class CMEGMatcher(object):
     CME_KYWRD_EXCLU = CRRNCY_KEYWORDS.union(CME_SPECIAL_KEYWORDS).union(
         {'nasdaq', 'ibovespa', 'index', 'mini', 'micro', 'nikkei', 'russell', 'ftse', 'swap'})
 
-    REGEX_TKN = RegexTokenizerExtra('[^\s/]+', ignored=False, required=False)
+    REGTK_EXP = '[^\s/\(\)]+'
+
+    REGEX_TKN = RegexTokenizerExtra(REGTK_EXP, ignored=False, required=False)
     SPLT_MRG_FLT = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True)
     LWRCS_FLT = LowercaseFilter()
 
