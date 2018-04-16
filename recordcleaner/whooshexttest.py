@@ -71,10 +71,9 @@ class CMEAnalyzerTests(ut.TestCase):
                       'cnh': CRRNCY_TOKENSUB['rmb'],
                       'huf': CRRNCY_TOKENSUB['huf']}
 
-    CME_SPECIAL_MAPPING = {'midcurve': [TokenSub('midcurve', 1, True, False), TokenSub('mc', 1.5, True, True)],
+    CME_SPECIAL_MAPPING = {'midcurve': [TokenSub('mc', 1.5, True, True)],
                            'pqo': [TokenSub('premium', 1, True, True), TokenSub('quoted', 1, True, True),
-                                   TokenSub('european', 1, True, True), TokenSub('style', 1, True, True),
-                                   TokenSub('options', 0.5, True, True)],
+                                   TokenSub('european', 1, True, True), TokenSub('style', 1, True, True)],
                            'eow': [TokenSub('weekly', 1, True, True), TokenSub('wk', 1, True, False)],
                            'eom': [TokenSub('monthly', 1, True, True)],
                            'usdzar': CRRNCY_TOKENSUB['usd'] + CRRNCY_TOKENSUB['zar'],
@@ -84,9 +83,10 @@ class CMEAnalyzerTests(ut.TestCase):
                            'nfd': [TokenSub('non', 1.5, True, True), TokenSub('fat', 1.5, True, True),
                                    TokenSub('dry', 1.5, True, True)],
                            'cs': [TokenSub('cash', 1.5, True, True), TokenSub('settled', 1.5, True, True)],
-                           'er': [TokenSub('excess', 1.5, True, True), TokenSub('return', 1.5, True, True)]}
+                           'er': [TokenSub('excess', 1.5, True, True), TokenSub('return', 1.5, True, True)],
+                           'catl': [TokenSub('cattle', 1.5, True, False)]}
 
-    CME_COMMON_WORDS = ['futures', 'options', 'index', 'cross', 'rate', 'rates']
+    CME_COMMON_WORDS = ['futures', 'future', 'options', 'option', 'index', 'cross', 'rate', 'rates']
 
     CRRNCY_KEYWORDS = set(dtsp.flatten_iter(
         [k.split(' ') + [tp.text for tp in v] for k, v in CRRNCY_MAPPING.items()]))
@@ -141,50 +141,55 @@ class CMEAnalyzerTests(ut.TestCase):
     #     self.assertListEqual(expected6, actual6)
 
 
-    def test_analyzer(self):
-        REGEX_TKN = RegexTokenizerExtra(self.REGTK_EXP, ignored=False, required=False)
-        SPLT_MRG_FLT = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True)
-        LWRCS_FLT = LowercaseFilter()
-
-        CME_STP_FLT = StopFilter(stoplist=self.STOP_LIST + self.CME_COMMON_WORDS, minsize=1)
-        CME_SP_FLT = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
-        CME_VW_FLT = VowelFilter(self.CME_KYWRD_EXCLU)
-        CME_MULT_FLT = MultiFilterFixed(index=CME_VW_FLT)
-
-        ana = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_STP_FLT | CME_SP_FLT
-        # ana = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_STP_FLT | CME_SP_FLT | CME_MULT_FLT
-        # ana = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_SP_FLT | CME_VW_FLT | STP_FLT
-        # ana = REGEX_TKN | IntraWordFilter(mergewords=True)
-
-        testcase1 = 'Nikkei/USD'
-        testcase2 = ' EOW1 S&P 500'
-        testcase3 = ' AUD/USD PQO 2pm Fix'
-        testcase4 = 'E-mini NASDAQ Biotechnology Index'
-        testcase5 = 'Nikkei/USD Futures'
-        testcase6 = 'S.AFRICAN RAND'
-        testcase7 = 'Chilean Peso/US Dollar (CLP/American Dollar) Futures'
-        testcase8 = '(CLP/USD) Chilean Peso/US Dollar American'
-
-        # result1 = [t.text for t in ana(testcase1)]
-        # result2 = [t.text for t in ana(testcase2)]
-        # result3 = [t.text for t in ana(testcase3)]
-        # result4 = [t.text for t in ana(testcase4, mode='index')]
-        # result5 = [t.text for t in ana(testcase5, mode='index')]
-        # result6 = [t.text for t in ana(testcase6, mode='index')]
-        # result7 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase7, mode='index')]
-        result8 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase8, mode='index')]
-
-
-        # print(result6)
-        # print(result5)
-        # print(result7)
-        print(result8)
-        # print(result4)
-        # expected1 = ['e', 'micro', 'emicro', 'aud', 'australian', 'dollar', 'usd', 'us', 'american', 'dollar']
-        # expected4 = ['e', 'mini', 'emini', 'nasdaq', 'biotechnology', 'btchnlgy', 'index']
-        #
-        # self.assertListEqual(expected1, result1)
-        # self.assertListEqual(expected4, result4)
+    # def test_analyzer(self):
+    #     REGEX_TKN = RegexTokenizerExtra(self.REGTK_EXP, ignored=False, required=False)
+    #     SPLT_MRG_FLT = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True)
+    #     LWRCS_FLT = LowercaseFilter()
+    #
+    #     CME_STP_FLT = StopFilter(stoplist=self.STOP_LIST + self.CME_COMMON_WORDS, minsize=1)
+    #     CME_SP_FLT = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
+    #     CME_VW_FLT = VowelFilter(self.CME_KYWRD_EXCLU)
+    #     CME_MULT_FLT = MultiFilterFixed(index=CME_VW_FLT)
+    #
+    #     ana = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_STP_FLT | CME_SP_FLT
+    #     # ana = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_STP_FLT | CME_SP_FLT | CME_MULT_FLT
+    #     # ana = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_SP_FLT | CME_VW_FLT | STP_FLT
+    #     # ana = REGEX_TKN | IntraWordFilter(mergewords=True)
+    #
+    #     testcase1 = 'Nikkei/USD'
+    #     testcase2 = ' EOW1 S&P 500'
+    #     testcase3 = ' AUD/USD PQO 2pm Fix'
+    #     testcase4 = 'E-mini NASDAQ Biotechnology Index'
+    #     testcase5 = 'Nikkei/USD Futures'
+    #     testcase6 = 'S.AFRICAN RAND'
+    #     testcase7 = 'Chilean Peso/US Dollar (CLP/American Dollar) Futures'
+    #     testcase8 = '(CLP/USD) Chilean Peso/US Dollar American'
+    #     # testcase9 = 'EURO MIDCURVE'
+    #     testcase9 = 'BRAZIL REAL'
+    #
+    #     # result1 = [t.text for t in ana(testcase1)]
+    #     # result2 = [t.text for t in ana(testcase2)]
+    #     # result3 = [t.text for t in ana(testcase3)]
+    #     # result4 = [t.text for t in ana(testcase4, mode='index')]
+    #     # result5 = [t.text for t in ana(testcase5, mode='index')]
+    #     # result6 = [t.text for t in ana(testcase6, mode='index')]
+    #     # result7 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase7, mode='index')]
+    #     # result8 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase8, mode='index')]
+    #
+    #     result9 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase9, mode='query')]
+    #
+    #
+    #     # print(result6)
+    #     # print(result5)
+    #     # print(result7)
+    #     # print(result8)
+    #     print(result9)
+    #     # print(result4)
+    #     # expected1 = ['e', 'micro', 'emicro', 'aud', 'australian', 'dollar', 'usd', 'us', 'american', 'dollar']
+    #     # expected4 = ['e', 'mini', 'emini', 'nasdaq', 'biotechnology', 'btchnlgy', 'index']
+    #     #
+    #     # self.assertListEqual(expected1, result1)
+    #     # self.assertListEqual(expected4, result4)
 
 
     # def test_composite_filter(self):
@@ -199,32 +204,68 @@ class CMEAnalyzerTests(ut.TestCase):
     #
     #     self.assertListEqual(expected4, result4)
 
-    # def test_ana_query_mode(self):
-    #     # SPLT_FLT = SplitFilter(delims='[&/\(\)\.-]', splitcase=True, splitnums=True, mergewords=True, mergenums=True)
-    #     # CME_SP_FLT = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
-    #     # CME_VW_FLT = VowelFilter(self.CME_KYWRD_EXCLU)
-    #     # CME_PDNM_ANA = RegexTokenizer('[^\s/]+') | SPLT_FLT
-    #
-    #     # testcase = 'EOW1 E-MINI RUSSELL 2000 WE'
-    #     # result = [t.text for t in CME_PDNM_ANA(testcase, mode='index')]
-    #
-    #     # print(result)
-    #
-    #     F_PRODUCT_NAME = 'Product_Name'
-    #
-    #     ix = open_dir('CME_Product_Index')
-    #     pdnm = 'Nikkei/USD Futures'
-    #     query = self.__exact_and_query(F_PRODUCT_NAME, ix.schema, pdnm)
-    #     print(query.terms())
-    #
-    # def __exact_and_query(self, field, schema, text):
-    #     parser = qparser.QueryParser(field, schema=schema)
-    #     return parser.parse(text)
-    #
-    # def __exact_or_query(self, field, schema, text):
-    #     og = qparser.OrGroup.factory(0.9)
-    #     parser = qparser.QueryParser(field, schema=schema, group=og)
-    #     return parser.parse(text)
+    def test_ana_query_mode(self):
+        # SPLT_FLT = SplitFilter(delims='[&/\(\)\.-]', splitcase=True, splitnums=True, mergewords=True, mergenums=True)
+        # CME_SP_FLT = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
+        # CME_VW_FLT = VowelFilter(self.CME_KYWRD_EXCLU)
+        # CME_PDNM_ANA = RegexTokenizer('[^\s/]+') | SPLT_FLT
+
+        # testcase = 'EOW1 E-MINI RUSSELL 2000 WE'
+        # result = [t.text for t in CME_PDNM_ANA(testcase, mode='index')]
+
+        # print(result)
+
+        F_PRODUCT_NAME = 'Product_Name'
+
+        ix = open_dir('CME_Product_Index')
+        pdnm = 'GBP/USD PQO 2pm Fix'
+        field_pdnm = {x[0]: x[1] for x in ix.schema.items()}[F_PRODUCT_NAME]
+
+
+        rcd1 = 'Weekly Premium Quoted European Style Options on British Pound/US Dollar Futures - Wk 3'
+        ana = field_pdnm.analyzer
+        tks_index = [t.text for t in ana(rcd1, mode='index')]
+        print(tks_index)
+        # tks_query = [t.text for t in ana(pdnm, mode='query')]
+        # print(tks_query)
+        and_words, or_words = self.__split_query_groups(field_pdnm, pdnm)
+        query = self.__andmaybe_query(F_PRODUCT_NAME, and_words, or_words)
+        print(list(query.terms()))
+
+        with ix.searcher() as searcher:
+            results = searcher.search(query)
+            if results:
+                for r in results:
+                    print(r)
+
+    def __exact_and_query(self, field, schema, text):
+        parser = qparser.QueryParser(field, schema=schema)
+        return parser.parse(text)
+
+    def __fuzzy_and_query(self, field, schema, text, maxdist=2, prefixlength=1):
+        parser = qparser.QueryParser(field, schema=schema)
+        query = parser.parse(text)
+        fuzzy_terms = And(
+            [FuzzyTerm(f, t, maxdist=maxdist, prefixlength=prefixlength) for f, t in query.iter_all_terms() if
+             len(t) > maxdist])
+        return fuzzy_terms
+
+    def __exact_or_query(self, field, schema, text):
+        og = qparser.OrGroup.factory(0.9)
+        parser = qparser.QueryParser(field, schema=schema, group=og)
+        return parser.parse(text)
+
+    def __split_query_groups(self, field, text, mode='query'):
+        tokens = field.analyzer(text, mode=mode)
+        and_words, maybe_words = [], []
+        for token in tokens:
+            (and_words if token.required else maybe_words).append(token.text)
+        return and_words, maybe_words
+
+    def __andmaybe_query(self, fieldname, and_words, maybe_words):
+        and_terms = And([Term(fieldname, w) for w in and_words])
+        maybe_terms = Or([Term(fieldname, w) for w in maybe_words])
+        return AndMaybe(and_terms, maybe_terms) if and_terms else maybe_terms
 
     # def test_min_dist_rslt(self):
     #     f_pn = 'Product_Name'

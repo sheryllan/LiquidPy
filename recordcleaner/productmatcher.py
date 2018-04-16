@@ -128,7 +128,9 @@ class CMEGMatcher(object):
     F_SUB_GROUP = 'Sub_Group'
     F_EXCHANGE = EXCHANGE
 
+    # region CME specific
     CME_EXACT_MAPPING = {
+        ('EURO MIDCURVE', 'Interest Rate', 'Options'): 'Eurodollar MC',
         ('NIKKEI 225 ($) STOCK', 'Equity Index', 'Futures'): 'Nikkei/USD Futures',
         ('NIKKEI 225 (YEN) STOCK', 'Equity Index', 'Futures'): 'Nikkei/Yen Futures',
         ('BDI', 'FX', 'Futures'): 'CME Bloomberg Dollar Spot Index',
@@ -142,6 +144,9 @@ class CMEGMatcher(object):
                           ('CANADIAN DOLLAR', 'FX', 'Options'),
                           ('EURO FX', 'FX', 'Options'),
                           ('JAPANESE YEN', 'FX', 'Options'),
+                          ('JAPANESE YEN (EU)', 'FX', 'Options'),
+                          ('SWISS FRANC (EU)', 'FX', 'Options'),
+                          ('AUSTRALIAN DLR (EU)', 'FX', 'Options'),
                           ('MLK MID', 'Ag Products', 'Futures')}
 
     CME_MULTI_MATCH = [('EURO MIDCURVE', 'Interest Rate', 'Options'),
@@ -150,12 +155,13 @@ class CMEGMatcher(object):
                        ('JPY/USD PQO 2pm Fix', 'FX', 'Options'),
                        ('EUR/USD PQO 2pm Fix', 'FX', 'Options'),
                        ('CAD/USD PQO 2pm Fix', 'FX', 'Options'),
-                       ('CHF/USD PQO 2pm Fix', 'FX', 'Options')]
+                       ('CHF/USD PQO 2pm Fix', 'FX', 'Options'),
+                       ('LV CATL CSO', 'Ag Products', 'Options')]
 
     CRRNCY_TOKENSUB = {'aud': [TokenSub('australian', 1.5, True, True), TokenSub('dollar', 1, True, True)],
                        'gbp': [TokenSub('british', 1.5, True, True), TokenSub('pound', 1.5, True, True)],
                        'cad': [TokenSub('canadian', 1.5, True, True), TokenSub('dollar', 1, True, True)],
-                       'euro': [TokenSub('euro', 1.5, True, False)],
+                       'euro': [TokenSub('euro', 1.5, True, True)],
                        'jpy': [TokenSub('japanese', 1.5, True, True), TokenSub('yen', 1.5, True, True)],
                        'nzd': [TokenSub('new', 1.5, True, True), TokenSub('zealand', 1.5, True, True),
                              TokenSub('dollar', 1, True, True)],
@@ -204,10 +210,8 @@ class CMEGMatcher(object):
                       'cnh': CRRNCY_TOKENSUB['rmb'],
                       'huf': CRRNCY_TOKENSUB['huf']}
 
-    CME_SPECIAL_MAPPING = {'midcurve': [TokenSub('midcurve', 1, True, False), TokenSub('mc', 1.5, True, True)],
-                           'pqo': [TokenSub('premium', 1, True, True), TokenSub('quoted', 1, True, True),
-                                   TokenSub('european', 1, True, True), TokenSub('style', 1, True, True),
-                                   TokenSub('options', 0.5, True, True)],
+    CME_SPECIAL_MAPPING = {'pqo': [TokenSub('premium', 1, True, True), TokenSub('quoted', 1, True, True),
+                                   TokenSub('european', 1, True, True), TokenSub('style', 1, True, True)],
                            'eow': [TokenSub('weekly', 1, True, True), TokenSub('wk', 1, True, False)],
                            'eom': [TokenSub('monthly', 1, True, True)],
                            'usdzar': CRRNCY_TOKENSUB['usd'] + CRRNCY_TOKENSUB['zar'],
@@ -217,20 +221,38 @@ class CMEGMatcher(object):
                            'nfd': [TokenSub('non', 1.5, True, True), TokenSub('fat', 1.5, True, True),
                                    TokenSub('dry', 1.5, True, True)],
                            'cs': [TokenSub('cash', 1.5, True, True), TokenSub('settled', 1.5, True, True)],
-                           'er': [TokenSub('excess', 1.5, True, True), TokenSub('return', 1.5, True, True)]}
+                           'er': [TokenSub('excess', 1.5, True, True), TokenSub('return', 1.5, True, True)],
+                           'catl': [TokenSub('cattle', 1.5, True, False)]}
 
-    CME_COMMON_WORDS = ['futures', 'options', 'index', 'cross', 'rate', 'rates']
-
-    CRRNCY_KEYWORDS = set(dtsp.flatten_iter(
-        [k.split(' ') + [tp.text for tp in v] for k, v in CRRNCY_MAPPING.items()]))
-
-    CME_SPECIAL_KEYWORDS = set(dtsp.flatten_iter(
-        [k.split(' ') + [tp.text for tp in v] for k, v in CME_SPECIAL_MAPPING.items()]))
+    CME_COMMON_WORDS = ['futures', 'future', 'options', 'option', 'index', 'cross', 'rate', 'rates']
 
     CME_KEYWORD_MAPPING = {**CRRNCY_MAPPING, **CME_SPECIAL_MAPPING}
 
-    CME_KYWRD_EXCLU = CRRNCY_KEYWORDS.union(CME_SPECIAL_KEYWORDS).union(
-        {'nasdaq', 'ibovespa', 'index', 'mini', 'micro', 'nikkei', 'russell', 'ftse', 'swap'})
+    CME_KYWRD_EXCLU = {'nasdaq', 'ibovespa', 'index', 'mini', 'micro', 'nikkei', 'russell', 'ftse', 'swap'}
+    # endregion
+
+
+    # region CBOT specific
+    CBOT_SPECIAL_MAPPING = {'yr': [TokenSub('year', 1, True, True)],
+                            'fed': [TokenSub('federal', 1.5, True, False)],
+                            't': [TokenSub('treasury', 1, True, True)],
+                            'dj': [TokenSub('dow', 1, True, True), TokenSub('jones', 1, True, True)],
+                            }
+
+
+    CBOT_MULTI_MATCH = [('10-YR NOTE', 'Interest Rate', 'Options'),
+                        ('5-YR NOTE', 'Interest Rate', 'Options'),
+                        ('2-YR NOTE', 'Interest Rate', 'Options'),
+                        ('FED FUND', 'Interest Rate', 'Options'),
+                        ('ULTRA T-BOND', 'Interest Rate', 'Options'),
+                        ('Ultra 10-Year Note', 'Interest Rate', 'Options'),
+                        ]
+
+
+    # endregion
+
+
+
 
     REGTK_EXP = '[^\s/\(\)]+'
 
@@ -243,7 +265,7 @@ class CMEGMatcher(object):
     CME_VW_FLT = VowelFilter(CME_KYWRD_EXCLU)
     CME_MULT_FLT = MultiFilterFixed(index=CME_VW_FLT)
 
-    CME_PDNM_ANA = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_STP_FLT | CME_SP_FLT | CME_MULT_FLT
+    CME_PDNM_ANA = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_STP_FLT | CME_SP_FLT | CME_MULT_FLT | CME_STP_FLT
     INDEX_FIELDS_CME = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=CME_PDNM_ANA),
                         F_PRODUCT_GROUP: ID(stored=True),
                         F_CLEARED_AS: ID(stored=True, unique=True),
@@ -354,36 +376,52 @@ class CMEGMatcher(object):
         found_clras = self.__find_clearedas(clras, clras_set)
         return found_clras if found_clras is not None else row_clras
 
+    def __get_query_params(self, row, pd_id, prods_pdgps, prods_clras):
+        pdnm = self.CME_EXACT_MAPPING[pd_id] if pd_id in self.CME_EXACT_MAPPING else row[self.PRODUCT]
+        pdgp = dtsp.find_first_n(prods_pdgps, lambda x: self.__match_pdgp(x, row[self.PRODUCT_GROUP]))
+        clras = self.__verify_clearedas(pdnm, row[self.CLEARED_AS], prods_clras)
+        return pdnm, pdgp, clras
+
     def match_prod_code(self, df_adv, ix, encoding='UTF-8'):
         df_matched = pd.DataFrame(columns=list(df_adv.columns) + ix.schema.names())
         with ix.searcher() as searcher:
             prods_pdgps = {s.decode(encoding) for s in searcher.lexicon(self.F_PRODUCT_GROUP)}
             prods_clras = {s.decode(encoding) for s in searcher.lexicon(self.F_CLEARED_AS)}
+            field_pdnm = self.INDEX_FIELDS_CME[self.F_PRODUCT_NAME]
 
             for i, row in df_adv.iterrows():
                 pd_id = (row[self.PRODUCT], row[self.PRODUCT_GROUP], row[self.CLEARED_AS])
-                results = None
+                results, min_dist, one_or_all, pdnm = None, True, None, None
                 if pd_id not in self.CME_NOTFOUND_PRODS:
                     one_or_all = 'all' if pd_id in self.CME_MULTI_MATCH else 'one'
-                    pdnm = self.CME_EXACT_MAPPING[pd_id] if pd_id in self.CME_EXACT_MAPPING else row[self.PRODUCT]
-                    pdgp = dtsp.find_first_n(prods_pdgps, lambda x: self.__match_pdgp(x, row[self.PRODUCT_GROUP]))
-                    clras = self.__verify_clearedas(pdnm, row[self.CLEARED_AS], prods_clras)
+                    pdnm, pdgp, clras = self.__get_query_params(row, pd_id, prods_pdgps, prods_clras)
                     grouping_q = And([Term(self.F_PRODUCT_GROUP, pdgp), Term(self.F_CLEARED_AS, clras)])
-                    query = self.__exact_and_query(self.F_PRODUCT_NAME, ix.schema, pdnm)
-                    results = searcher.search(query, filter=grouping_q, limit=None)
-                    if not results:
-                        query = self.__fuzzy_and_query(self.F_PRODUCT_NAME, ix.schema, pdnm)
+
+                    and_words, or_words = self.__split_query_groups(field_pdnm, pdnm)
+                    if not and_words:
+                        query = self.__exact_and_query(self.F_PRODUCT_NAME, ix.schema, pdnm)
                         results = searcher.search(query, filter=grouping_q, limit=None)
+                        min_dist = True
                         if not results:
-                            query = self.__exact_or_query(self.F_PRODUCT_NAME, ix.schema, row[self.PRODUCT])
+                            query = self.__fuzzy_and_query(self.F_PRODUCT_NAME, ix.schema, pdnm)
                             results = searcher.search(query, filter=grouping_q, limit=None)
+                            min_dist = False
+                            if not results:
+                                query = self.__exact_or_query(self.F_PRODUCT_NAME, ix.schema, pdnm)
+                                results = searcher.search(query, filter=grouping_q, limit=None)
+                                min_dist = True
+                    else:
+                        query = self.__andmaybe_query(self.F_PRODUCT_NAME, and_words, or_words)
+                        results = searcher.search(query, filter=grouping_q, limit=None)
+                        min_dist = True
+                        if not results:
+                            query = self.__fuzzy_and_query(self.F_PRODUCT_NAME, ix.schema, pdnm)
+                            results = searcher.search(query, filter=grouping_q, limit=None)
+                            min_dist = False
 
                 if results:
-                    if one_or_all == 'one':
-                        results = min_dist_rslt(results, pdnm,
-                                                self.F_PRODUCT_NAME,
-                                                self.INDEX_FIELDS_CME[self.F_PRODUCT_NAME],
-                                                minboost=0.2)
+                    if one_or_all == 'one' and min_dist:
+                        results = min_dist_rslt(results, pdnm, self.F_PRODUCT_NAME, field_pdnm, minboost=0.2)
                     rows_matched = self.__join_results(results, row, how=one_or_all)
                 else:
                     rows_matched = row
@@ -420,6 +458,18 @@ class CMEGMatcher(object):
         og = qparser.OrGroup.factory(0.9)
         parser = qparser.QueryParser(field, schema=schema, group=og)
         return parser.parse(text)
+
+    def __split_query_groups(self, field, text, mode='query'):
+        tokens = field.analyzer(text, mode=mode)
+        and_words, maybe_words = [], []
+        for token in tokens:
+            (and_words if token.required else maybe_words).append(token.text)
+        return and_words, maybe_words
+
+    def __andmaybe_query(self, fieldname, and_words, maybe_words):
+        and_terms = And([Term(fieldname, w) for w in and_words])
+        maybe_terms = Or([Term(fieldname, w) for w in maybe_words])
+        return AndMaybe(and_terms, maybe_terms) if and_terms else maybe_terms
 
     def __update_doc(self, ix, doc):
         wrt = ix.writer()
@@ -467,26 +517,24 @@ class CMEGMatcher(object):
         ix_cme, ix_cbot, gdf_exch = self.init_ix_cme_cbot(clean)
         self.match_nymex_comex(dfs_adv[self.NYMEX], gdf_exch)
 
-        # pdgp_cme = set(gdf_exch[self.CME][self.COL2FIELD[self.PRODUCT_GROUP]])
         mdf_cme = self.match_prod_code(dfs_adv[self.CME], ix_cme)
-        # pdgp_cbot = set(gdf_exch[self.CBOT][self.COL2FIELD[self.PRODUCT_GROUP]])
         mdf_cbot = self.match_prod_code(dfs_adv[self.CBOT], ix_cbot)
 
         outpath = self.matched_file if outpath is None else outpath
         cp.XlsxWriter.save_sheets(outpath, {self.CME: mdf_cme, self.CBOT: mdf_cbot}, override=False)
 
 
-# checked_path = os.getcwd()
-#
-# exchanges = ['asx', 'bloomberg', 'cme', 'cbot', 'nymex_comex', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
-# report_fmtname = 'Web_ADV_Report_{}.xlsx'
-#
-# report_files = {e: report_fmtname.format(e.upper()) for e in exchanges}
-#
-# cme_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
-# cme_adv_files = [os.path.join(checked_path, report_files['cme']),
-#                  os.path.join(checked_path, report_files['cbot']),
-#                  os.path.join(checked_path, report_files['nymex_comex'])]
-#
-# cme = CMEGMatcher(cme_adv_files, cme_prds_file, '2017')
-# cme.run_pd_mtch(clean=True)
+checked_path = os.getcwd()
+
+exchanges = ['asx', 'bloomberg', 'cme', 'cbot', 'nymex_comex', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
+report_fmtname = 'Web_ADV_Report_{}.xlsx'
+
+report_files = {e: report_fmtname.format(e.upper()) for e in exchanges}
+
+cme_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
+cme_adv_files = [os.path.join(checked_path, report_files['cme']),
+                 os.path.join(checked_path, report_files['cbot']),
+                 os.path.join(checked_path, report_files['nymex_comex'])]
+
+cme = CMEGMatcher(cme_adv_files, cme_prds_file, '2017')
+cme.run_pd_mtch(clean=True)

@@ -310,16 +310,11 @@ class SpecialWordFilter(Filter):
                         yield set_token(token, **tk._asdict())
                     prev_kws, next_group = self.__clear()
 
-                if tk_cpy.text in next_group:
-                    ismapped = False
-                    prev_kws, next_group = self.__move_down(prev_kws, next_group, tk_cpy)
-                elif tk_cpy.text not in self.word_dict:
-                    ismapped = False
-                    for tk in self.__gen_tokens([tk_cpy], memory, ismapped):
-                        yield set_token(token, **tk._asdict())
-                else:
+                if tk_cpy.text in self.word_dict:
                     mapped_tksubs = self.__mapped_kwtokens(tk_cpy, memory, self.original)
                     try:
+                        last = next(mapped_tksubs)
+                        yield set_token(token, **last._asdict())
                         last = next(mapped_tksubs)
                         for tk in mapped_tksubs:
                             yield set_token(token, **last._asdict())
@@ -331,6 +326,13 @@ class SpecialWordFilter(Filter):
                         ismapped = True
                     except StopIteration:
                         pass
+                elif tk_cpy.text in next_group:
+                    ismapped = False
+                    prev_kws, next_group = self.__move_down(prev_kws, next_group, tk_cpy)
+                else:
+                    ismapped = False
+                    for tk in self.__gen_tokens([tk_cpy], memory, ismapped):
+                        yield set_token(token, **tk._asdict())
 
         if prev_kws and next_group != self.kws_treedict and token is not None:
             trans_tokens = self.__prev_tokens(prev_kws)
@@ -385,40 +387,53 @@ class SpecialWordFilter(Filter):
 
     def __multi_all(self, trans_tokens, memory):
         all_in, all_mapped, all_notmapped = (True,) * 3
+        all_yielded, all_notyielded = (True,) * 2
         for ts_tk in trans_tokens:
             record = (ts_tk.text, ts_tk.boost)
             if record not in memory:
                 all_in, all_mapped, all_notmapped = (False,) * 3
                 break
             else:
-                all_mapped = all_mapped and memory[record]
-                all_notmapped = all_notmapped and not memory[record]
+                all_mapped = all_mapped and memory[record][0]
+                all_notmapped = all_notmapped and not memory[record][0]
+                all_yielded = all_yielded and memory[record][1]
+                all_notyielded = all_notyielded and not memory[record][1]
 
-        return all_in, all_mapped, all_notmapped
+        return all_in, all_mapped, all_notmapped, all_yielded, all_notyielded
 
     def __gen_tokens(self, trans_tokens, memory=None, ismapped=False):
         trans_tokens = dtsp.to_list(trans_tokens)
         if memory is not None:
-            all_in, all_mapped, all_notmapped = self.__multi_all(trans_tokens, memory)
+            all_in, all_mapped, all_notmapped, all_yielded, all_notyielded = self.__multi_all(trans_tokens, memory)
+            to_yield = not all_in or (all_in and
+                                      ((all_mapped and all_notyielded) or
+                                       (all_notmapped and (not ismapped or all_notyielded))))
 
-            if all_in:
-                if all_mapped and not ismapped:
-                    for ts_tk in trans_tokens:
-                        memory[(ts_tk.text, ts_tk.boost)] = ismapped
-                        return iter('')
-                elif all_mapped and ismapped:
-                    for ts_tk in trans_tokens:
-                        memory[(ts_tk.text, ts_tk.boost)] = not ismapped
-                        return iter('')
-                elif all_notmapped and not ismapped:
-                    for ts_tk in trans_tokens:
-                        yield ts_tk
-                else:
-                    return iter('')
-            else:
-                for ts_tk in trans_tokens:
-                    memory.update({(ts_tk.text, ts_tk.boost): ismapped})
+            for ts_tk in trans_tokens:
+                record = (ts_tk.text, ts_tk.boost)
+                if to_yield:
                     yield ts_tk
+
+                memory.update({record: (ismapped, to_yield)})
+
+            # if all_in:
+            #     if all_mapped and not ismapped:
+            #         for ts_tk in trans_tokens:
+            #             memory[(ts_tk.text, ts_tk.boost)] = ismapped
+            #             return iter('')
+            #     elif all_mapped and ismapped:
+            #         for ts_tk in trans_tokens:
+            #             memory[(ts_tk.text, ts_tk.boost)] = not ismapped
+            #             return iter('')
+            #     elif all_notmapped and not ismapped:
+            #         for ts_tk in trans_tokens:
+            #             yield ts_tk
+            #     else:
+            #         return iter('')
+            # else:
+            #     for ts_tk in trans_tokens:
+            #         memory.update({(ts_tk.text, ts_tk.boost): ismapped})
+            #         yield ts_tk
         else:
             for ts_tk in trans_tokens:
                 yield ts_tk
