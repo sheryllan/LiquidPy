@@ -50,6 +50,13 @@ def clear_index(ix):
     wrt.commit(mergetype=writing.CLEAR)
 
 
+def __update_doc(self, ix, doc):
+    wrt = ix.writer()
+    wrt.update_document(**doc)
+    wrt.commit()
+    print(len(list(ix.searcher().documents())))
+
+
 def join_words(words, minlen=2):
     result = ''
     for w in words:
@@ -415,25 +422,6 @@ class SpecialWordFilter(Filter):
                     yield ts_tk
 
                 memory.update({record: (ismapped, to_yield)})
-
-            # if all_in:
-            #     if all_mapped and not ismapped:
-            #         for ts_tk in trans_tokens:
-            #             memory[(ts_tk.text, ts_tk.boost)] = ismapped
-            #             return iter('')
-            #     elif all_mapped and ismapped:
-            #         for ts_tk in trans_tokens:
-            #             memory[(ts_tk.text, ts_tk.boost)] = not ismapped
-            #             return iter('')
-            #     elif all_notmapped and not ismapped:
-            #         for ts_tk in trans_tokens:
-            #             yield ts_tk
-            #     else:
-            #         return iter('')
-            # else:
-            #     for ts_tk in trans_tokens:
-            #         memory.update({(ts_tk.text, ts_tk.boost): ismapped})
-            #         yield ts_tk
         else:
             for ts_tk in trans_tokens:
                 yield ts_tk

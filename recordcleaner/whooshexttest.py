@@ -8,9 +8,11 @@ from whooshext import *
 from whoosh.index import open_dir
 from whoosh.query import *
 from whoosh import qparser
+from whoosh.searching import Searcher
 
 import datascraper as dtsp
 from productmatcher import CMEGMatcher
+from productmatcher import WhooshSnippet
 
 
 class CMEAnalyzerTests(ut.TestCase):
@@ -204,68 +206,66 @@ class CMEAnalyzerTests(ut.TestCase):
     #
     #     self.assertListEqual(expected4, result4)
 
-    def test_ana_query_mode(self):
-        # SPLT_FLT = SplitFilter(delims='[&/\(\)\.-]', splitcase=True, splitnums=True, mergewords=True, mergenums=True)
-        # CME_SP_FLT = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
-        # CME_VW_FLT = VowelFilter(self.CME_KYWRD_EXCLU)
-        # CME_PDNM_ANA = RegexTokenizer('[^\s/]+') | SPLT_FLT
+    # def test_ana_query_mode(self):
+    #     # SPLT_FLT = SplitFilter(delims='[&/\(\)\.-]', splitcase=True, splitnums=True, mergewords=True, mergenums=True)
+    #     # CME_SP_FLT = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
+    #     # CME_VW_FLT = VowelFilter(self.CME_KYWRD_EXCLU)
+    #     # CME_PDNM_ANA = RegexTokenizer('[^\s/]+') | SPLT_FLT
+    #
+    #     # testcase = 'EOW1 E-MINI RUSSELL 2000 WE'
+    #     # result = [t.text for t in CME_PDNM_ANA(testcase, mode='index')]
+    #
+    #     # print(result)
+    #
+    #     F_PRODUCT_NAME = 'Product_Name'
+    #
+    #     ix = open_dir('CME_Product_Index')
+    #     pdnm = 'GBP/USD PQO 2pm Fix'
+    #     field_pdnm = {x[0]: x[1] for x in ix.schema.items()}[F_PRODUCT_NAME]
+    #
+    #
+    #     rcd1 = 'Weekly Premium Quoted European Style Options on British Pound/US Dollar Futures - Wk 3'
+    #     ana = field_pdnm.analyzer
+    #     tks_index = [t.text for t in ana(rcd1, mode='index')]
+    #     print(tks_index)
+    #     # tks_query = [t.text for t in ana(pdnm, mode='query')]
+    #     # print(tks_query)
+    #     and_words, or_words = self.__split_query_groups(field_pdnm, pdnm)
+    #     query = self.__andmaybe_query(F_PRODUCT_NAME, and_words, or_words)
+    #     print(list(query.terms()))
+    #
+    #     with ix.searcher() as searcher:
+    #         results = searcher.search(query)
+    #         if results:
+    #             for r in results:
+    #                 print(r)
 
-        # testcase = 'EOW1 E-MINI RUSSELL 2000 WE'
-        # result = [t.text for t in CME_PDNM_ANA(testcase, mode='index')]
 
-        # print(result)
-
-        F_PRODUCT_NAME = 'Product_Name'
-
-        ix = open_dir('CME_Product_Index')
-        pdnm = 'GBP/USD PQO 2pm Fix'
-        field_pdnm = {x[0]: x[1] for x in ix.schema.items()}[F_PRODUCT_NAME]
-
-
-        rcd1 = 'Weekly Premium Quoted European Style Options on British Pound/US Dollar Futures - Wk 3'
-        ana = field_pdnm.analyzer
-        tks_index = [t.text for t in ana(rcd1, mode='index')]
-        print(tks_index)
-        # tks_query = [t.text for t in ana(pdnm, mode='query')]
-        # print(tks_query)
-        and_words, or_words = self.__split_query_groups(field_pdnm, pdnm)
-        query = self.__andmaybe_query(F_PRODUCT_NAME, and_words, or_words)
-        print(list(query.terms()))
-
+    def test_index_grouping(self):
+        ix = open_dir('CBOT_Product_Index')
+        f_pdgp = CMEGMatcher.F_PRODUCT_GROUP
+        f_clas = CMEGMatcher.F_CLEARED_AS
+        f_sbgp = CMEGMatcher.F_SUB_GROUP
         with ix.searcher() as searcher:
-            results = searcher.search(query)
-            if results:
-                for r in results:
-                    print(r)
+            lexicons = WhooshSnippet.get_idx_lexicon(
+                searcher, f_pdgp, f_clas, **{f_pdgp: f_sbgp})
+            prods_pdgps, prods_clras, prods_subgps = \
+                lexicons[f_pdgp], lexicons[f_clas], lexicons[f_sbgp]
+            print(prods_pdgps)
+            print(prods_clras)
+            print(prods_subgps)
 
-    def __exact_and_query(self, field, schema, text):
-        parser = qparser.QueryParser(field, schema=schema)
-        return parser.parse(text)
+            # results = searcher.search(Every(), groupedby=[F_PRODUCT_GROUP, F_CLEARED_AS])
+            # pdgp_dict = {gp: [searcher.stored_fields(docid) for docid in ids]
+            #              for gp, ids in results.groups(F_PRODUCT_GROUP).items()}
+            # pdgps = list(pdgp_dict.keys())
+            # clas = list(results.groups(F_CLEARED_AS).keys())
+            # subgps = {gp: set([doc[F_SUB_GROUP] for doc in docs]) for gp, docs in pdgp_dict.items()}
+            #
+            # print(pdgps)
+            # print(clas)
+            # print(subgps)
 
-    def __fuzzy_and_query(self, field, schema, text, maxdist=2, prefixlength=1):
-        parser = qparser.QueryParser(field, schema=schema)
-        query = parser.parse(text)
-        fuzzy_terms = And(
-            [FuzzyTerm(f, t, maxdist=maxdist, prefixlength=prefixlength) for f, t in query.iter_all_terms() if
-             len(t) > maxdist])
-        return fuzzy_terms
-
-    def __exact_or_query(self, field, schema, text):
-        og = qparser.OrGroup.factory(0.9)
-        parser = qparser.QueryParser(field, schema=schema, group=og)
-        return parser.parse(text)
-
-    def __split_query_groups(self, field, text, mode='query'):
-        tokens = field.analyzer(text, mode=mode)
-        and_words, maybe_words = [], []
-        for token in tokens:
-            (and_words if token.required else maybe_words).append(token.text)
-        return and_words, maybe_words
-
-    def __andmaybe_query(self, fieldname, and_words, maybe_words):
-        and_terms = And([Term(fieldname, w) for w in and_words])
-        maybe_terms = Or([Term(fieldname, w) for w in maybe_words])
-        return AndMaybe(and_terms, maybe_terms) if and_terms else maybe_terms
 
     # def test_min_dist_rslt(self):
     #     f_pn = 'Product_Name'

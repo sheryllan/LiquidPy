@@ -31,7 +31,7 @@ STOP_LIST = ['and', 'is', 'it', 'an', 'as', 'at', 'have', 'in', 'yet', 'if', 'fr
              'this', 'of', 'will', 'can', 'the', 'or', 'are']
 
 
-class SearchHelper(object):
+class Matcher(object):
     vowels = ('a', 'e', 'i', 'o', 'u')
 
     @staticmethod
@@ -40,7 +40,7 @@ class SearchHelper(object):
 
     @staticmethod
     def get_initials(string):
-        words = SearchHelper.get_words(string)
+        words = Matcher.get_words(string)
         initials = list()
         for word in words:
             if word[0:2].lower() == 'ex':
@@ -54,8 +54,8 @@ class SearchHelper(object):
         if not casesensitive:
             s1 = s1.lower()
             s2 = s2.lower()
-        return ''.join(SearchHelper.get_initials(s1)) == s2 \
-               or ''.join(SearchHelper.get_initials(s2)) == s1
+        return ''.join(Matcher.get_initials(s1)) == s2 \
+               or ''.join(Matcher.get_initials(s2)) == s1
 
     @staticmethod
     def match_first_n(s1, s2, n=2, casesensitive=False):
@@ -84,8 +84,8 @@ class SearchHelper(object):
             s1 = s1.lower()
             s2 = s2.lower()
         p = inflect.engine()
-        words1 = [(w, 1) for w in SearchHelper.get_words(s1)]
-        words2 = [(w, 2) for w in SearchHelper.get_words(s2)]
+        words1 = [(w, 1) for w in Matcher.get_words(s1)]
+        words2 = [(w, 2) for w in Matcher.get_words(s2)]
         if stemming:
             words1 = words1 + [(p.plural(w), 1) for w, i in words1]
         words = set(words1 + words2)
@@ -94,6 +94,69 @@ class SearchHelper(object):
             if len(list(group)) == 2:
                 return True
         return False
+
+
+class WhooshSnippet(object):
+    def __init__(self):
+        self.results = None
+
+    @staticmethod
+    def get_idx_lexicon(searcher, *fds, **kwfds):
+        grouped_docs = searcher.search(Every(), groupedby=fds)
+        lexicons = dict()
+        for fd in fds:
+            gp_dict = {gp: [searcher.stored_fields(docid) for docid in ids]
+                     for gp, ids in grouped_docs.groups(fd).items()}
+            lexicons.update({fd: set(gp_dict.keys())})
+            if fd in kwfds:
+                subfd = kwfds[fd]
+                subgp_dict = {gp: set([doc[subfd] for doc in docs]) for gp, docs in gp_dict.items()}
+                lexicons.update({subfd: subgp_dict})
+        return lexicons
+
+    @staticmethod
+    def exact_and_query(field, schema, text):
+        parser = qparser.QueryParser(field, schema=schema)
+        return parser.parse(text)
+
+    @staticmethod
+    def fuzzy_and_query(field, schema, text, maxdist=2, prefixlength=1):
+        parser = qparser.QueryParser(field, schema=schema)
+        query = parser.parse(text)
+        fuzzy_terms = And(
+            [FuzzyTerm(f, t, maxdist=maxdist, prefixlength=prefixlength) for f, t in query.iter_all_terms() if
+             len(t) > maxdist])
+        return fuzzy_terms
+
+    @staticmethod
+    def exact_or_query(field, schema, text):
+        og = qparser.OrGroup.factory(0.9)
+        parser = qparser.QueryParser(field, schema=schema, group=og)
+        return parser.parse(text)
+
+    @staticmethod
+    def tokenize_split(field, text, keyfunc, mode='query'):
+        tokens = field.analyzer(text, mode=mode)
+        and_words, maybe_words = [], []
+        for token in tokens:
+            (and_words if keyfunc(token) else maybe_words).append(token.text)
+        return and_words, maybe_words
+
+    @staticmethod
+    def andmaybe_query(fieldname, and_words, maybe_words):
+        and_terms = And([Term(fieldname, w) for w in and_words])
+        maybe_terms = Or([Term(fieldname, w) for w in maybe_words])
+        return AndMaybe(and_terms, maybe_terms) if and_terms else maybe_terms
+
+    @staticmethod
+    def filter_query(*args):
+        qterms = list()
+        for arg in args:
+            if all(arg):
+                qterms.append(Term(*arg))
+        return qterms
+
+
 
 
 class CMEGMatcher(object):
@@ -105,6 +168,7 @@ class CMEGMatcher(object):
     NYMEX = 'NYMEX'
     COMEX = 'COMEX'
 
+    # region columns  & fields
     PRODUCT = dtsp.CMEGScraper.PRODUCT
     PRODUCT_GROUP = dtsp.CMEGScraper.PRODUCT_GROUP
     CLEARED_AS = dtsp.CMEGScraper.CLEARED_AS
@@ -127,6 +191,7 @@ class CMEGMatcher(object):
     F_GLOBEX = GLOBEX
     F_SUB_GROUP = 'Sub_Group'
     F_EXCHANGE = EXCHANGE
+    # endregion
 
     # region CME specific
     CME_EXACT_MAPPING = {
@@ -231,12 +296,24 @@ class CMEGMatcher(object):
     CME_KYWRD_EXCLU = {'nasdaq', 'ibovespa', 'index', 'mini', 'micro', 'nikkei', 'russell', 'ftse', 'swap'}
     # endregion
 
-
     # region CBOT specific
+    CBOT_EXACT_MAPPING = {('DOW-UBS COMMOD INDEX', 'Ag Products', 'Futures'): 'Bloomberg Commodity Index Futures',
+                          ('DJ_UBS ROLL SELECT INDEX FU', 'Ag Products', 'Futures'):
+                              'Bloomberg Roll Select Commodity Index Futures',
+                          ('SOYBN NEARBY+2 CAL SPRD', 'Ag Products', 'Options'): 'Consecutive Soybean CSO',
+                          ('WHEAT NEARBY+2 CAL SPRD', 'Ag Products', 'Options'): 'Consecutive Wheat CSO',
+                          ('CORN NEARBY+2 CAL SPRD', 'Ag Products', 'Options'): 'Consecutive Corn CSO',
+                          ('Intercommodity Spread', 'Ag Products', 'Options'): 'KC HRW-Chicago SRW Wheat Intercommodity Spread Options'
+                          }
+
     CBOT_SPECIAL_MAPPING = {'yr': [TokenSub('year', 1, True, True)],
                             'fed': [TokenSub('federal', 1.5, True, False)],
                             't': [TokenSub('treasury', 1, True, True)],
                             'dj': [TokenSub('dow', 1, True, True), TokenSub('jones', 1, True, True)],
+                            'cso': [TokenSub('calendar', 1.5, True, True), TokenSub('spread', 1, True, False)],
+                            'cal': [TokenSub('calendar', 1.5, True, True)],
+                            'hrw': [TokenSub('hr', 1.5, True, True), TokenSub('wheat', 1.5, True, True)],
+                            'icso': [TokenSub('intercommodity', 1.5, True, True), TokenSub('spread', 1, True, True)],
                             }
 
 
@@ -246,20 +323,23 @@ class CMEGMatcher(object):
                         ('FED FUND', 'Interest Rate', 'Options'),
                         ('ULTRA T-BOND', 'Interest Rate', 'Options'),
                         ('Ultra 10-Year Note', 'Interest Rate', 'Options'),
+                        ('FERTILIZER PRODUCS', 'Ag Products', 'Futures'),
+                        ('DEC-JULY WHEAT CAL SPRD', 'Ag Products', 'Options'),
+                        ('JULY-DEC WHEAT CAL SPRD', 'Ag Products', 'Options'),
+                        ('MAR-JULY WHEAT CAL SPRD', 'Ag Products', 'Options'),
+                        ('Intercommodity Spread', 'Ag Products', 'Options')
                         ]
 
+    CBOT_COMMON_WORDS = ['futures', 'future', 'options', 'option']
 
     # endregion
 
-
-
-
     REGTK_EXP = '[^\s/\(\)]+'
-
     REGEX_TKN = RegexTokenizerExtra(REGTK_EXP, ignored=False, required=False)
     SPLT_MRG_FLT = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True)
     LWRCS_FLT = LowercaseFilter()
 
+    # region CME index settings
     CME_STP_FLT = StopFilter(stoplist=STOP_LIST + CME_COMMON_WORDS, minsize=1)
     CME_SP_FLT = SpecialWordFilter(CME_KEYWORD_MAPPING)
     CME_VW_FLT = VowelFilter(CME_KYWRD_EXCLU)
@@ -267,20 +347,31 @@ class CMEGMatcher(object):
 
     CME_PDNM_ANA = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_STP_FLT | CME_SP_FLT | CME_MULT_FLT | CME_STP_FLT
     INDEX_FIELDS_CME = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=CME_PDNM_ANA),
-                        F_PRODUCT_GROUP: ID(stored=True),
+                        F_PRODUCT_GROUP: ID(stored=True, unique=True),
                         F_CLEARED_AS: ID(stored=True, unique=True),
                         F_CLEARING: ID(stored=True, unique=True),
                         F_GLOBEX: ID(stored=True, unique=True),
-                        F_SUB_GROUP: TEXT(stored=True, analyzer=SimpleAnalyzer()),
+                        F_SUB_GROUP: ID(stored=True, unique=True),
                         F_EXCHANGE: ID}
+    # endregion
 
-    INDEX_FIELDS_CBOT = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=CME_PDNM_ANA),
-                         F_PRODUCT_GROUP: ID(stored=True),
+    # region cbot index settings
+    CBOT_STP_FLT = StopFilter(stoplist=STOP_LIST + CBOT_COMMON_WORDS, minsize=1)
+    CBOT_SP_FLT = SpecialWordFilter(CBOT_SPECIAL_MAPPING)
+    CBOT_VW_FLT = VowelFilter()
+    CBOT_MULT_FLT = MultiFilterFixed(index=CBOT_VW_FLT)
+
+    CBOT_PDNM_ANA = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CBOT_STP_FLT | CBOT_SP_FLT | CBOT_VW_FLT | CBOT_STP_FLT
+
+    INDEX_FIELDS_CBOT = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=CBOT_PDNM_ANA),
+                         F_PRODUCT_GROUP: ID(stored=True, unique=True),
                          F_CLEARED_AS: ID(stored=True, unique=True),
                          F_CLEARING: ID(stored=True, unique=True),
                          F_GLOBEX: ID(stored=True, unique=True),
-                         F_SUB_GROUP: TEXT(stored=True, analyzer=SimpleAnalyzer()),
+                         F_SUB_GROUP: ID(stored=True, unique=True),
                          F_EXCHANGE: ID}
+
+    # endregion
 
     COL2FIELD = {PRODUCT_NAME: F_PRODUCT_NAME,
                  PRODUCT_GROUP: F_PRODUCT_GROUP,
@@ -352,41 +443,51 @@ class CMEGMatcher(object):
             return group_dict
 
     def __match_pdgp(self, s1, s2):
-        wds1 = SearchHelper.get_words(s1)
-        wds2 = SearchHelper.get_words(s2)
+        wds1 = Matcher.get_words(s1)
+        wds2 = Matcher.get_words(s2)
         if len(wds1) == 1 and len(wds2) == 1:
-            return s1 == s2 or SearchHelper.match_sgl_plrl(wds1[0], wds2[0]) \
-                   or SearchHelper.match_first_n(wds1[0], wds2[0])
+            return s1 == s2 or Matcher.match_sgl_plrl(wds1[0], wds2[0]) \
+                   or Matcher.match_first_n(wds1[0], wds2[0])
         else:
-            return s1 == s2 or SearchHelper.match_any_word(s1, s2) \
-                   or SearchHelper.match_initials(s1, s2) or SearchHelper.match_first_n(s1, s2)
+            return s1 == s2 or Matcher.match_any_word(s1, s2) \
+                   or Matcher.match_initials(s1, s2) or Matcher.match_first_n(s1, s2)
 
-    def __find_clearedas(self, guess, indexed):
+    def __match_clearedas(self, guess, indexed):
         guess = guess.lower()
         p = inflect.engine()
         for idx in indexed:
             matched = any(i in guess if len(i) < 3 else i in guess or p.plural(i) in guess
-                          for i in SearchHelper.get_words(idx.lower()))
+                          for i in Matcher.get_words(idx.lower()))
             if matched:
                 return idx
         return None
 
     def __verify_clearedas(self, prodname, row_clras, clras_set):
-        clras = SearchHelper.get_words(prodname)[-1]
-        found_clras = self.__find_clearedas(clras, clras_set)
+        clras = Matcher.get_words(prodname)[-1]
+        found_clras = self.__match_clearedas(clras, clras_set)
         return found_clras if found_clras is not None else row_clras
 
-    def __get_query_params(self, row, pd_id, prods_pdgps, prods_clras):
+    def __match_subgp(self, subgps, pdnm):
+        for sgp in subgps:
+            if sgp in pdnm:
+                return sgp
+        return None
+
+    def __get_query_params(self, row, pd_id, prods_pdgps, prods_clras, prods_subgps):
         pdnm = self.CME_EXACT_MAPPING[pd_id] if pd_id in self.CME_EXACT_MAPPING else row[self.PRODUCT]
         pdgp = dtsp.find_first_n(prods_pdgps, lambda x: self.__match_pdgp(x, row[self.PRODUCT_GROUP]))
         clras = self.__verify_clearedas(pdnm, row[self.CLEARED_AS], prods_clras)
-        return pdnm, pdgp, clras
+        subgp = self.__match_subgp(prods_subgps, pdnm)
+        return pdnm, pdgp, clras, subgp
 
-    def match_prod_code(self, df_adv, ix, encoding='UTF-8'):
+    def match_prod_code(self, df_adv, ix):
         df_matched = pd.DataFrame(columns=list(df_adv.columns) + ix.schema.names())
         with ix.searcher() as searcher:
-            prods_pdgps = {s.decode(encoding) for s in searcher.lexicon(self.F_PRODUCT_GROUP)}
-            prods_clras = {s.decode(encoding) for s in searcher.lexicon(self.F_CLEARED_AS)}
+            lexicons = WhooshSnippet.get_idx_lexicon(
+                searcher, self.F_PRODUCT_GROUP, self.F_CLEARED_AS, **{self.F_PRODUCT_GROUP: self.F_SUB_GROUP})
+            prods_pdgps, prods_clras, prods_subgps = \
+                lexicons[self.F_PRODUCT_GROUP], lexicons[self.F_CLEARED_AS], lexicons[self.F_SUB_GROUP]
+
             field_pdnm = self.INDEX_FIELDS_CME[self.F_PRODUCT_NAME]
 
             for i, row in df_adv.iterrows():
@@ -394,11 +495,15 @@ class CMEGMatcher(object):
                 results, min_dist, one_or_all, pdnm = None, True, None, None
                 if pd_id not in self.CME_NOTFOUND_PRODS:
                     one_or_all = 'all' if pd_id in self.CME_MULTI_MATCH else 'one'
-                    pdnm, pdgp, clras = self.__get_query_params(row, pd_id, prods_pdgps, prods_clras)
-                    grouping_q = And([Term(self.F_PRODUCT_GROUP, pdgp), Term(self.F_CLEARED_AS, clras)])
+                    pdnm, pdgp, clras, subgp = self.__get_query_params(row, pd_id, prods_pdgps, prods_clras, prods_subgps)
 
-                    and_words, or_words = self.__split_query_groups(field_pdnm, pdnm)
+                    grouping_q = WhooshSnippet.filter_query(
+                        (self.F_PRODUCT_GROUP, pdgp), (self.F_CLEARED_AS, clras), (self.F_SUB_GROUP, subgp))
+                    and_words, or_words = WhooshSnippet.tokenize_split(field_pdnm, pdnm, lambda x: x.required)
+
                     if not and_words:
+
+
                         query = self.__exact_and_query(self.F_PRODUCT_NAME, ix.schema, pdnm)
                         results = searcher.search(query, filter=grouping_q, limit=None)
                         min_dist = True
@@ -442,42 +547,8 @@ class CMEGMatcher(object):
                     jd.update(df)
         return joined_dict
 
-    def __exact_and_query(self, field, schema, text):
-        parser = qparser.QueryParser(field, schema=schema)
-        return parser.parse(text)
 
-    def __fuzzy_and_query(self, field, schema, text, maxdist=2, prefixlength=1):
-        parser = qparser.QueryParser(field, schema=schema)
-        query = parser.parse(text)
-        fuzzy_terms = And(
-            [FuzzyTerm(f, t, maxdist=maxdist, prefixlength=prefixlength) for f, t in query.iter_all_terms() if
-             len(t) > maxdist])
-        return fuzzy_terms
-
-    def __exact_or_query(self, field, schema, text):
-        og = qparser.OrGroup.factory(0.9)
-        parser = qparser.QueryParser(field, schema=schema, group=og)
-        return parser.parse(text)
-
-    def __split_query_groups(self, field, text, mode='query'):
-        tokens = field.analyzer(text, mode=mode)
-        and_words, maybe_words = [], []
-        for token in tokens:
-            (and_words if token.required else maybe_words).append(token.text)
-        return and_words, maybe_words
-
-    def __andmaybe_query(self, fieldname, and_words, maybe_words):
-        and_terms = And([Term(fieldname, w) for w in and_words])
-        maybe_terms = Or([Term(fieldname, w) for w in maybe_words])
-        return AndMaybe(and_terms, maybe_terms) if and_terms else maybe_terms
-
-    def __update_doc(self, ix, doc):
-        wrt = ix.writer()
-        wrt.update_document(**doc)
-        wrt.commit()
-        print(len(list(ix.searcher().documents())))
-
-    def __get_mtched_prods_by_cmmd(self, df_prods, df_adv):
+    def __match_prods_by_commodity(self, df_prods, df_adv):
         prod_dict = {str(row[self.GLOBEX]): row for _, row in df_prods.iterrows()}
         prod_dict.update({str(row[self.CLEARING]): row for _, row in df_prods.iterrows()})
         matched_rows = [{**row, **prod_dict[str(row[self.COMMODITY])]} for _, row in df_adv.iterrows()
@@ -506,7 +577,7 @@ class CMEGMatcher(object):
         df_nymex_comex_prods.reset_index(drop=True, inplace=True)
         if 'index' in df_nymex_comex_prods.columns:
             df_nymex_comex_prods.drop(['index'], axis=1, inplace=True)
-        df_adv = self.__get_mtched_prods_by_cmmd(df_nymex_comex_prods, df_adv)
+        df_adv = self.__match_prods_by_commodity(df_nymex_comex_prods, df_adv)
         cp.XlsxWriter.save_sheets(self.matched_file, {self.NYMEX: df_adv}, override=True)
 
     def run_pd_mtch(self, outpath=None, clean=False):
@@ -524,17 +595,17 @@ class CMEGMatcher(object):
         cp.XlsxWriter.save_sheets(outpath, {self.CME: mdf_cme, self.CBOT: mdf_cbot}, override=False)
 
 
-checked_path = os.getcwd()
-
-exchanges = ['asx', 'bloomberg', 'cme', 'cbot', 'nymex_comex', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
-report_fmtname = 'Web_ADV_Report_{}.xlsx'
-
-report_files = {e: report_fmtname.format(e.upper()) for e in exchanges}
-
-cme_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
-cme_adv_files = [os.path.join(checked_path, report_files['cme']),
-                 os.path.join(checked_path, report_files['cbot']),
-                 os.path.join(checked_path, report_files['nymex_comex'])]
-
-cme = CMEGMatcher(cme_adv_files, cme_prds_file, '2017')
-cme.run_pd_mtch(clean=True)
+# checked_path = os.getcwd()
+#
+# exchanges = ['asx', 'bloomberg', 'cme', 'cbot', 'nymex_comex', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
+# report_fmtname = 'Web_ADV_Report_{}.xlsx'
+#
+# report_files = {e: report_fmtname.format(e.upper()) for e in exchanges}
+#
+# cme_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
+# cme_adv_files = [os.path.join(checked_path, report_files['cme']),
+#                  os.path.join(checked_path, report_files['cbot']),
+#                  os.path.join(checked_path, report_files['nymex_comex'])]
+#
+# cme = CMEGMatcher(cme_adv_files, cme_prds_file, '2017')
+# cme.run_pd_mtch(clean=True)
