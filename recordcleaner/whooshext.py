@@ -7,6 +7,7 @@ from collections import namedtuple
 from collections import OrderedDict
 from collections import Mapping
 from collections import deque
+import copy
 
 from whoosh.fields import *
 from whoosh.analysis import *
@@ -71,34 +72,21 @@ def join_words(words, minlen=2):
         yield result
 
 
-def merge_lists(*args):
-    len_iter = len(args[0])
-    if any(len(arg) != len_iter for arg in args):
-        warnings.warn('Merging iterables of different length')
-    for items in zip(*args):
-        yielded = set()
-        for item in items:
-            if item not in yielded:
-                yielded.add(item)
-                yield item
-
-
-def slice_last(iterable):
-    it = iter(iterable)
-    try:
-        current = next(it)
-        for i in it:
-            yield current
-            current = i
-        return current
-    except StopIteration:
-        return iterable
-
-
 def set_token(token, **kwargs):
     for k, v in kwargs.items():
         setattr(token, k, v)
     return token
+
+
+def update_tksub(tksub_old, tksub_new, boostfunc=None):
+    text = tksub_new.text
+    if text != tksub_old.text:
+        return tksub_new
+    else:
+        boost = boostfunc(tksub_old.boost, tksub_new.boost) if boostfunc else tksub_new.boost
+        ignored = tksub_old.ignored or tksub_new.ignored
+        required = tksub_old.required or tksub_new.required
+        return TokenSub(text, boost, ignored, required)
 
 
 def last_indexof(items, target):
@@ -155,10 +143,9 @@ TokenSub = namedtuple_with_defaults('TokenSub', ['text', 'boost', 'ignored', 're
 class VowelFilter(Filter):
     VOWELS = ('a', 'e', 'i', 'o', 'u')
 
-    def __init__(self, exclusions=list(), weight=0.2, ignore=True, lift_ignore=True, original=True):
+    def __init__(self, exclusions=list(), weight=0.2, lift_ignore=True, original=True):
         self.exclusions = exclusions
         self.weight = weight
-        self.ignore = ignore
         self.lift_ignore = lift_ignore
         self.original = original
 
@@ -306,10 +293,12 @@ class SpecialWordFilter(Filter):
         ismapped = False
         for token in stream:
             tk_cpy = TokenSub(token.text, token.boost, token.ignored, token.required)
+            if self.original:
+                memory.update({tk_cpy: (False, True)})
+                yield token
 
             if tk_cpy.text in next_group:
                 prev_kws, next_group = self.__move_down(prev_kws, next_group, tk_cpy)
-
             else:
                 if prev_kws and next_group != self.kws_treedict:
                     trans_tokens = self.__prev_tokens(prev_kws)
@@ -318,46 +307,61 @@ class SpecialWordFilter(Filter):
                     prev_kws, next_group = self.__clear()
 
                 if tk_cpy.text in self.word_dict:
-                    mapped_tksubs = self.__mapped_kwtokens(tk_cpy, memory, self.original)
-                    try:
-                        last = next(mapped_tksubs)
-                        yield set_token(token, **last._asdict())
-                        last = next(mapped_tksubs)
-                        for tk in mapped_tksubs:
-                            yield set_token(token, **last._asdict())
-                            last = tk
-                        if last.text in next_group:
-                            prev_kws, next_group = self.__move_down(prev_kws, next_group, last)
-                        else:
-                            yield set_token(token, **last._asdict())
-                        ismapped = True
-                    except StopIteration:
-                        pass
+                    ismapped = True
+                    mapped_tksubs = self.__mapped_kwtokens(tk_cpy)
+                    last = mapped_tksubs[-1]
+                    if last.text in next_group:
+                        prev_kws.extend(mapped_tksubs)
+                        next_group = self.__update_treedict(next_group, mapped_tksubs)
+                    else:
+                        for tk in self.__gen_tokens(mapped_tksubs, memory, ismapped):
+                            yield set_token(token, **tk._asdict())
                 elif tk_cpy.text in next_group:
                     ismapped = False
                     prev_kws, next_group = self.__move_down(prev_kws, next_group, tk_cpy)
                 else:
                     ismapped = False
-                    for tk in self.__gen_tokens([tk_cpy], memory, ismapped):
-                        yield set_token(token, **tk._asdict())
+                    memory.update({tk_cpy: (ismapped, True)})
+                    yield set_token(token, **tk_cpy._asdict())
 
         if prev_kws and next_group != self.kws_treedict and token is not None:
             trans_tokens = self.__prev_tokens(prev_kws)
             for tk in self.__gen_tokens(trans_tokens, memory, ismapped):
                 yield set_token(token, **tk._asdict())
 
-    def __mapped_kwtokens(self, tk_cpy, memory=None, original=False):
-        if original:
-            for tk in self.__gen_tokens([tk_cpy], memory):
-                yield tk
+    def __update_treedict(self, treedict, to_append):
+        child = treedict[to_append[-1].text]
+        dict_toupdate = treedict
+        for item in to_append:
+            dict_toupdate = dict_toupdate[item.text]
+        dict_toupdate.update(self.__get_extended_treedict(child, to_append))
+        return dict_toupdate
+
+    def __get_extended_treedict(self, treedict, tokens):
+
+        def update_rcrs(value, items):
+            if not isinstance(value, dict) and isinstance(value, list):
+                item_list = dtsp.to_list(items)
+                return item_list + [v for v in value if v not in item_list]
+
+            for k, v in value.items():
+                new_val = update_rcrs(v, items)
+                if new_val:
+                    value.update({k: new_val})
+
+        new_trdict = copy.deepcopy(treedict)
+        update_rcrs(new_trdict, tokens)
+        return new_trdict
+
+    def __mapped_kwtokens(self, tk_cpy):
+        if not isinstance(tk_cpy, TokenSub):
+            raise TypeError('The first argument must be of type TokenSub')
 
         values = dtsp.to_list(self.word_dict[tk_cpy.text])
-        tks = (TokenSub(tk.text, val.boost * tk_cpy.boost,
+        return [TokenSub(tk.text, val.boost * tk_cpy.boost,
                         val.ignored or tk_cpy.ignored,
                         val.required or tk_cpy.required)
-               for val in values for tk in self.tokenizer(val.text))
-        for tk in self.__gen_tokens(tks, memory, True):
-            yield tk
+               for val in values for tk in self.tokenizer(val.text)]
 
     def __move_down(self, prev_kws, next_group, token):
         prev_kws.append(token)
@@ -366,14 +370,15 @@ class SpecialWordFilter(Filter):
             prev_kws.append(None)
         return prev_kws, next_group
 
-    def __prev_tokens(self, prev_kws):
+    def __prev_tokens(self, prev_kws, ismapped=False):
         if not prev_kws:
             return prev_kws
         last_idx = last_indexof(prev_kws, None)
         trans_tokens = prev_kws
         if last_idx is not None:
-            longest_kwtokens = merge_lists(self.__longest_kwtokens(prev_kws[0: last_idx], True)) \
-                if self.original else self.__longest_kwtokens(prev_kws[0: last_idx])
+            longest_kwtokens = self.__longest_kwtokens(prev_kws[0: last_idx], not ismapped)
+            longest_kwtokens = longest_kwtokens if ismapped \
+                else [update_tksub(to, tn, lambda x1, x2: x1 * x2) for to, tn in zip(*longest_kwtokens)]
             trans_tokens = longest_kwtokens + prev_kws[last_idx + 1:]
         return trans_tokens
 
@@ -396,7 +401,7 @@ class SpecialWordFilter(Filter):
         all_in, all_mapped, all_notmapped = (True,) * 3
         all_yielded, all_notyielded = (True,) * 2
         for ts_tk in trans_tokens:
-            record = (ts_tk.text, ts_tk.boost)
+            record = TokenSub(ts_tk.text, ts_tk.boost, ts_tk.ignored, ts_tk.required)
             if record not in memory:
                 all_in, all_mapped, all_notmapped = (False,) * 3
                 break
@@ -417,7 +422,7 @@ class SpecialWordFilter(Filter):
                                        (all_notmapped and (not ismapped or all_notyielded))))
 
             for ts_tk in trans_tokens:
-                record = (ts_tk.text, ts_tk.boost)
+                record = TokenSub(ts_tk.text, ts_tk.boost, ts_tk.ignored, ts_tk.required)
                 if to_yield:
                     yield ts_tk
 
@@ -541,6 +546,23 @@ class TreeMap(object):
 
         return get_items_recursive(head, [])
 
+
+class AdvSearch(object):
+    def __init__(self, searcher):
+        self.searcher = searcher
+        self.results = None
+
+    def chain_search(self, query, init=False, callback=None, **kwargs):
+        if init:
+            self.results = None
+
+        if not self.results:
+            self.results = self.searcher.search(query, **kwargs)
+            if callback:
+                callback()
+
+        return self
+
 # region unused codes
 
 # class CompositeFilter(Filter):
@@ -583,6 +605,29 @@ class TreeMap(object):
 #         def __init__(self, data=None, children=None):
 #             self.data = data
 #             self.children = children
+
+# def merge_lists(*args):
+#     len_iter = len(args[0])
+#     if any(len(arg) != len_iter for arg in args):
+#         warnings.warn('Merging iterables of different length')
+#     for items in zip(*args):
+#         yielded = set()
+#         for item in items:
+#             if item not in yielded:
+#                 yielded.add(item)
+#                 yield item
+#
+#
+# def slice_last(iterable):
+#     it = iter(iterable)
+#     try:
+#         current = next(it)
+#         for i in it:
+#             yield current
+#             current = i
+#         return current
+#     except StopIteration:
+#         return iterable
 
 # endregion
 

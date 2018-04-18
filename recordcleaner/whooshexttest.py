@@ -167,7 +167,7 @@ class CMEAnalyzerTests(ut.TestCase):
     #     testcase7 = 'Chilean Peso/US Dollar (CLP/American Dollar) Futures'
     #     testcase8 = '(CLP/USD) Chilean Peso/US Dollar American'
     #     # testcase9 = 'EURO MIDCURVE'
-    #     testcase9 = 'BRAZIL REAL'
+    #     # testcase9 = 'BRAZIL REAL'
     #
     #     # result1 = [t.text for t in ana(testcase1)]
     #     # result2 = [t.text for t in ana(testcase2)]
@@ -175,17 +175,17 @@ class CMEAnalyzerTests(ut.TestCase):
     #     # result4 = [t.text for t in ana(testcase4, mode='index')]
     #     # result5 = [t.text for t in ana(testcase5, mode='index')]
     #     # result6 = [t.text for t in ana(testcase6, mode='index')]
-    #     # result7 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase7, mode='index')]
-    #     # result8 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase8, mode='index')]
+    #     result7 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase7, mode='index')]
+    #     result8 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase8, mode='index')]
     #
-    #     result9 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase9, mode='query')]
+    #     # result9 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase9, mode='query')]
     #
     #
     #     # print(result6)
     #     # print(result5)
-    #     # print(result7)
-    #     # print(result8)
-    #     print(result9)
+    #     print(result7)
+    #     print(result8)
+    #     # print(result9)
     #     # print(result4)
     #     # expected1 = ['e', 'micro', 'emicro', 'aud', 'australian', 'dollar', 'usd', 'us', 'american', 'dollar']
     #     # expected4 = ['e', 'mini', 'emini', 'nasdaq', 'biotechnology', 'btchnlgy', 'index']
@@ -206,65 +206,77 @@ class CMEAnalyzerTests(ut.TestCase):
     #
     #     self.assertListEqual(expected4, result4)
 
-    # def test_ana_query_mode(self):
-    #     # SPLT_FLT = SplitFilter(delims='[&/\(\)\.-]', splitcase=True, splitnums=True, mergewords=True, mergenums=True)
-    #     # CME_SP_FLT = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
-    #     # CME_VW_FLT = VowelFilter(self.CME_KYWRD_EXCLU)
-    #     # CME_PDNM_ANA = RegexTokenizer('[^\s/]+') | SPLT_FLT
-    #
-    #     # testcase = 'EOW1 E-MINI RUSSELL 2000 WE'
-    #     # result = [t.text for t in CME_PDNM_ANA(testcase, mode='index')]
-    #
-    #     # print(result)
-    #
-    #     F_PRODUCT_NAME = 'Product_Name'
-    #
-    #     ix = open_dir('CME_Product_Index')
-    #     pdnm = 'GBP/USD PQO 2pm Fix'
-    #     field_pdnm = {x[0]: x[1] for x in ix.schema.items()}[F_PRODUCT_NAME]
-    #
-    #
-    #     rcd1 = 'Weekly Premium Quoted European Style Options on British Pound/US Dollar Futures - Wk 3'
-    #     ana = field_pdnm.analyzer
-    #     tks_index = [t.text for t in ana(rcd1, mode='index')]
-    #     print(tks_index)
-    #     # tks_query = [t.text for t in ana(pdnm, mode='query')]
-    #     # print(tks_query)
-    #     and_words, or_words = self.__split_query_groups(field_pdnm, pdnm)
-    #     query = self.__andmaybe_query(F_PRODUCT_NAME, and_words, or_words)
-    #     print(list(query.terms()))
-    #
-    #     with ix.searcher() as searcher:
-    #         results = searcher.search(query)
-    #         if results:
-    #             for r in results:
-    #                 print(r)
+    def test_ana_query_mode(self):
+        # SPLT_FLT = SplitFilter(delims='[&/\(\)\.-]', splitcase=True, splitnums=True, mergewords=True, mergenums=True)
+        # CME_SP_FLT = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
+        # CME_VW_FLT = VowelFilter(self.CME_KYWRD_EXCLU)
+        # CME_PDNM_ANA = RegexTokenizer('[^\s/]+') | SPLT_FLT
 
+        # testcase = 'EOW1 E-MINI RUSSELL 2000 WE'
+        # result = [t.text for t in CME_PDNM_ANA(testcase, mode='index')]
 
-    def test_index_grouping(self):
-        ix = open_dir('CBOT_Product_Index')
-        f_pdgp = CMEGMatcher.F_PRODUCT_GROUP
-        f_clas = CMEGMatcher.F_CLEARED_AS
-        f_sbgp = CMEGMatcher.F_SUB_GROUP
+        # print(result)
+
+        F_PRODUCT_NAME = 'Product_Name'
+
+        ix = open_dir('CME_Product_Index')
+        field_pdnm = {x[0]: x[1] for x in ix.schema.items()}[F_PRODUCT_NAME]
+
+        pdnm1 = 'GBP/USD PQO 2pm Fix'
+        pdnm2 = 'E-MINI EURO FX'
+
+        rcd1 = 'Weekly Premium Quoted European Style Options on British Pound/US Dollar Futures - Wk 3'
+        rcd2 = 'E-mini Euro FX Futures'
+
+        ana = field_pdnm.analyzer
+        tks2_index = [(t.text, t.boost, t.ignored, t.required) for t in ana(rcd2, mode='index')]
+        tks2_query = [(t.text, t.boost, t.ignored, t.required) for t in ana(pdnm2, mode='query')]
+        print(tks2_index)
+        print(tks2_query)
+        # tks_query = [t.text for t in ana(pdnm, mode='query')]
+        # print(tks_query)
+        # and_words, or_words = WhooshSnippet.tokenize_split(field_pdnm, pdnm1, lambda x: x.required)
+        # query = WhooshSnippet.andmaybe_query(F_PRODUCT_NAME, and_words, or_words)
+        # with ix.searcher() as searcher:
+        #     results = searcher.search(query)
+        #     if results:
+        #         for r in results:
+        #             print(r)
+
+        and_words2, or_words2 = WhooshSnippet.tokenize_split(field_pdnm, pdnm2, lambda x: x.required)
+        query2 = WhooshSnippet.andmaybe_query(F_PRODUCT_NAME, and_words2, or_words2)
+
         with ix.searcher() as searcher:
-            lexicons = WhooshSnippet.get_idx_lexicon(
-                searcher, f_pdgp, f_clas, **{f_pdgp: f_sbgp})
-            prods_pdgps, prods_clras, prods_subgps = \
-                lexicons[f_pdgp], lexicons[f_clas], lexicons[f_sbgp]
-            print(prods_pdgps)
-            print(prods_clras)
-            print(prods_subgps)
+            results = searcher.search(query2)
+            if results:
+                for r in results:
+                    print(r)
 
-            # results = searcher.search(Every(), groupedby=[F_PRODUCT_GROUP, F_CLEARED_AS])
-            # pdgp_dict = {gp: [searcher.stored_fields(docid) for docid in ids]
-            #              for gp, ids in results.groups(F_PRODUCT_GROUP).items()}
-            # pdgps = list(pdgp_dict.keys())
-            # clas = list(results.groups(F_CLEARED_AS).keys())
-            # subgps = {gp: set([doc[F_SUB_GROUP] for doc in docs]) for gp, docs in pdgp_dict.items()}
-            #
-            # print(pdgps)
-            # print(clas)
-            # print(subgps)
+
+    # def test_index_grouping(self):
+    #     ix = open_dir('CBOT_Product_Index')
+    #     f_pdgp = CMEGMatcher.F_PRODUCT_GROUP
+    #     f_clas = CMEGMatcher.F_CLEARED_AS
+    #     f_sbgp = CMEGMatcher.F_SUB_GROUP
+    #     with ix.searcher() as searcher:
+    #         lexicons = WhooshSnippet.get_idx_lexicon(
+    #             searcher, f_pdgp, f_clas, **{f_pdgp: f_sbgp})
+    #         prods_pdgps, prods_clras, prods_subgps = \
+    #             lexicons[f_pdgp], lexicons[f_clas], lexicons[f_sbgp]
+    #         print(prods_pdgps)
+    #         print(prods_clras)
+    #         print(prods_subgps)
+    #
+    #         # results = searcher.search(Every(), groupedby=[F_PRODUCT_GROUP, F_CLEARED_AS])
+    #         # pdgp_dict = {gp: [searcher.stored_fields(docid) for docid in ids]
+    #         #              for gp, ids in results.groups(F_PRODUCT_GROUP).items()}
+    #         # pdgps = list(pdgp_dict.keys())
+    #         # clas = list(results.groups(F_CLEARED_AS).keys())
+    #         # subgps = {gp: set([doc[F_SUB_GROUP] for doc in docs]) for gp, docs in pdgp_dict.items()}
+    #         #
+    #         # print(pdgps)
+    #         # print(clas)
+    #         # print(subgps)
 
 
     # def test_min_dist_rslt(self):

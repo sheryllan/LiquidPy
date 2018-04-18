@@ -124,8 +124,9 @@ class WhooshSnippet(object):
         parser = qparser.QueryParser(field, schema=schema)
         query = parser.parse(text)
         fuzzy_terms = And(
-            [FuzzyTerm(f, t, maxdist=maxdist, prefixlength=prefixlength) for f, t in query.iter_all_terms() if
-             len(t) > maxdist])
+            [FuzzyTerm(f, t, maxdist=maxdist, prefixlength=prefixlength)
+             if len(t) > maxdist else Term(f, t) for f, t in query.iter_all_terms()])
+
         return fuzzy_terms
 
     @staticmethod
@@ -154,7 +155,7 @@ class WhooshSnippet(object):
         for arg in args:
             if all(arg):
                 qterms.append(Term(*arg))
-        return qterms
+        return And(qterms)
 
 
 
@@ -229,12 +230,12 @@ class CMEGMatcher(object):
                        'euro': [TokenSub('euro', 1.5, True, True)],
                        'jpy': [TokenSub('japanese', 1.5, True, True), TokenSub('yen', 1.5, True, True)],
                        'nzd': [TokenSub('new', 1.5, True, True), TokenSub('zealand', 1.5, True, True),
-                             TokenSub('dollar', 1, True, True)],
+                               TokenSub('dollar', 1, True, True)],
                        'nkr': [TokenSub('norwegian', 1.5, True, True), TokenSub('krone', 1.5, True, True)],
                        'sek': [TokenSub('swedish', 1.5, True, True), TokenSub('krona', 1.5, True, True)],
                        'chf': [TokenSub('swiss', 1.5, True, True), TokenSub('franc', 1.5, True, True)],
                        'zar': [TokenSub('south', 1.5, True, True), TokenSub('african', 1.5, True, True),
-                              TokenSub('rand', 1.5, True, True)],
+                               TokenSub('rand', 1.5, True, True)],
                        'pln': [TokenSub('polish', 1.5, True, True), TokenSub('zloty', 1.5, True, True)],
                        'inr': [TokenSub('indian', 1.5, True, True), TokenSub('rupee', 1.5, True, True)],
                        'rmb': [TokenSub('chinese', 1.5, True, True), TokenSub('renminbi', 1.5, True, True)],
@@ -248,8 +249,10 @@ class CMEGMatcher(object):
     CRRNCY_MAPPING = {'ad': CRRNCY_TOKENSUB['aud'],
                       'bp': CRRNCY_TOKENSUB['gbp'],
                       'cd': CRRNCY_TOKENSUB['cad'],
-                      'ec': CRRNCY_TOKENSUB['euro'] + [TokenSub('cross', 0.5, True, False), TokenSub('rates', 0.5, True, False)],
-                      'efx': CRRNCY_TOKENSUB['euro'] + [TokenSub('fx', 0.8, True, False)],
+                      'ec': CRRNCY_TOKENSUB['euro'] +
+                            [TokenSub('cross', 0.5, True, False), TokenSub('rates', 0.5, True, False)],
+                      'efx': CRRNCY_TOKENSUB['euro'] +
+                             [TokenSub('fx', 0.8, True, False)],
                       'jy': CRRNCY_TOKENSUB['jpy'],
                       'jpy': CRRNCY_TOKENSUB['jpy'],
                       'ne': CRRNCY_TOKENSUB['nzd'],
@@ -342,7 +345,7 @@ class CMEGMatcher(object):
     # region CME index settings
     CME_STP_FLT = StopFilter(stoplist=STOP_LIST + CME_COMMON_WORDS, minsize=1)
     CME_SP_FLT = SpecialWordFilter(CME_KEYWORD_MAPPING)
-    CME_VW_FLT = VowelFilter(CME_KYWRD_EXCLU)
+    CME_VW_FLT = VowelFilter(CME_KYWRD_EXCLU, lift_ignore=False)
     CME_MULT_FLT = MultiFilterFixed(index=CME_VW_FLT)
 
     CME_PDNM_ANA = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_STP_FLT | CME_SP_FLT | CME_MULT_FLT | CME_STP_FLT
@@ -358,7 +361,7 @@ class CMEGMatcher(object):
     # region cbot index settings
     CBOT_STP_FLT = StopFilter(stoplist=STOP_LIST + CBOT_COMMON_WORDS, minsize=1)
     CBOT_SP_FLT = SpecialWordFilter(CBOT_SPECIAL_MAPPING)
-    CBOT_VW_FLT = VowelFilter()
+    CBOT_VW_FLT = VowelFilter(lift_ignore=False)
     CBOT_MULT_FLT = MultiFilterFixed(index=CBOT_VW_FLT)
 
     CBOT_PDNM_ANA = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CBOT_STP_FLT | CBOT_SP_FLT | CBOT_VW_FLT | CBOT_STP_FLT
@@ -487,8 +490,9 @@ class CMEGMatcher(object):
                 searcher, self.F_PRODUCT_GROUP, self.F_CLEARED_AS, **{self.F_PRODUCT_GROUP: self.F_SUB_GROUP})
             prods_pdgps, prods_clras, prods_subgps = \
                 lexicons[self.F_PRODUCT_GROUP], lexicons[self.F_CLEARED_AS], lexicons[self.F_SUB_GROUP]
-
-            field_pdnm = self.INDEX_FIELDS_CME[self.F_PRODUCT_NAME]
+            schema = ix.schema
+            field_pdnm = {fn: fd for fn, fd in schema.items()}[self.F_PRODUCT_NAME]
+            adsearch = AdvSearch(searcher)
 
             for i, row in df_adv.iterrows():
                 pd_id = (row[self.PRODUCT], row[self.PRODUCT_GROUP], row[self.CLEARED_AS])
@@ -501,28 +505,47 @@ class CMEGMatcher(object):
                         (self.F_PRODUCT_GROUP, pdgp), (self.F_CLEARED_AS, clras), (self.F_SUB_GROUP, subgp))
                     and_words, or_words = WhooshSnippet.tokenize_split(field_pdnm, pdnm, lambda x: x.required)
 
+                    qparams = (self.F_PRODUCT_NAME, schema, pdnm)
+                    q_fuzzy = WhooshSnippet.fuzzy_and_query(*qparams)
+
+                    def callback(val):
+                        min_dist = val
+
                     if not and_words:
+                        q_and = WhooshSnippet.exact_and_query(*qparams)
+                        q_or = WhooshSnippet.exact_or_query(*qparams)
+                        results = adsearch.chain_search(q_and, init=True, callback=lambda: callback(True),
+                                                        filter=grouping_q, limit=None)\
+                            .chain_search(q_fuzzy, callback=lambda: callback(False), filter=grouping_q, limit=None)\
+                            .chain_search(q_or, callback=lambda: callback(True), filter=grouping_q, limit=None)\
+                            .results
 
 
-                        query = self.__exact_and_query(self.F_PRODUCT_NAME, ix.schema, pdnm)
-                        results = searcher.search(query, filter=grouping_q, limit=None)
-                        min_dist = True
-                        if not results:
-                            query = self.__fuzzy_and_query(self.F_PRODUCT_NAME, ix.schema, pdnm)
-                            results = searcher.search(query, filter=grouping_q, limit=None)
-                            min_dist = False
-                            if not results:
-                                query = self.__exact_or_query(self.F_PRODUCT_NAME, ix.schema, pdnm)
-                                results = searcher.search(query, filter=grouping_q, limit=None)
-                                min_dist = True
+                        # query = self.__exact_and_query(self.F_PRODUCT_NAME, ix.schema, pdnm)
+                        # results = searcher.search(query, filter=grouping_q, limit=None)
+                        # min_dist = True
+                        # if not results:
+                        #     query = self.__fuzzy_and_query(self.F_PRODUCT_NAME, ix.schema, pdnm)
+                        #     results = searcher.search(query, filter=grouping_q, limit=None)
+                        #     min_dist = False
+                        #     if not results:
+                        #         query = self.__exact_or_query(self.F_PRODUCT_NAME, ix.schema, pdnm)
+                        #         results = searcher.search(query, filter=grouping_q, limit=None)
+                        #         min_dist = True
                     else:
-                        query = self.__andmaybe_query(self.F_PRODUCT_NAME, and_words, or_words)
-                        results = searcher.search(query, filter=grouping_q, limit=None)
-                        min_dist = True
-                        if not results:
-                            query = self.__fuzzy_and_query(self.F_PRODUCT_NAME, ix.schema, pdnm)
-                            results = searcher.search(query, filter=grouping_q, limit=None)
-                            min_dist = False
+                        q_andmaybe = WhooshSnippet.andmaybe_query(self.F_PRODUCT_NAME, and_words, or_words)
+                        results = adsearch.chain_search(q_andmaybe, init=True, callback=lambda: callback(True),
+                                                        filter=grouping_q, limit=None)\
+                            .chain_search(q_fuzzy, callback=lambda: callback(False), filter=grouping_q, limit=None)\
+                            .results
+
+                        # query = WhooshSnippet.andmaybe_query(self.F_PRODUCT_NAME, and_words, or_words)
+                        # results = searcher.search(query, filter=grouping_q, limit=None)
+                        # min_dist = True
+                        # if not results:
+                        #     query = WhooshSnippet.fuzzy_and_query(self.F_PRODUCT_NAME, ix.schema, pdnm)
+                        #     results = searcher.search(query, filter=grouping_q, limit=None)
+                        #     min_dist = False
 
                 if results:
                     if one_or_all == 'one' and min_dist:
@@ -595,17 +618,17 @@ class CMEGMatcher(object):
         cp.XlsxWriter.save_sheets(outpath, {self.CME: mdf_cme, self.CBOT: mdf_cbot}, override=False)
 
 
-# checked_path = os.getcwd()
-#
-# exchanges = ['asx', 'bloomberg', 'cme', 'cbot', 'nymex_comex', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
-# report_fmtname = 'Web_ADV_Report_{}.xlsx'
-#
-# report_files = {e: report_fmtname.format(e.upper()) for e in exchanges}
-#
-# cme_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
-# cme_adv_files = [os.path.join(checked_path, report_files['cme']),
-#                  os.path.join(checked_path, report_files['cbot']),
-#                  os.path.join(checked_path, report_files['nymex_comex'])]
-#
-# cme = CMEGMatcher(cme_adv_files, cme_prds_file, '2017')
-# cme.run_pd_mtch(clean=True)
+checked_path = os.getcwd()
+
+exchanges = ['asx', 'bloomberg', 'cme', 'cbot', 'nymex_comex', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
+report_fmtname = 'Web_ADV_Report_{}.xlsx'
+
+report_files = {e: report_fmtname.format(e.upper()) for e in exchanges}
+
+cme_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
+cme_adv_files = [os.path.join(checked_path, report_files['cme']),
+                 os.path.join(checked_path, report_files['cbot']),
+                 os.path.join(checked_path, report_files['nymex_comex'])]
+
+cme = CMEGMatcher(cme_adv_files, cme_prds_file, '2017')
+cme.run_pd_mtch(clean=True)
