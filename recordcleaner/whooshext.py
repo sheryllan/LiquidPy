@@ -51,12 +51,15 @@ def clear_index(ix):
     wrt.commit(mergetype=writing.CLEAR)
 
 
-def __update_doc(self, ix, doc):
+def update_doc(ix, doc):
     wrt = ix.writer()
     wrt.update_document(**doc)
     wrt.commit()
     print(len(list(ix.searcher().documents())))
 
+
+def get_field(schema, fieldname):
+    return dtsp.find_first_n(schema.items(), lambda x: x[0] == fieldname)
 
 def join_words(words, minlen=2):
     result = ''
@@ -98,7 +101,8 @@ def last_indexof(items, target):
     return j
 
 
-def min_dist_rslt(results, qstring, fieldname, field, minboost=0):
+def min_dist_rslt(results, qstring, fieldname, schema, minboost=0):
+    field = get_field(schema, fieldname)
     ana = field.analyzer
     q_tokens = sorted([(token.text, token.boost) for token in ana(qstring, mode='query') if token.boost >= minboost],
                       key=lambda x: x[0])
@@ -550,18 +554,25 @@ class TreeMap(object):
 class AdvSearch(object):
     def __init__(self, searcher):
         self.searcher = searcher
-        self.results = None
 
-    def chain_search(self, query, init=False, callback=None, **kwargs):
-        if init:
-            self.results = None
+    def search(self, query, qparams, callback=lambda: None, **kwargs):
+        searcher = self.searcher
 
-        if not self.results:
-            self.results = self.searcher.search(query, **kwargs)
-            if callback:
-                callback()
+        def search_func():
+            results = searcher.search(query(*qparams), **kwargs)
+            callback()
+            return results
 
-        return self
+        return search_func
+
+    def chain_search(self, searches):
+        results = None
+        for search in searches:
+            if results:
+                return results
+            results = search()
+        return results
+
 
 # region unused codes
 

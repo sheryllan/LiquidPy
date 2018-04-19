@@ -206,51 +206,81 @@ class CMEAnalyzerTests(ut.TestCase):
     #
     #     self.assertListEqual(expected4, result4)
 
-    def test_ana_query_mode(self):
-        # SPLT_FLT = SplitFilter(delims='[&/\(\)\.-]', splitcase=True, splitnums=True, mergewords=True, mergenums=True)
-        # CME_SP_FLT = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
-        # CME_VW_FLT = VowelFilter(self.CME_KYWRD_EXCLU)
-        # CME_PDNM_ANA = RegexTokenizer('[^\s/]+') | SPLT_FLT
+    # def test_ana_query_mode(self):
+    #     # SPLT_FLT = SplitFilter(delims='[&/\(\)\.-]', splitcase=True, splitnums=True, mergewords=True, mergenums=True)
+    #     # CME_SP_FLT = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
+    #     # CME_VW_FLT = VowelFilter(self.CME_KYWRD_EXCLU)
+    #     # CME_PDNM_ANA = RegexTokenizer('[^\s/]+') | SPLT_FLT
+    #
+    #     # testcase = 'EOW1 E-MINI RUSSELL 2000 WE'
+    #     # result = [t.text for t in CME_PDNM_ANA(testcase, mode='index')]
+    #
+    #     # print(result)
+    #
+    #     F_PRODUCT_NAME = 'Product_Name'
+    #
+    #     ix = open_dir('CME_Product_Index')
+    #     field_pdnm = {x[0]: x[1] for x in ix.schema.items()}[F_PRODUCT_NAME]
+    #
+    #     pdnm1 = 'GBP/USD PQO 2pm Fix'
+    #     pdnm2 = 'E-MINI EURO FX'
+    #
+    #     rcd1 = 'Weekly Premium Quoted European Style Options on British Pound/US Dollar Futures - Wk 3'
+    #     rcd2 = 'E-mini Euro FX Futures'
+    #
+    #     ana = field_pdnm.analyzer
+    #     tks2_index = [(t.text, t.boost, t.ignored, t.required) for t in ana(rcd2, mode='index')]
+    #     tks2_query = [(t.text, t.boost, t.ignored, t.required) for t in ana(pdnm2, mode='query')]
+    #     print(tks2_index)
+    #     print(tks2_query)
+    #     # tks_query = [t.text for t in ana(pdnm, mode='query')]
+    #     # print(tks_query)
+    #     # and_words, or_words = WhooshSnippet.tokenize_split(field_pdnm, pdnm1, lambda x: x.required)
+    #     # query = WhooshSnippet.andmaybe_query(F_PRODUCT_NAME, and_words, or_words)
+    #     # with ix.searcher() as searcher:
+    #     #     results = searcher.search(query)
+    #     #     if results:
+    #     #         for r in results:
+    #     #             print(r)
+    #
+    #     and_words2, or_words2 = WhooshSnippet.tokenize_split(field_pdnm, pdnm2, lambda x: x.required)
+    #     query2 = WhooshSnippet.andmaybe_query(F_PRODUCT_NAME, and_words2, or_words2)
+    #
+    #     with ix.searcher() as searcher:
+    #         results = searcher.search(query2)
+    #         if results:
+    #             for r in results:
+    #                 print(r)
 
-        # testcase = 'EOW1 E-MINI RUSSELL 2000 WE'
-        # result = [t.text for t in CME_PDNM_ANA(testcase, mode='index')]
 
-        # print(result)
-
-        F_PRODUCT_NAME = 'Product_Name'
-
+    def test_match_prod_code(self):
         ix = open_dir('CME_Product_Index')
-        field_pdnm = {x[0]: x[1] for x in ix.schema.items()}[F_PRODUCT_NAME]
+        cmeg = CMEGMatcher()
+        df = pd.DataFrame([{
+            cmeg.PRODUCT: 'E-MINI EURO FX',
+            cmeg.PRODUCT_GROUP: 'FX',
+            cmeg.CLEARED_AS: 'Futures',
+            'ADV Y.T.D 2017': 4205
+        }])
 
-        pdnm1 = 'GBP/USD PQO 2pm Fix'
+        cmeg.match_prod_code(df, ix)
+
         pdnm2 = 'E-MINI EURO FX'
-
-        rcd1 = 'Weekly Premium Quoted European Style Options on British Pound/US Dollar Futures - Wk 3'
-        rcd2 = 'E-mini Euro FX Futures'
-
+        field_pdnm = {x[0]: x[1] for x in ix.schema.items()}[cmeg.F_PRODUCT_NAME]
         ana = field_pdnm.analyzer
-        tks2_index = [(t.text, t.boost, t.ignored, t.required) for t in ana(rcd2, mode='index')]
         tks2_query = [(t.text, t.boost, t.ignored, t.required) for t in ana(pdnm2, mode='query')]
-        print(tks2_index)
-        print(tks2_query)
-        # tks_query = [t.text for t in ana(pdnm, mode='query')]
-        # print(tks_query)
-        # and_words, or_words = WhooshSnippet.tokenize_split(field_pdnm, pdnm1, lambda x: x.required)
-        # query = WhooshSnippet.andmaybe_query(F_PRODUCT_NAME, and_words, or_words)
-        # with ix.searcher() as searcher:
-        #     results = searcher.search(query)
-        #     if results:
-        #         for r in results:
-        #             print(r)
 
         and_words2, or_words2 = WhooshSnippet.tokenize_split(field_pdnm, pdnm2, lambda x: x.required)
-        query2 = WhooshSnippet.andmaybe_query(F_PRODUCT_NAME, and_words2, or_words2)
+        query2 = WhooshSnippet.andmaybe_query(cmeg.F_PRODUCT_NAME, and_words2, or_words2)
 
-        with ix.searcher() as searcher:
-            results = searcher.search(query2)
-            if results:
-                for r in results:
-                    print(r)
+        pdnm3 = 'AUD/USD PQO 2pm Fix'
+        and_words3, or_words3 = WhooshSnippet.tokenize_split(field_pdnm, pdnm3, lambda x: x.required)
+        parser = qparser.QueryParser(field_pdnm, schema=ix.schema)
+        mt_dfl_query = parser.multitoken_query('default', and_words3, field_pdnm, Term, 1)
+        mt_and_query = parser.multitoken_query('and', and_words3, field_pdnm, Term, 1)
+        mt_or_query = parser.multitoken_query('or', or_words3, field_pdnm, Term, 1)
+
+        print(mt_dfl_query)
 
 
     # def test_index_grouping(self):
