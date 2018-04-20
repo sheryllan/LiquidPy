@@ -96,84 +96,6 @@ class Matcher(object):
         return False
 
 
-class WhooshSnippet(object):
-    def __init__(self):
-        self.results = None
-
-    @staticmethod
-    def get_idx_lexicon(searcher, *fds, **kwfds):
-        grouped_docs = searcher.search(Every(), groupedby=fds)
-        lexicons = dict()
-        for fd in fds:
-            gp_dict = {gp: [searcher.stored_fields(docid) for docid in ids]
-                     for gp, ids in grouped_docs.groups(fd).items()}
-            lexicons.update({fd: set(gp_dict.keys())})
-            if fd in kwfds:
-                subfd = kwfds[fd]
-                subgp_dict = {gp: set([doc[subfd] for doc in docs]) for gp, docs in gp_dict.items()}
-                lexicons.update({subfd: subgp_dict})
-        return lexicons
-
-    @staticmethod
-    def exact_and_query(field, schema, text):
-        parser = qparser.QueryParser(field, schema=schema)
-        return parser.parse(text)
-
-    @staticmethod
-    def fuzzy_and_query(field, schema, text, maxdist=2, prefixlength=1):
-        parser = qparser.QueryParser(field, schema=schema)
-        query = parser.parse(text)
-        fuzzy_terms = And(
-            [FuzzyTerm(f, t, maxdist=maxdist, prefixlength=prefixlength)
-             if len(t) > maxdist else Term(f, t) for f, t in query.iter_all_terms()])
-
-        return fuzzy_terms
-
-    @staticmethod
-    def exact_or_query(field, schema, text):
-        og = qparser.OrGroup.factory(0.9)
-        parser = qparser.QueryParser(field, schema=schema, group=og)
-        return parser.parse(text)
-
-    @staticmethod
-    def tokenize_split(field, text, keyfunc, mode='query'):
-        tokens = field.analyzer(text, mode=mode)
-        and_words, maybe_words = [], []
-        for token in tokens:
-            (and_words if keyfunc(token) else maybe_words).append(token.text)
-        return and_words, maybe_words
-
-    @staticmethod
-    def andmaybe_query(fieldname, schema, text, keyfunc):
-        field = get_field(schema, fieldname)
-        and_words, maybe_words = WhooshSnippet.tokenize_split(field, text, keyfunc)
-        and_terms = And([Term(fieldname, w) for w in and_words])
-        maybe_terms = Or([Term(fieldname, w) for w in maybe_words])
-        return AndMaybe(and_terms, maybe_terms) if and_terms else maybe_terms
-
-    @staticmethod
-    def andnot_query(field, schema, and_words, not_words):
-        parser = qparser.QueryParser(field, schema=schema)
-        q_and = parser.parse(and_words)
-        q_not = parser.parse(not_words)
-        return AndNot(q_and, q_not)
-
-    @staticmethod
-    def filter_query(*args):
-        qterms = list()
-        for arg in args:
-            if all(arg):
-                qterms.append(Term(*arg))
-        return And(qterms)
-
-    query_dict = {'and': exact_and_query,
-                  'or': exact_or_query,
-                  'andmaybe': andmaybe_query,
-                  'fuzzyand': fuzzy_and_query,
-                  'andnot': andnot_query}
-
-
-
 class CMEGMatcher(object):
     PATTERN_ADV_YTD = 'ADV Y.T.D'
     INDEX_CME = 'CME_Product_Index'
@@ -224,20 +146,20 @@ class CMEGMatcher(object):
                           ('CANADIAN DOLLAR', 'FX', 'Options'),
                           ('EURO FX', 'FX', 'Options'),
                           ('JAPANESE YEN', 'FX', 'Options'),
-                          ('SWISS FRANC',  'FX', 'Options'),
+                          ('SWISS FRANC', 'FX', 'Options'),
                           ('JAPANESE YEN (EU)', 'FX', 'Options'),
                           ('SWISS FRANC (EU)', 'FX', 'Options'),
                           ('AUSTRALIAN DLR (EU)', 'FX', 'Options'),
                           ('MLK MID', 'Ag Products', 'Futures')}
 
-    CME_MULTI_MATCH = {('EURO MIDCURVE', 'Interest Rate', 'Options'): ['andmaybe'],
-                       ('AUD/USD PQO 2pm Fix', 'FX', 'Options'): ['andmaybe'],
-                       ('GBP/USD PQO 2pm Fix', 'FX', 'Options'): ['andmaybe'],
-                       ('JPY/USD PQO 2pm Fix', 'FX', 'Options'): ['andmaybe'],
-                       ('EUR/USD PQO 2pm Fix', 'FX', 'Options'): ['andmaybe'],
-                       ('CAD/USD PQO 2pm Fix', 'FX', 'Options'): ['andmaybe'],
-                       ('CHF/USD PQO 2pm Fix', 'FX', 'Options'): ['andmaybe'],
-                       ('LV CATL CSO', 'Ag Products', 'Options'): ['andmaybe']}
+    CME_MULTI_MATCH = {('EURO MIDCURVE', 'Interest Rate', 'Options'): {QUERY: 'andmaybe'},
+                       ('AUD/USD PQO 2pm Fix', 'FX', 'Options'): {QUERY: 'andmaybe'},
+                       ('GBP/USD PQO 2pm Fix', 'FX', 'Options'): {QUERY: 'andmaybe'},
+                       ('JPY/USD PQO 2pm Fix', 'FX', 'Options'): {QUERY: 'andmaybe'},
+                       ('EUR/USD PQO 2pm Fix', 'FX', 'Options'): {QUERY: 'andmaybe'},
+                       ('CAD/USD PQO 2pm Fix', 'FX', 'Options'): {QUERY: 'andmaybe'},
+                       ('CHF/USD PQO 2pm Fix', 'FX', 'Options'): {QUERY: 'andmaybe'},
+                       ('LV CATL CSO', 'Ag Products', 'Options'): {QUERY: 'andmaybe'}}
 
     CRRNCY_TOKENSUB = {'aud': [TokenSub('australian', 1.5, True, True), TokenSub('dollar', 1, True, True)],
                        'gbp': [TokenSub('british', 1.5, True, True), TokenSub('pound', 1.5, True, True)],
@@ -321,12 +243,14 @@ class CMEGMatcher(object):
                           ('SOYBN NEARBY+2 CAL SPRD', 'Ag Products', 'Options'): 'Consecutive Soybean CSO',
                           ('WHEAT NEARBY+2 CAL SPRD', 'Ag Products', 'Options'): 'Consecutive Wheat CSO',
                           ('CORN NEARBY+2 CAL SPRD', 'Ag Products', 'Options'): 'Consecutive Corn CSO',
-                          ('Intercommodity Spread', 'Ag Products', 'Options'): 'KC HRW-Chicago SRW Wheat Intercommodity Spread Options'
+                          ('Intercommodity Spread', 'Ag Products',
+                           'Options'): 'KC HRW-Chicago SRW Wheat Intercommodity Spread Options'
                           }
 
     CBOT_SPECIAL_MAPPING = {'yr': [TokenSub('year', 1, True, False)],
                             'fed': [TokenSub('federal', 1.5, True, True)],
                             't': [TokenSub('treasury', 1, True, True)],
+                            'note': [TokenSub('note', 1, True, True)],
                             'dj': [TokenSub('dow', 1, True, True), TokenSub('jones', 1, True, True)],
                             'cso': [TokenSub('calendar', 1.5, True, True), TokenSub('spread', 1, True, False)],
                             'cal': [TokenSub('calendar', 1.5, True, True)],
@@ -334,60 +258,20 @@ class CMEGMatcher(object):
                             'icso': [TokenSub('intercommodity', 1.5, True, True), TokenSub('spread', 1, True, True)],
                             }
 
-    CBOT_MULTI_MATCH = {('10-YR NOTE', 'Interest Rate', 'Options'): ['andnot', ('', 'ultra')],
-                        ('5-YR NOTE', 'Interest Rate', 'Options'): ['andnot', ('', 'ultra')],
-                        ('2-YR NOTE', 'Interest Rate', 'Options'): ['andnot', ('', 'ultra')],
-                        ('FED FUND', 'Interest Rate', 'Options'): ['and'],
-                        ('ULTRA T-BOND', 'Interest Rate', 'Options'): ['and'],
-                        ('Ultra 10-Year Note', 'Interest Rate', 'Options'): ['and'],
-                        ('FERTILIZER PRODUCS', 'Ag Products', 'Futures'): ['every'],
-                        ('DEC-JULY WHEAT CAL SPRD', 'Ag Products', 'Options'): ['and'],
-                        ('JULY-DEC WHEAT CAL SPRD', 'Ag Products', 'Options'): ['and'],
-                        ('MAR-JULY WHEAT CAL SPRD', 'Ag Products', 'Options'): ['and'],
-                        ('Intercommodity Spread', 'Ag Products', 'Options'): ['andnot', ('', 'wheat-corn')]}
+    CBOT_MULTI_MATCH = {('10-YR NOTE', 'Interest Rate', 'Options'): {QUERY: 'andnot', NOTWORDS: 'ultra'},
+                        ('5-YR NOTE', 'Interest Rate', 'Options'): {QUERY: 'andnot', NOTWORDS: 'ultra'},
+                        ('2-YR NOTE', 'Interest Rate', 'Options'): {QUERY: 'andnot', NOTWORDS: 'ultra'},
+                        ('FED FUND', 'Interest Rate', 'Options'): {QUERY: 'andmaybe'},
+                        ('ULTRA T-BOND', 'Interest Rate', 'Options'): {QUERY: 'andmaybe', ANDEXTRAS: 'bond'},
+                        ('Ultra 10-Year Note', 'Interest Rate', 'Options'): {QUERY: 'and'},
+                        ('FERTILIZER PRODUCS', 'Ag Products', 'Futures'): {QUERY: 'and'},
+                        ('DEC-JULY WHEAT CAL SPRD', 'Ag Products', 'Options'): {QUERY: 'and'},
+                        ('JULY-DEC WHEAT CAL SPRD', 'Ag Products', 'Options'): {QUERY: 'and'},
+                        ('MAR-JULY WHEAT CAL SPRD', 'Ag Products', 'Options'): {QUERY: 'and'},
+                        ('Intercommodity Spread', 'Ag Products', 'Options'):
+                            {QUERY: 'andnot', 'not_words': 'wheat-corn'}}
 
     CBOT_COMMON_WORDS = ['futures', 'future', 'options', 'option']
-
-    # endregion
-
-    REGTK_EXP = '[^\s/\(\)]+'
-    REGEX_TKN = RegexTokenizerExtra(REGTK_EXP, ignored=False, required=False)
-    SPLT_MRG_FLT = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True)
-    LWRCS_FLT = LowercaseFilter()
-
-    # region CME index settings
-    CME_STP_FLT = StopFilter(stoplist=STOP_LIST + CME_COMMON_WORDS, minsize=1)
-    CME_SP_FLT = SpecialWordFilter(CME_KEYWORD_MAPPING)
-    CME_VW_FLT = VowelFilter(CME_KYWRD_EXCLU, lift_ignore=False)
-    CME_MULT_FLT = MultiFilterFixed(index=CME_VW_FLT)
-
-    CME_PDNM_ANA = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_STP_FLT | CME_SP_FLT | CME_MULT_FLT | CME_STP_FLT
-    INDEX_FIELDS_CME = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=CME_PDNM_ANA),
-                        F_PRODUCT_GROUP: ID(stored=True, unique=True),
-                        F_CLEARED_AS: ID(stored=True, unique=True),
-                        F_CLEARING: ID(stored=True, unique=True),
-                        F_GLOBEX: ID(stored=True, unique=True),
-                        F_SUB_GROUP: ID(stored=True, unique=True),
-                        F_EXCHANGE: ID}
-    # endregion
-
-    # region cbot index settings
-    CBOT_STP_FLT = StopFilter(stoplist=STOP_LIST + CBOT_COMMON_WORDS, minsize=1)
-    CBOT_SP_FLT = SpecialWordFilter(CBOT_SPECIAL_MAPPING)
-    CBOT_VW_FLT = VowelFilter(lift_ignore=False)
-    CBOT_MULT_FLT = MultiFilterFixed(index=CBOT_VW_FLT)
-
-    CBOT_PDNM_ANA = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CBOT_STP_FLT | CBOT_SP_FLT | CBOT_VW_FLT | CBOT_STP_FLT
-
-    INDEX_FIELDS_CBOT = {F_PRODUCT_NAME: TEXT(stored=True, analyzer=CBOT_PDNM_ANA),
-                         F_PRODUCT_GROUP: ID(stored=True, unique=True),
-                         F_CLEARED_AS: ID(stored=True, unique=True),
-                         F_CLEARING: ID(stored=True, unique=True),
-                         F_GLOBEX: ID(stored=True, unique=True),
-                         F_SUB_GROUP: ID(stored=True, unique=True),
-                         F_EXCHANGE: ID}
-
-    # endregion
 
     COL2FIELD = {PRODUCT_NAME: F_PRODUCT_NAME,
                  PRODUCT_GROUP: F_PRODUCT_GROUP,
@@ -485,22 +369,22 @@ class CMEGMatcher(object):
         found_clras = self.__match_in_string(clras, clras_set)
         return found_clras if found_clras is not None else row_clras
 
-    def __get_query_params(self, row, pd_id, mapping, prods_pdgps, prods_clras, prods_subgps):
+    def __preprocess_qparams(self, row, pd_id, prods_pdgps, prods_clras, prods_subgps, mapping=None):
+        mapping = dict() if mapping is None else mapping
         pdnm = mapping[pd_id] if pd_id in mapping else row[self.PRODUCT]
         pdgp = dtsp.find_first_n(prods_pdgps, lambda x: self.__match_pdgp(x, row[self.PRODUCT_GROUP]))
         clras = self.__verify_clearedas(pdnm, row[self.CLEARED_AS], prods_clras)
         subgp = self.__match_in_string(pdnm, prods_subgps[pdgp], False)
         return pdnm, pdgp, clras, subgp
 
-    def match_prod_code(self, df_adv, ix, exact_mapping='', notfound=set(), multi_match=set()):
+    def match_prod_code(self, df_adv, ix, exact_mapping=None, notfound=None, multi_match=None):
         df_matched = pd.DataFrame(columns=list(df_adv.columns) + ix.schema.names())
         with ix.searcher() as searcher:
-            lexicons = WhooshSnippet.get_idx_lexicon(
+            lexicons = get_idx_lexicon(
                 searcher, self.F_PRODUCT_GROUP, self.F_CLEARED_AS, **{self.F_PRODUCT_GROUP: self.F_SUB_GROUP})
             prods_pdgps, prods_clras, prods_subgps = \
                 lexicons[self.F_PRODUCT_GROUP], lexicons[self.F_CLEARED_AS], lexicons[self.F_SUB_GROUP]
             schema = ix.schema
-            # field_pdnm = {fn: fd for fn, fd in schema.items()}[self.F_PRODUCT_NAME]
             adsearch = AdvSearch(searcher)
 
             for i, row in df_adv.iterrows():
@@ -510,43 +394,40 @@ class CMEGMatcher(object):
                 def callback(val):
                     min_dist = val
 
-                if pd_id not in notfound:
-                    one_or_all = 'all' if pd_id in multi_match else 'one'
-                    pdnm, pdgp, clras, subgp = self.__get_query_params(
-                        row, pd_id, exact_mapping, prods_pdgps, prods_clras, prods_subgps)
-                    grouping_q = WhooshSnippet.filter_query(
+                if notfound is None or pd_id not in notfound:
+                    one_or_all = 'one' if multi_match is None or pd_id not in multi_match else 'all'
+                    pdnm, pdgp, clras, subgp = self.__preprocess_qparams(
+                        row, pd_id, prods_pdgps, prods_clras, prods_subgps, exact_mapping)
+                    grouping_q = filter_query(
                         (self.F_PRODUCT_GROUP, pdgp), (self.F_CLEARED_AS, clras), (self.F_SUB_GROUP, subgp))
 
-                    # and_words, or_words = WhooshSnippet.tokenize_split(field_pdnm, pdnm, lambda x: x.required)
-                    qparams1 = (self.F_PRODUCT_NAME, schema, pdnm)
-                    qparams2 = (self.F_PRODUCT_NAME, schema, pdnm, lambda x: x.required)
-
+                    qparams = {FIELDNAME: self.F_PRODUCT_NAME,
+                               SCHEMA: schema,
+                               QSTRING: pdnm,
+                               KEYFUNC: lambda x: x.required}
 
                     if one_or_all == 'one':
-                        src_and = adsearch.search(WhooshSnippet.exact_and_query, qparams1, lambda: callback(True),
-                                                  filter=grouping_q, limit=None)
-                        src_fuzzy = adsearch.search(WhooshSnippet.fuzzy_and_query, qparams1, lambda: callback(False),
-                                                    filter=grouping_q, limit=None)
-                        src_andmaybe = adsearch.search(WhooshSnippet.andmaybe_query, qparams2, lambda: callback(True),
-                                                       filter=grouping_q, limit=None)
+                        src_and = adsearch.search(*get_query_params(query='and', **qparams),
+                                                  lambda: callback(True),
+                                                  filter=grouping_q,
+                                                  limit=None)
+                        src_fuzzy = adsearch.search(*get_query_params(query='fuzzyand', **qparams),
+                                                    lambda: callback(False),
+                                                    filter=grouping_q,
+                                                    limit=None)
+                        src_andmaybe = adsearch.search(*get_query_params(query='andmaybe', **qparams),
+                                                       lambda: callback(True),
+                                                       filter=grouping_q,
+                                                       limit=None)
                         results = adsearch.chain_search([src_and, src_fuzzy, src_andmaybe])
                     else:
                         q_configs = multi_match[pd_id]
-
-
-                    # if not and_words or one_or_all == 'all':
-                    #     q_or = WhooshSnippet.exact_or_query(*qparams)
-                    #     results = adsearch.chain_search(q_and, init=True, callback=lambda: callback(True),
-                    #                                     filter=grouping_q, limit=None)\
-                    #         .chain_search(q_fuzzy, callback=lambda: callback(False), filter=grouping_q, limit=None)\
-                    #         .chain_search(q_or, callback=lambda: callback(True), filter=grouping_q, limit=None)\
-                    #         .results
-                    # else:
-                    #     q_andmaybe = WhooshSnippet.andmaybe_query(self.F_PRODUCT_NAME, and_words, or_words)
-                    #     results = adsearch.chain_search(q_andmaybe, init=True, callback=lambda: callback(True),
-                    #                                     filter=grouping_q, limit=None)\
-                    #         .chain_search(q_fuzzy, callback=lambda: callback(False), filter=grouping_q, limit=None)\
-                    #         .results
+                        qparams.update(q_configs)
+                        src = adsearch.search(*get_query_params(**qparams),
+                                              lambda: callback(True),
+                                              filter=grouping_q,
+                                              limit=None)
+                        results = src()
                 if results:
                     if one_or_all == 'one' and min_dist:
                         results = min_dist_rslt(results, pdnm, self.F_PRODUCT_NAME, schema, minboost=0.2)
@@ -554,16 +435,16 @@ class CMEGMatcher(object):
                 else:
                     rows_matched = row
                 df_matched = df_matched.append(rows_matched, ignore_index=True)
-                if rows_matched is row:
-                    print('Failed matching {}'.format(row[self.PRODUCT]))
-                else:
-                    for r in rows_matched:
-                        print('Successful matching {} with {}'.format(row[self.PRODUCT], r[self.F_PRODUCT_NAME]))
+                self.__prt_match_status(row, rows_matched)
 
         return df_matched
 
-
-
+    def __prt_match_status(self, row, rows_matched):
+        if rows_matched is row:
+            print('Failed matching {}'.format(row[self.PRODUCT]))
+        else:
+            for r in rows_matched:
+                print('Successful matching {} with {}'.format(row[self.PRODUCT], r[self.F_PRODUCT_NAME]))
 
     def __join_results(self, results, *dfs, how='one'):
         joined_dict = [results[0].fields()] if how == 'one' else [r.fields() for r in results]
@@ -572,7 +453,6 @@ class CMEGMatcher(object):
                 for jd in joined_dict:
                     jd.update(df)
         return joined_dict
-
 
     def __match_prods_by_commodity(self, df_prods, df_adv):
         prod_dict = {str(row[self.GLOBEX]): row for _, row in df_prods.iterrows()}
@@ -590,12 +470,52 @@ class CMEGMatcher(object):
         # df_adv.reset_index(drop=0, inplace=True)
         return df
 
+    def get_cbot_fields(self):
+        regtk_exp = '[^\s/\(\)]+'
+        regex_tkn = RegexTokenizerExtra(regtk_exp, ignored=False, required=False)
+        lwc_flt = LowercaseFilter()
+        splt_mrg_flt = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True)
+
+        stp_flt = StopFilter(stoplist=STOP_LIST + self.CBOT_COMMON_WORDS, minsize=1)
+        sp_flt = SpecialWordFilter(self.CBOT_SPECIAL_MAPPING)
+        vw_flt = VowelFilter(lift_ignore=False)
+        multi_flt = MultiFilterFixed(index=vw_flt)
+        ana = regex_tkn | splt_mrg_flt | lwc_flt | stp_flt | sp_flt | multi_flt | stp_flt
+
+        return {self.F_PRODUCT_NAME: TEXT(stored=True, analyzer=ana),
+                self.F_PRODUCT_GROUP: ID(stored=True, unique=True),
+                self.F_CLEARED_AS: ID(stored=True, unique=True),
+                self.F_CLEARING: ID(stored=True, unique=True),
+                self.F_GLOBEX: ID(stored=True, unique=True),
+                self.F_SUB_GROUP: ID(stored=True, unique=True),
+                self.F_EXCHANGE: ID}
+
+    def get_cme_fields(self):
+        regtk_exp = '[^\s/\(\)]+'
+        regex_tkn = RegexTokenizerExtra(regtk_exp, ignored=False, required=False)
+        lwc_flt = LowercaseFilter()
+        splt_mrg_flt = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True)
+
+        stp_flt =StopFilter(stoplist=STOP_LIST + self.CME_COMMON_WORDS, minsize=1)
+        sp_flt = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
+        vw_flt = VowelFilter(self.CME_KYWRD_EXCLU, lift_ignore=False)
+        multi_flt = MultiFilterFixed(index=vw_flt)
+        ana = regex_tkn | splt_mrg_flt | lwc_flt | stp_flt | sp_flt | multi_flt | stp_flt
+
+        return {self.F_PRODUCT_NAME: TEXT(stored=True, analyzer=ana),
+                self.F_PRODUCT_GROUP: ID(stored=True, unique=True),
+                self.F_CLEARED_AS: ID(stored=True, unique=True),
+                self.F_CLEARING: ID(stored=True, unique=True),
+                self.F_GLOBEX: ID(stored=True, unique=True),
+                self.F_SUB_GROUP: ID(stored=True, unique=True),
+                self.F_EXCHANGE: ID}
+
     def init_ix_cme_cbot(self, clean=False):
         df_prods = self.__from_prods(self.prods_file)
         df_ix = df_prods.rename(columns=self.COL2FIELD)
         gdf_exch = {exch: df.reset_index(drop=0) for exch, df in self.__groupby(df_ix, [self.EXCHANGE]).items()}
-        ix_cme = setup_ix(self.INDEX_FIELDS_CME, gdf_exch[self.CME], self.index_cme, clean)
-        ix_cbot = setup_ix(self.INDEX_FIELDS_CBOT, gdf_exch[self.CBOT], self.index_cbot, clean)
+        ix_cme = setup_ix(self.get_cme_fields(), gdf_exch[self.CME], self.index_cme, clean)
+        ix_cbot = setup_ix(self.get_cbot_fields(), gdf_exch[self.CBOT], self.index_cbot, clean)
         return ix_cme, ix_cbot, gdf_exch
 
     def match_nymex_comex(self, df_adv, gdf_exch):
@@ -614,24 +534,26 @@ class CMEGMatcher(object):
         ix_cme, ix_cbot, gdf_exch = self.init_ix_cme_cbot(clean)
         self.match_nymex_comex(dfs_adv[self.NYMEX], gdf_exch)
 
-        mdf_cme = self.match_prod_code(dfs_adv[self.CME], ix_cme, self.CME_EXACT_MAPPING, self.CME_NOTFOUND_PRODS, self.CME_MULTI_MATCH)
-        mdf_cbot = self.match_prod_code(dfs_adv[self.CBOT], ix_cbot, self.CBOT_EXACT_MAPPING, multi_match=self.CBOT_MULTI_MATCH)
+        mdf_cme = self.match_prod_code(dfs_adv[self.CME], ix_cme, self.CME_EXACT_MAPPING, self.CME_NOTFOUND_PRODS,
+                                       self.CME_MULTI_MATCH)
+        mdf_cbot = self.match_prod_code(dfs_adv[self.CBOT], ix_cbot, self.CBOT_EXACT_MAPPING,
+                                        multi_match=self.CBOT_MULTI_MATCH)
 
         outpath = self.matched_file if outpath is None else outpath
         cp.XlsxWriter.save_sheets(outpath, {self.CME: mdf_cme, self.CBOT: mdf_cbot}, override=False)
 
 
-# checked_path = os.getcwd()
-#
-# exchanges = ['asx', 'bloomberg', 'cme', 'cbot', 'nymex_comex', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
-# report_fmtname = 'Web_ADV_Report_{}.xlsx'
-#
-# report_files = {e: report_fmtname.format(e.upper()) for e in exchanges}
-#
-# cme_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
-# cme_adv_files = [os.path.join(checked_path, report_files['cme']),
-#                  os.path.join(checked_path, report_files['cbot']),
-#                  os.path.join(checked_path, report_files['nymex_comex'])]
-#
-# cme = CMEGMatcher(cme_adv_files, cme_prds_file, '2017')
-# cme.run_pd_mtch(clean=True)
+checked_path = os.getcwd()
+
+exchanges = ['asx', 'bloomberg', 'cme', 'cbot', 'nymex_comex', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
+report_fmtname = 'Web_ADV_Report_{}.xlsx'
+
+report_files = {e: report_fmtname.format(e.upper()) for e in exchanges}
+
+cmeg_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
+cmeg_adv_files = [os.path.join(checked_path, report_files['cme']),
+                  os.path.join(checked_path, report_files['cbot']),
+                  os.path.join(checked_path, report_files['nymex_comex'])]
+
+cmeg = CMEGMatcher(cmeg_adv_files, cmeg_prds_file, '2017')
+cmeg.run_pd_mtch(clean=True)

@@ -14,6 +14,8 @@ from whoosh.analysis import *
 from whoosh.index import create_in
 from whoosh.index import open_dir
 from whoosh import writing
+from whoosh.query import *
+from whoosh import qparser
 
 import datascraper as dtsp
 
@@ -59,7 +61,8 @@ def update_doc(ix, doc):
 
 
 def get_field(schema, fieldname):
-    return dtsp.find_first_n(schema.items(), lambda x: x[0] == fieldname)
+    return dtsp.find_first_n(schema.items(), lambda x: x[0] == fieldname)[1]
+
 
 def join_words(words, minlen=2):
     result = ''
@@ -192,7 +195,7 @@ class SplitMergeFilter(Filter):
     PTN_MRG_WRD = '[A-Za-z]+'
     PTN_MRG_NUM = '[0-9]+'
 
-    def __init__(self, delims_splt='\W+', delims_mrg='\W+', min_spltlen=2, original=False,
+    def __init__(self, delims_splt='\W+', delims_mrg='\W+', min_spltlen=1, original=False,
                  splitcase=False, splitnums=False, mergewords=False, mergenums=False,
                  ignore_splt=False, ignore_mrg=True):
         self.delims_splt = delims_splt
@@ -572,6 +575,107 @@ class AdvSearch(object):
                 return results
             results = search()
         return results
+
+QUERY, FIELDNAME, SCHEMA, QSTRING = 'query', 'fieldname', 'schema', 'qstring'
+ANDEXTRAS, MAYBEEXTRAS = 'and_extras', 'maybe_extras'
+KEYFUNC, ANDWORDS, NOTWORDS = 'keyfunc', 'and_words', 'not_words'
+
+
+def get_idx_lexicon(searcher, *fds, **kwfds):
+    grouped_docs = searcher.search(Every(), groupedby=fds)
+    lexicons = dict()
+    for fd in fds:
+        gp_dict = {gp: [searcher.stored_fields(docid) for docid in ids]
+                   for gp, ids in grouped_docs.groups(fd).items()}
+        lexicons.update({fd: set(gp_dict.keys())})
+        if fd in kwfds:
+            subfd = kwfds[fd]
+            subgp_dict = {gp: set([doc[subfd] for doc in docs]) for gp, docs in gp_dict.items()}
+            lexicons.update({subfd: subgp_dict})
+    return lexicons
+
+
+def exact_and_query(field, schema, qstring):
+    parser = qparser.QueryParser(field, schema=schema)
+    return parser.parse(qstring)
+
+
+def fuzzy_and_query(field, schema, qstring, maxdist=2, prefixlength=1):
+    parser = qparser.QueryParser(field, schema=schema)
+    query = parser.parse(qstring)
+    fuzzy_terms = And(
+        [FuzzyTerm(f, t, maxdist=maxdist, prefixlength=prefixlength)
+         if len(t) > maxdist else Term(f, t) for f, t in query.iter_all_terms()])
+
+    return fuzzy_terms
+
+
+def exact_or_query(fieldname, schema, qstring):
+    og = qparser.OrGroup.factory(0.9)
+    parser = qparser.QueryParser(fieldname, schema=schema, group=og)
+    return parser.parse(qstring)
+
+
+def tokenize_split(fieldname, qstring, keyfunc, mode='query'):
+    tokens = fieldname.analyzer(qstring, mode=mode)
+    and_words, maybe_words = [], []
+    for token in tokens:
+        (and_words if keyfunc(token) else maybe_words).append(token.text)
+    return and_words, maybe_words
+
+
+def andmaybe_query(fieldname, schema, qstring, keyfunc, and_extras=None, maybe_extras=None):
+    field = get_field(schema, fieldname)
+    and_words, maybe_words = tokenize_split(field, qstring, keyfunc)
+    and_words = and_words + list(field.process_text(and_extras)) if and_extras else and_words
+    maybe_words = maybe_words + list(field.process_text(maybe_extras)) if maybe_extras else maybe_words
+    and_terms = And([Term(fieldname, w) for w in and_words])
+    maybe_terms = Or([Term(fieldname, w) for w in maybe_words])
+    return AndMaybe(and_terms, maybe_terms) if and_terms else maybe_terms
+
+
+def andnot_query(fieldname, schema, and_words, not_words):
+    parser = qparser.QueryParser(fieldname, schema=schema)
+    q_and = parser.parse(and_words)
+    q_not = parser.parse(not_words)
+    return AndNot(q_and, q_not)
+
+
+def filter_query(*args):
+    qterms = list()
+    for arg in args:
+        if all(arg):
+            qterms.append(Term(*arg))
+    return And(qterms)
+
+
+query_dict = {'and': exact_and_query,
+              'or': exact_or_query,
+              'andmaybe': andmaybe_query,
+              'fuzzyand': fuzzy_and_query,
+              'andnot': andnot_query}
+
+
+def get_query_params(**kwargs):
+    essentials = [QUERY, FIELDNAME, SCHEMA, QSTRING]
+    if any(k not in kwargs for k in essentials):
+        raise KeyError('Input must have values for the keys: {}'.format(essentials))
+    params = ()
+    if kwargs[QUERY] == 'and' or kwargs[QUERY] == 'fuzzyand' or kwargs[QUERY] == 'or':
+        params = (kwargs[FIELDNAME], kwargs[SCHEMA], kwargs[QSTRING])
+    elif kwargs[QUERY] == 'andmaybe':
+        params = (kwargs[FIELDNAME], kwargs[SCHEMA],
+                  kwargs[QSTRING], kwargs[KEYFUNC])
+        extras = (kwargs[ANDEXTRAS], ) if ANDEXTRAS in kwargs else () + \
+                    (kwargs[MAYBEEXTRAS], ) if MAYBEEXTRAS in kwargs else ()
+        params = params + extras
+    elif kwargs[QUERY] == 'andnot':
+        kwargs[ANDWORDS] = kwargs[QSTRING] if ANDWORDS not in kwargs or not kwargs[ANDWORDS] \
+            else ' '.join([kwargs[ANDWORDS], kwargs[QSTRING]])
+        params = (kwargs[FIELDNAME], kwargs[SCHEMA],
+                  kwargs[ANDWORDS], kwargs[NOTWORDS])
+    queryobj = query_dict[kwargs[QUERY]]
+    return queryobj, params
 
 
 # region unused codes
