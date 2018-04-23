@@ -144,7 +144,7 @@ class CMEAnalyzerTests(ut.TestCase):
 
     # def test_analyzer(self):
     #     REGEX_TKN = RegexTokenizerExtra(self.REGTK_EXP, ignored=False, required=False)
-    #     SPLT_MRG_FLT = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True)
+    #     SPLT_MRG_FLT = SplitMergeFilter(original=True, splitcase=True, splitnums=True, mergewords=True, mergenums=True)
     #     LWRCS_FLT = LowercaseFilter()
     #
     #     CME_STP_FLT = StopFilter(stoplist=self.STOP_LIST + self.CME_COMMON_WORDS, minsize=1)
@@ -166,26 +166,29 @@ class CMEAnalyzerTests(ut.TestCase):
     #     testcase7 = 'Chilean Peso/US Dollar (CLP/American Dollar) Futures'
     #     testcase8 = '(CLP/USD) Chilean Peso/US Dollar American'
     #     # testcase9 = 'EURO MIDCURVE'
-    #     # testcase9 = 'BRAZIL REAL'
+    #     testcase9 = '10-Year T-Note Weekly Options Wk 2'
+    #     testcase10 = '2-YR NOTE'
     #
     #     # result1 = [t.text for t in ana(testcase1)]
     #     # result2 = [t.text for t in ana(testcase2)]
     #     # result3 = [t.text for t in ana(testcase3)]
-    #     # result4 = [t.text for t in ana(testcase4, mode='index')]
+    #     result4 = [t.text for t in ana(testcase4, mode='index')]
     #     # result5 = [t.text for t in ana(testcase5, mode='index')]
     #     # result6 = [t.text for t in ana(testcase6, mode='index')]
-    #     result7 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase7, mode='index')]
-    #     result8 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase8, mode='index')]
+    #     # result7 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase7, mode='index')]
+    #     # result8 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase8, mode='index')]
     #
-    #     # result9 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase9, mode='query')]
+    #     result9 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase9, mode='index')]
+    #     result10 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase10, mode='query')]
     #
-    #
+    #     print(result4)
     #     # print(result6)
     #     # print(result5)
-    #     print(result7)
-    #     print(result8)
-    #     # print(result9)
-    #     # print(result4)
+    #     # print(result7)
+    #     # print(result8)
+    #     print(result9)
+    #     print(result10)
+    #
     #     # expected1 = ['e', 'micro', 'emicro', 'aud', 'australian', 'dollar', 'usd', 'us', 'american', 'dollar']
     #     # expected4 = ['e', 'mini', 'emini', 'nasdaq', 'biotechnology', 'btchnlgy', 'index']
     #     #
@@ -211,7 +214,9 @@ class CMEAnalyzerTests(ut.TestCase):
         cmeg_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
         cmeg = CMEGMatcher(prods_file=cmeg_prds_file)
 
-        ix_cme, ix_cbot, gdf_exch = cmeg.init_ix_cme_cbot(True)
+
+        ix_cbot = open_dir('CBOT_Product_Index')
+        # ix_cme, ix_cbot, gdf_exch = cmeg.init_ix_cme_cbot(True)
         # field_pdnm = {x[0]: x[1] for x in ix.schema.items()}[F_PRODUCT_NAME]
         #
         # pdnm1 = 'GBP/USD PQO 2pm Fix'
@@ -246,18 +251,56 @@ class CMEAnalyzerTests(ut.TestCase):
 
         field_pdnm = {x[0]: x[1] for x in ix_cbot.schema.items()}[F_PRODUCT_NAME]
         ana = field_pdnm.analyzer
-        pdnm1 = '2-YR NOTE'
-        rcd1 = '2-Year T-Note Weekly Options Wk 1'
+        # pdnm1 = '2-YR NOTE'
+        # rcd1 = '2-Year T-Note Weekly Options Wk 1'
+        #
+        # tks1_index = [(t.text, t.boost, t.ignored, t.required) for t in ana(rcd1, mode='index')]
+        # tks1_query = [(t.text, t.boost, t.ignored, t.required) for t in ana(pdnm1, mode='query')]
+        # print(tks1_index)
+        # print(tks1_query)
+        #
+        # pdnm2 = 'ULTRA T-BOND'
+        # tks2_query = [(t.text, t.boost, t.ignored, t.required) for t in ana(pdnm2, mode='query')]
+        # print(tks2_query)
+        #
+        # pdnm3 = 'DEC-JULY WHEAT CAL SPRD'
+        # rcd3_1 = 'Chicago SRW Wheat Dec-July CSO'
+        # rcd3_2 = 'KC HRW Dec-Jul CSO'
+        # tks3_query = [(t.text, t.boost, t.ignored, t.required) for t in ana(pdnm3, mode='query')]
+        # print(tks3_query)
+        #
+        # tks3_1_index = [(t.text, t.boost, t.ignored, t.required) for t in ana(rcd3_1, mode='index')]
+        # tks3_2_index = [(t.text, t.boost, t.ignored, t.required) for t in ana(rcd3_2, mode='index')]
+        # print(tks3_1_index)
+        # print(tks3_2_index)
+        #
+        # # q_fz = exact_and_query(F_PRODUCT_NAME, ix_cbot.schema, pdnm3)
+        # q_fz = fuzzy_and_query(F_PRODUCT_NAME, ix_cbot.schema, pdnm3)
+        # q_flt = filter_query((cmeg.F_PRODUCT_GROUP, 'Agriculture'), (cmeg.F_CLEARED_AS, 'Options'))
+        # with ix_cbot.searcher() as searcher:
+        #     results = searcher.search(q_fz, filter=q_flt, limit=None)
+        #     if results:
+        #         for r in results:
+        #             print(r)
 
-        tks1_index = [(t.text, t.boost, t.ignored, t.required) for t in ana(rcd1, mode='index')]
-        tks1_query = [(t.text, t.boost, t.ignored, t.required) for t in ana(pdnm1, mode='query')]
-        print(tks1_index)
-        print(tks1_query)
+        pdnm4 = 'KC HRW-Chicago SRW MGEX-Chicago SRW MGEX-KC  HRW'
+        rcd4_1 = 'KC HRW-Chicago SRW Wheat Intercommodity Spread Options'
+        rcd4_2 = 'MGEX-KC HRW Wheat Intercommodity Spread Options'
+        tks4_query = [(t.text, t.boost, t.ignored, t.required) for t in ana(pdnm4, mode='query')]
+        tks4_1_index = [(t.text, t.boost, t.ignored, t.required) for t in ana(rcd4_1, mode='index')]
+        tks4_2_index = [(t.text, t.boost, t.ignored, t.required) for t in ana(rcd4_2, mode='index')]
+        print(tks4_query)
+        print(tks4_1_index)
+        print(tks4_2_index)
 
-        pdnm2 = 'ULTRA T-BOND'
-        tks2_query = [(t.text, t.boost, t.ignored, t.required) for t in ana(pdnm2, mode='query')]
-        print(tks2_query)
-
+        # q_and = andnot_query(F_PRODUCT_NAME, ix_cbot.schema, pdnm4, 'wheat-corn')
+        q_or = or_query(F_PRODUCT_NAME, ix_cbot.refresh(), pdnm4)
+        q_flt = filter_query((cmeg.F_PRODUCT_GROUP,  'Agriculture'), (cmeg.F_CLEARED_AS, 'Options'))
+        with ix_cbot.searcher() as searcher:
+            results = searcher.search(q_or, filter=q_flt, limit=None)
+            if results:
+                for r in results:
+                    print(r)
 
 
     # def test_match_prod_code(self):

@@ -237,14 +237,14 @@ class CMEGMatcher(object):
     # endregion
 
     # region CBOT specific
-    CBOT_EXACT_MAPPING = {('DOW-UBS COMMOD INDEX', 'Ag Products', 'Futures'): 'Bloomberg Commodity Index Futures',
+    CBOT_EXACT_MAPPING = {('30-YR BOND', 'Interest Rate', 'Futures'): 'U.S. Treasury Bond Futures',
+                          ('30-YR BOND', 'Interest Rate', 'Options'): 'U.S. Treasury Bond Options',
+                          ('DOW-UBS COMMOD INDEX', 'Ag Products', 'Futures'): 'Bloomberg Commodity Index Futures',
                           ('DJ_UBS ROLL SELECT INDEX FU', 'Ag Products', 'Futures'):
                               'Bloomberg Roll Select Commodity Index Futures',
                           ('SOYBN NEARBY+2 CAL SPRD', 'Ag Products', 'Options'): 'Consecutive Soybean CSO',
                           ('WHEAT NEARBY+2 CAL SPRD', 'Ag Products', 'Options'): 'Consecutive Wheat CSO',
-                          ('CORN NEARBY+2 CAL SPRD', 'Ag Products', 'Options'): 'Consecutive Corn CSO',
-                          ('Intercommodity Spread', 'Ag Products',
-                           'Options'): 'KC HRW-Chicago SRW Wheat Intercommodity Spread Options'
+                          ('CORN NEARBY+2 CAL SPRD', 'Ag Products', 'Options'): 'Consecutive Corn CSO'
                           }
 
     CBOT_SPECIAL_MAPPING = {'yr': [TokenSub('year', 1, True, False)],
@@ -252,24 +252,28 @@ class CMEGMatcher(object):
                             't': [TokenSub('treasury', 1, True, True)],
                             'note': [TokenSub('note', 1, True, True)],
                             'dj': [TokenSub('dow', 1, True, True), TokenSub('jones', 1, True, True)],
-                            'cso': [TokenSub('calendar', 1.5, True, True), TokenSub('spread', 1, True, False)],
+                            'cso': [TokenSub('calendar', 1.5, True, True), TokenSub('spread', 1, False, False)],
                             'cal': [TokenSub('calendar', 1.5, True, True)],
                             'hrw': [TokenSub('hr', 1.5, True, True), TokenSub('wheat', 1.5, True, True)],
                             'icso': [TokenSub('intercommodity', 1.5, True, True), TokenSub('spread', 1, True, True)],
+                            'chi': [TokenSub('chicago', 1, True, True)]
                             }
 
-    CBOT_MULTI_MATCH = {('10-YR NOTE', 'Interest Rate', 'Options'): {QUERY: 'andnot', NOTWORDS: 'ultra'},
+    CBOT_MULTI_MATCH = {('30-YR BOND', 'Interest Rate', 'Options'): {QUERY: 'andnot', NOTWORDS: 'ultra'},
+                        ('10-YR NOTE', 'Interest Rate', 'Options'): {QUERY: 'andnot', NOTWORDS: 'ultra'},
                         ('5-YR NOTE', 'Interest Rate', 'Options'): {QUERY: 'andnot', NOTWORDS: 'ultra'},
                         ('2-YR NOTE', 'Interest Rate', 'Options'): {QUERY: 'andnot', NOTWORDS: 'ultra'},
                         ('FED FUND', 'Interest Rate', 'Options'): {QUERY: 'andmaybe'},
-                        ('ULTRA T-BOND', 'Interest Rate', 'Options'): {QUERY: 'andmaybe', ANDEXTRAS: 'bond'},
+                        ('ULTRA T-BOND', 'Interest Rate', 'Options'): {QUERY: 'andmaybe', ANDEXTRAS: 'ultra bond'},
                         ('Ultra 10-Year Note', 'Interest Rate', 'Options'): {QUERY: 'and'},
-                        ('FERTILIZER PRODUCS', 'Ag Products', 'Futures'): {QUERY: 'and'},
+                        ('FERTILIZER PRODUCS', 'Ag Products', 'Futures'): {QUERY: 'every'},
                         ('DEC-JULY WHEAT CAL SPRD', 'Ag Products', 'Options'): {QUERY: 'and'},
                         ('JULY-DEC WHEAT CAL SPRD', 'Ag Products', 'Options'): {QUERY: 'and'},
                         ('MAR-JULY WHEAT CAL SPRD', 'Ag Products', 'Options'): {QUERY: 'and'},
                         ('Intercommodity Spread', 'Ag Products', 'Options'):
-                            {QUERY: 'andnot', 'not_words': 'wheat-corn'}}
+                            {QUERY: 'orofand', ANDLIST: ['MGEX-Chicago SRW Wheat Spread',
+                                                         'KC HRW-Chicago SRW Wheat Intercommodity Spread',
+                                                         'MGEX-KC HRW Wheat Intercommodity Spread']}}
 
     CBOT_COMMON_WORDS = ['futures', 'future', 'options', 'option']
 
@@ -403,15 +407,14 @@ class CMEGMatcher(object):
 
                     qparams = {FIELDNAME: self.F_PRODUCT_NAME,
                                SCHEMA: schema,
-                               QSTRING: pdnm,
-                               KEYFUNC: lambda x: x.required}
+                               QSTRING: pdnm}
 
                     if one_or_all == 'one':
                         src_and = adsearch.search(*get_query_params(query='and', **qparams),
                                                   lambda: callback(True),
                                                   filter=grouping_q,
                                                   limit=None)
-                        src_fuzzy = adsearch.search(*get_query_params(query='fuzzyand', **qparams),
+                        src_fuzzy = adsearch.search(*get_query_params(query='and', **{**qparams, TERMCLASS: FuzzyTerm}),
                                                     lambda: callback(False),
                                                     filter=grouping_q,
                                                     limit=None)
@@ -428,6 +431,13 @@ class CMEGMatcher(object):
                                               filter=grouping_q,
                                               limit=None)
                         results = src()
+                        if len(results) < 2 and q_configs[QUERY] != 'every':
+                            qparams.update({TERMCLASS: FuzzyTerm})
+                            src = adsearch.search(*get_query_params(**qparams),
+                                                  lambda: callback(False),
+                                                  filter=grouping_q,
+                                                  limit=None)
+                            results = src()
                 if results:
                     if one_or_all == 'one' and min_dist:
                         results = min_dist_rslt(results, pdnm, self.F_PRODUCT_NAME, schema, minboost=0.2)
@@ -474,7 +484,7 @@ class CMEGMatcher(object):
         regtk_exp = '[^\s/\(\)]+'
         regex_tkn = RegexTokenizerExtra(regtk_exp, ignored=False, required=False)
         lwc_flt = LowercaseFilter()
-        splt_mrg_flt = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True)
+        splt_mrg_flt = SplitMergeFilter(original=True, splitcase=True, splitnums=True, mergewords=True, mergenums=True)
 
         stp_flt = StopFilter(stoplist=STOP_LIST + self.CBOT_COMMON_WORDS, minsize=1)
         sp_flt = SpecialWordFilter(self.CBOT_SPECIAL_MAPPING)
@@ -494,7 +504,7 @@ class CMEGMatcher(object):
         regtk_exp = '[^\s/\(\)]+'
         regex_tkn = RegexTokenizerExtra(regtk_exp, ignored=False, required=False)
         lwc_flt = LowercaseFilter()
-        splt_mrg_flt = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True)
+        splt_mrg_flt = SplitMergeFilter(original=True, splitcase=True, splitnums=True, mergewords=True, mergenums=True)
 
         stp_flt =StopFilter(stoplist=STOP_LIST + self.CME_COMMON_WORDS, minsize=1)
         sp_flt = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
