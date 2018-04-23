@@ -576,13 +576,6 @@ class AdvSearch(object):
             results = search()
         return results
 
-QUERY, FIELDNAME, SCHEMA, QSTRING = 'query', 'fieldname', 'schema', 'qstring'
-BOOST, TERMCLASS = 'boost', 'termclass'
-ANDEXTRAS, MAYBEEXTRAS = 'and_extras', 'maybe_extras'
-KEYFUNC, ANDWORDS, NOTWORDS = 'keyfunc', 'and_words', 'not_words'
-ANDLIST = 'and_list'
-
-COMMON_PARAMS = {QUERY, FIELDNAME, SCHEMA, QSTRING, BOOST, TERMCLASS}
 
 def get_idx_lexicon(searcher, *fds, **kwfds):
     grouped_docs = searcher.search(Every(), groupedby=fds)
@@ -596,16 +589,6 @@ def get_idx_lexicon(searcher, *fds, **kwfds):
             subgp_dict = {gp: set([doc[subfd] for doc in docs]) for gp, docs in gp_dict.items()}
             lexicons.update({subfd: subgp_dict})
     return lexicons
-
-
-def fuzzy_and_query(fieldname, schema, qstring, maxdist=2, prefixlength=1):
-    parser = qparser.QueryParser(fieldname, schema=schema)
-    query = parser.parse(qstring)
-    fuzzy_terms = And(
-        [FuzzyTerm(f, t, maxdist=maxdist, prefixlength=prefixlength)
-         if len(t) > maxdist else Term(f, t) for f, t in query.iter_all_terms()])
-
-    return fuzzy_terms
 
 
 def fuzzy_terms(fieldname, schema, qstring, boost=1, maxdist=2, prefixlength=1):
@@ -690,13 +673,27 @@ def filter_query(*args):
     return And(qterms)
 
 
+QUERY, FIELDNAME, SCHEMA, QSTRING = 'query', 'fieldname', 'schema', 'qstring'
+BOOST, TERMCLASS = 'boost', 'termclass'
+ANDEXTRAS, MAYBEEXTRAS = 'and_extras', 'maybe_extras'
+KEYFUNC, ANDWORDS, NOTWORDS = 'keyfunc', 'and_words', 'not_words'
+ANDLIST = 'and_list'
+
 query_dict = {'and': and_query,
               'or': or_query,
               'andmaybe': andmaybe_query,
-              'fuzzyand': fuzzy_and_query,
               'andnot': andnot_query,
               'orofand': or_of_and_query,
               'every': every_query}
+
+params_dict = {'and': {FIELDNAME, SCHEMA, QSTRING, BOOST, TERMCLASS},
+               'or': {FIELDNAME, SCHEMA, QSTRING, BOOST, TERMCLASS},
+               'andmaybe': {FIELDNAME, SCHEMA, QSTRING, KEYFUNC, ANDEXTRAS, MAYBEEXTRAS, BOOST, TERMCLASS},
+               'andnot': {FIELDNAME, SCHEMA, ANDWORDS, NOTWORDS, BOOST, TERMCLASS},
+               'orofand': {FIELDNAME, SCHEMA, ANDLIST, BOOST, TERMCLASS},
+               'every': {FIELDNAME}}
+
+reserved_params = set([QUERY] + dtsp.flatten_iter(params_dict.values()))
 
 
 def get_query_params(**kwargs):
@@ -705,37 +702,30 @@ def get_query_params(**kwargs):
         raise KeyError('Input must have values for the keys: {}'.format(essentials))
 
     params = dict()
-    queryobj = query_dict[kwargs[QUERY]]
-    if kwargs[QUERY] == 'every':
-        params = {FIELDNAME: kwargs[FIELDNAME]}
-        return queryobj, params
+    query = kwargs[QUERY]
+    queryobj = query_dict[query]
 
-    params.update(kwargs)
-    del params[QUERY]
-    if kwargs[QUERY] == 'andnot':
+    if query == 'andnot':
         kwargs[ANDWORDS] = kwargs[QSTRING] if ANDWORDS not in kwargs or not kwargs[ANDWORDS] \
             else ' '.join([kwargs[ANDWORDS], kwargs[QSTRING]])
-        del params[QSTRING]
-        params.update({ANDWORDS: kwargs[ANDWORDS], NOTWORDS: kwargs[NOTWORDS]})
-    elif kwargs[QUERY] == 'orofand':
-        del params[QSTRING]
 
-    # params.update({SCHEMA: kwargs[SCHEMA]})
-    # if kwargs[QUERY] == 'and' or kwargs[QUERY] == 'or':
-    #     params.update({QSTRING: kwargs[QSTRING]})
-    # elif kwargs[QUERY] == 'andmaybe':
-    #     params.update({QSTRING: kwargs[QSTRING], KEYFUNC: kwargs[KEYFUNC]})
-    #     extras = {ANDEXTRAS: kwargs[ANDEXTRAS]} if ANDEXTRAS in kwargs else {}
-    #     extras.update({MAYBEEXTRAS: kwargs[MAYBEEXTRAS]} if MAYBEEXTRAS in kwargs else {})
-    #     params.update(extras)
-    # elif kwargs[QUERY] == 'andnot':
+    params.update({k: v for k, v in kwargs.items() if k in params_dict[query] or k not in reserved_params})
+
+    # params = dict()
+    # queryobj = query_dict[kwargs[QUERY]]
+    # if kwargs[QUERY] == 'every':
+    #     params = {FIELDNAME: kwargs[FIELDNAME]}
+    #     return queryobj, params
+    #
+    # params.update(kwargs)
+    # del params[QUERY]
+    # if kwargs[QUERY] == 'andnot':
     #     kwargs[ANDWORDS] = kwargs[QSTRING] if ANDWORDS not in kwargs or not kwargs[ANDWORDS] \
     #         else ' '.join([kwargs[ANDWORDS], kwargs[QSTRING]])
+    #     del params[QSTRING]
     #     params.update({ANDWORDS: kwargs[ANDWORDS], NOTWORDS: kwargs[NOTWORDS]})
     # elif kwargs[QUERY] == 'orofand':
-    #     params.update({ANDLIST: kwargs[ANDLIST]})
-    # params.update({BOOST: kwargs[BOOST]} if BOOST in kwargs else {})
-    # params.update({TERMCLASS: kwargs[TERMCLASS]} if TERMCLASS in kwargs else {})
+    #     del params[QSTRING]
     return queryobj, params
 
 
@@ -804,6 +794,15 @@ def get_query_params(**kwargs):
 #         return current
 #     except StopIteration:
 #         return iterable
+
+# def fuzzy_and_query(fieldname, schema, qstring, maxdist=2, prefixlength=1):
+#     parser = qparser.QueryParser(fieldname, schema=schema)
+#     query = parser.parse(qstring)
+#     fuzzy_terms = And(
+#         [FuzzyTerm(f, t, maxdist=maxdist, prefixlength=prefixlength)
+#          if len(t) > maxdist else Term(f, t) for f, t in query.iter_all_terms()])
+#
+#     return fuzzy_terms
 
 # endregion
 
