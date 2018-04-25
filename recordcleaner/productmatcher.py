@@ -12,6 +12,7 @@ from whoosh.fields import *
 from whoosh.analysis import *
 from whoosh.query import *
 from whoosh import qparser
+from whoosh.searching import Hit
 
 import datascraper as dtsp
 from whooshext import *
@@ -24,6 +25,18 @@ def last_word(string):
 
 def filter(df, col, exp):
     return df[col].map(exp)
+
+
+def df_groupby(df, cols):
+    if not cols:
+        return df
+    else:
+        gpobj = df.groupby(cols[0])
+        group_dict = dict()
+        for group in gpobj.groups.keys():
+            new_df = gpobj.get_group(group)
+            group_dict[group] = df_groupby(new_df, cols[1:])
+        return group_dict
 
 
 STOP_LIST = ['and', 'is', 'it', 'an', 'as', 'at', 'have', 'in', 'yet', 'if', 'from', 'for', 'when',
@@ -215,7 +228,8 @@ class CMEGMatcher(object):
                       'cnh': CRRNCY_TOKENSUB['rmb'],
                       'huf': CRRNCY_TOKENSUB['huf']}
 
-    CME_SPECIAL_MAPPING = {'pqo': [TokenSub('premium', 1, True, True), TokenSub('quoted', 1, True, True),
+    CME_SPECIAL_MAPPING = {'mc': [TokenSub('midcurve', 1, True, True)],
+                           'pqo': [TokenSub('premium', 1, True, True), TokenSub('quoted', 1, True, True),
                                    TokenSub('european', 1, True, True), TokenSub('style', 1, True, True)],
                            'eow': [TokenSub('weekly', 1, True, True), TokenSub('wk', 1, True, False)],
                            'eom': [TokenSub('monthly', 1, True, True)],
@@ -306,11 +320,14 @@ class CMEGMatcher(object):
         self.index_cbot = os.path.join(self.out_path, self.INDEX_CBOT)
         self.matched_file = os.path.join(os.getcwd(), 'CMEG_matched.xlsx')
 
+    def get_ytd_header(self, df):
+        headers = list(df.columns.values)
+        return dtsp.find_first_n(headers, lambda x: self.PATTERN_ADV_YTD in x and self.year in x)
+
     def __from_adv(self, filename, cols=None, encoding='utf-8'):
         with open(filename, 'rb') as fh:
             df = pd.read_excel(fh, encoding=encoding)
-        headers = list(df.columns.values)
-        ytd = dtsp.find_first_n(headers, lambda x: self.PATTERN_ADV_YTD in x and self.year in x)
+        ytd = self.get_ytd_header(df)
         cols = self.COLS_ADV if cols is None else cols
         cols = cols + [ytd]
         df = df[cols]
@@ -334,17 +351,6 @@ class CMEGMatcher(object):
         der_type = row[self.CLEARED_AS]
         product = product.replace(der_type, '') if last_word(product) == der_type else product
         return product.rstrip()
-
-    def __groupby(self, df, cols):
-        if not cols:
-            return df
-        else:
-            gpobj = df.groupby(cols[0])
-            group_dict = dict()
-            for group in gpobj.groups.keys():
-                new_df = gpobj.get_group(group)
-                group_dict[group] = self.__groupby(new_df, cols[1:])
-            return group_dict
 
     def __match_pdgp(self, s1, s2):
         wds1 = Matcher.get_words(s1)
@@ -373,96 +379,112 @@ class CMEGMatcher(object):
         found_clras = self.__match_in_string(clras, clras_set)
         return found_clras if found_clras is not None else row_clras
 
-    def __preprocess_qparams(self, row, pd_id, prods_pdgps, prods_clras, prods_subgps, mapping=None):
-        mapping = dict() if mapping is None else mapping
-        pdnm = mapping[pd_id] if pd_id in mapping else row[self.PRODUCT]
-        pdgp = dtsp.find_first_n(prods_pdgps, lambda x: self.__match_pdgp(x, row[self.PRODUCT_GROUP]))
-        clras = self.__verify_clearedas(pdnm, row[self.CLEARED_AS], prods_clras)
-        subgp = self.__match_in_string(pdnm, prods_subgps[pdgp], False)
-        return pdnm, pdgp, clras, subgp
-
     def match_prod_code(self, df_adv, ix, exact_mapping=None, notfound=None, multi_match=None):
-        df_matched = pd.DataFrame(columns=list(df_adv.columns) + ix.schema.names())
+        df_matched = pd.DataFrame(columns=list(df_adv.columns) + ix.schema.stored_names())
         with ix.searcher() as searcher:
-            lexicons = get_idx_lexicon(
-                searcher, self.F_PRODUCT_GROUP, self.F_CLEARED_AS, **{self.F_PRODUCT_GROUP: self.F_SUB_GROUP})
-            prods_pdgps, prods_clras, prods_subgps = \
-                lexicons[self.F_PRODUCT_GROUP], lexicons[self.F_CLEARED_AS], lexicons[self.F_SUB_GROUP]
-            schema = ix.schema
+            lexicons = get_idx_lexicon(searcher, self.F_PRODUCT_GROUP, self.F_CLEARED_AS,
+                                       **{self.F_PRODUCT_GROUP: self.F_SUB_GROUP})
             adsearch = AdvSearch(searcher)
 
             for i, row in df_adv.iterrows():
-                pd_id = (row[self.PRODUCT], row[self.PRODUCT_GROUP], row[self.CLEARED_AS])
-                results, min_dist, one_or_all, pdnm = None, True, None, None
-
-                def callback(val):
-                    min_dist = val
-
-                if notfound is None or pd_id not in notfound:
-                    one_or_all = 'one' if multi_match is None or pd_id not in multi_match else 'all'
-                    pdnm, pdgp, clras, subgp = self.__preprocess_qparams(
-                        row, pd_id, prods_pdgps, prods_clras, prods_subgps, exact_mapping)
-                    grouping_q = filter_query(
-                        (self.F_PRODUCT_GROUP, pdgp), (self.F_CLEARED_AS, clras), (self.F_SUB_GROUP, subgp))
-
-                    qparams = {FIELDNAME: self.F_PRODUCT_NAME,
-                               SCHEMA: schema,
-                               QSTRING: pdnm}
-
-                    if one_or_all == 'one':
-                        src_and = adsearch.search(*get_query_params(query='and', **qparams),
-                                                  lambda: callback(True),
-                                                  filter=grouping_q,
-                                                  limit=None)
-                        src_fuzzy = adsearch.search(*get_query_params(query='and', **{**qparams, TERMCLASS: FuzzyTerm}),
-                                                    lambda: callback(False),
-                                                    filter=grouping_q,
-                                                    limit=None)
-                        src_andmaybe = adsearch.search(*get_query_params(query='andmaybe', **qparams),
-                                                       lambda: callback(True),
-                                                       filter=grouping_q,
-                                                       limit=None)
-                        results = adsearch.chain_search([src_and, src_fuzzy, src_andmaybe])
-                    else:
-                        q_configs = multi_match[pd_id]
-                        qparams.update(q_configs)
-                        src = adsearch.search(*get_query_params(**qparams),
-                                              lambda: callback(True),
-                                              filter=grouping_q,
-                                              limit=None)
-                        results = src()
-                        if len(results) < 2 and q_configs[QUERY] != 'every':
-                            qparams.update({TERMCLASS: FuzzyTerm})
-                            src = adsearch.search(*get_query_params(**qparams),
-                                                  lambda: callback(False),
-                                                  filter=grouping_q,
-                                                  limit=None)
-                            results = src()
-                if results:
-                    if one_or_all == 'one' and min_dist:
-                        results = min_dist_rslt(results, pdnm, self.F_PRODUCT_NAME, schema, minboost=0.2)
-                    rows_matched = self.__join_results(results, row, how=one_or_all)
-                else:
-                    rows_matched = row
-                df_matched = df_matched.append(rows_matched, ignore_index=True)
-                self.__prt_match_status(row, rows_matched)
-
+                results = self.__match_a_row(row, lexicons, exact_mapping, notfound, multi_match, ix.schema, adsearch)
+                rows_matched = self.__join_results(results, row)
+                df_matched = df_matched.append(pd.DataFrame(rows_matched), ignore_index=True)
+                matched = True if results else False
+                self.__prt_match_status(matched, rows_matched)
         return df_matched
 
-    def __prt_match_status(self, row, rows_matched):
-        if rows_matched is row:
-            print('Failed matching {}'.format(row[self.PRODUCT]))
-        else:
-            for r in rows_matched:
-                print('Successful matching {} with {}'.format(row[self.PRODUCT], r[self.F_PRODUCT_NAME]))
+    def __match_a_row(self, row, lexicons, exact_mapping, notfound, multi_match, schema, adsearch):
+        pd_id = (row[self.PRODUCT], row[self.PRODUCT_GROUP], row[self.CLEARED_AS])
+        if notfound is not None and pd_id in notfound:
+            return None
+        pdnm = exact_mapping[pd_id] if pd_id in exact_mapping else row[self.PRODUCT]
+        is_one = True if multi_match is None or pd_id not in multi_match else False
+        grouping_q = self.__get_grouping_query(row, pdnm, lexicons)
+        qparams = {FIELDNAME: self.F_PRODUCT_NAME,
+                   SCHEMA: schema,
+                   QSTRING: pdnm}
+        min_dist = True
 
-    def __join_results(self, results, *dfs, how='one'):
-        joined_dict = [results[0].fields()] if how == 'one' else [r.fields() for r in results]
-        if dfs is not None:
-            for df in dfs:
-                for jd in joined_dict:
-                    jd.update(df)
-        return joined_dict
+        def callback(val):
+            min_dist = val
+
+        if is_one:
+            results = self.__search_for_one(adsearch, qparams, grouping_q, callback)
+            if results and min_dist:
+                results = min_dist_rslt(results, pdnm, self.F_PRODUCT_NAME, schema, minboost=0.2)[0]
+        else:
+            q_configs = multi_match[pd_id]
+            qparams.update(q_configs)
+            results = self.__search_for_all(adsearch, qparams, grouping_q, callback)
+        return results
+
+    def __get_grouping_query(self, row, pdnm, lexicons):
+        prods_pdgps, prods_subgps = lexicons[self.F_PRODUCT_GROUP], lexicons[self.F_SUB_GROUP]
+        prods_clras = lexicons[self.F_CLEARED_AS]
+        pdgp = dtsp.find_first_n(prods_pdgps, lambda x: self.__match_pdgp(x, row[self.PRODUCT_GROUP]))
+        clras = self.__verify_clearedas(pdnm, row[self.CLEARED_AS], prods_clras)
+        subgp = self.__match_in_string(pdnm, prods_subgps[pdgp], False)
+        return filter_query((self.F_PRODUCT_GROUP, pdgp), (self.F_CLEARED_AS, clras), (self.F_SUB_GROUP, subgp))
+
+    def __search_for_one(self, adsearch, qparams, grouping_q, callback):
+        src_and = adsearch.search(*get_query_params('and', **qparams),
+                                  lambda: callback(True),
+                                  filter=grouping_q,
+                                  limit=None)
+        src_fuzzy = adsearch.search(*get_query_params('and', **{**qparams, TERMCLASS: FuzzyTerm}),
+                                    lambda: callback(False),
+                                    filter=grouping_q,
+                                    limit=None)
+        src_andmaybe = adsearch.search(*get_query_params('andmaybe', **qparams),
+                                       lambda: callback(True),
+                                       filter=grouping_q,
+                                       limit=None)
+        return adsearch.chain_search([src_and, src_fuzzy, src_andmaybe])
+
+    def __search_for_all(self, adsearch, qparams, grouping_q, callback):
+        query = qparams[QUERY]
+        src = adsearch.search(*get_query_params(**qparams),
+                              lambda: callback(True),
+                              filter=grouping_q,
+                              limit=None)
+
+        src_fuzzy = adsearch.search(*get_query_params(**{**qparams, TERMCLASS: FuzzyTerm}),
+                                    lambda: callback(False),
+                                    filter=grouping_q,
+                                    limit=None)
+
+        def chain_condition(r):
+            if not r:
+                return True
+            if r and query != 'every' and len(r) < 2:
+                return True
+            return False
+
+        return adsearch.chain_search([src, src_fuzzy], chain_condition)
+
+    def __prt_match_status(self, matched, rows_matched):
+        for r in rows_matched:
+            if not matched:
+                print('Failed matching {}'.format(r[self.PRODUCT]))
+            else:
+                print('Successful matching {} with {}'.format(r[self.PRODUCT], r[self.F_PRODUCT_NAME]))
+
+    def __join_results(self, results, df):
+        joined_dicts = []
+
+        def df_to_dict():
+            return {k: v for k, v in df.items()}
+
+        results = [results] if isinstance(results, Hit) else results
+        if results:
+            for r in results:
+                df_copy = df_to_dict()
+                df_copy.update(r)
+                joined_dicts.append(df_copy)
+        else:
+            joined_dicts.append(df_to_dict())
+        return joined_dicts
 
     def __match_prods_by_commodity(self, df_prods, df_adv):
         prod_dict = {str(row[self.GLOBEX]): row for _, row in df_prods.iterrows()}
@@ -471,20 +493,13 @@ class CMEGMatcher(object):
                         if str(row[self.COMMODITY]) in prod_dict]
         cols = list(df_adv.columns) + list(df_prods.columns)
         df = pd.DataFrame(matched_rows, columns=cols)
-        # unmatched = [(i, str(entry)) for i, entry in df_adv[self.COMMODITY].iteritems() if
-        #              str(entry) not in df_prods[self.GLOBEX].astype(str).unique()]
-        # unmatched = [(i, entry) for i, entry in unmatched if entry not in df_prods[self.CLEARING].astype(str).unique()]
-        # ytd = dtsp.find_first_n(list(df_adv.columns), lambda x: self.PATTERN_ADV_YTD in x)
-        # indices = [i for i, _ in unmatched if df_adv.iloc[i][ytd] == 0]
-        # df_adv.drop(df_adv.index[indices], inplace=True)
-        # df_adv.reset_index(drop=0, inplace=True)
         return df
 
     def get_cbot_fields(self):
         regtk_exp = '[^\s/\(\)]+'
         regex_tkn = RegexTokenizerExtra(regtk_exp, ignored=False, required=False)
         lwc_flt = LowercaseFilter()
-        splt_mrg_flt = SplitMergeFilter(original=True, splitcase=True, splitnums=True, mergewords=True, mergenums=True)
+        splt_mrg_flt = SplitMergeFilter(splitcase=True, splitnums=True, ignore_splt=True)
 
         stp_flt = StopFilter(stoplist=STOP_LIST + self.CBOT_COMMON_WORDS, minsize=1)
         sp_flt = SpecialWordFilter(self.CBOT_SPECIAL_MAPPING)
@@ -504,7 +519,7 @@ class CMEGMatcher(object):
         regtk_exp = '[^\s/\(\)]+'
         regex_tkn = RegexTokenizerExtra(regtk_exp, ignored=False, required=False)
         lwc_flt = LowercaseFilter()
-        splt_mrg_flt = SplitMergeFilter(original=True, splitcase=True, splitnums=True, mergewords=True, mergenums=True)
+        splt_mrg_flt = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True, ignore_mrg=True)
 
         stp_flt =StopFilter(stoplist=STOP_LIST + self.CME_COMMON_WORDS, minsize=1)
         sp_flt = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
@@ -523,7 +538,7 @@ class CMEGMatcher(object):
     def init_ix_cme_cbot(self, clean=False):
         df_prods = self.__from_prods(self.prods_file)
         df_ix = df_prods.rename(columns=self.COL2FIELD)
-        gdf_exch = {exch: df.reset_index(drop=0) for exch, df in self.__groupby(df_ix, [self.EXCHANGE]).items()}
+        gdf_exch = {exch: df.reset_index(drop=0) for exch, df in df_groupby(df_ix, [self.EXCHANGE]).items()}
         ix_cme = setup_ix(self.get_cme_fields(), gdf_exch[self.CME], self.index_cme, clean)
         ix_cbot = setup_ix(self.get_cbot_fields(), gdf_exch[self.CBOT], self.index_cbot, clean)
         return ix_cme, ix_cbot, gdf_exch
@@ -534,23 +549,25 @@ class CMEGMatcher(object):
         if 'index' in df_nymex_comex_prods.columns:
             df_nymex_comex_prods.drop(['index'], axis=1, inplace=True)
         df_adv = self.__match_prods_by_commodity(df_nymex_comex_prods, df_adv)
-        cp.XlsxWriter.save_sheets(self.matched_file, {self.NYMEX: df_adv}, override=True)
+        return df_adv
 
-    def run_pd_mtch(self, outpath=None, clean=False):
+    def run_pd_mtch(self, clean=False):
         dfs_adv = {self.CME: self.__from_adv(self.adv_cme, self.COLS_ADV),
                    self.CBOT: self.__from_adv(self.adv_cbot, self.COLS_ADV),
                    self.NYMEX: self.__from_adv(self.adv_nymex_comex, self.COLS_ADV + [self.COMMODITY])}
 
         ix_cme, ix_cbot, gdf_exch = self.init_ix_cme_cbot(clean)
-        self.match_nymex_comex(dfs_adv[self.NYMEX], gdf_exch)
-
+        mdf_nymex = self.match_nymex_comex(dfs_adv[self.NYMEX], gdf_exch)
         mdf_cme = self.match_prod_code(dfs_adv[self.CME], ix_cme, self.CME_EXACT_MAPPING, self.CME_NOTFOUND_PRODS,
                                        self.CME_MULTI_MATCH)
         mdf_cbot = self.match_prod_code(dfs_adv[self.CBOT], ix_cbot, self.CBOT_EXACT_MAPPING,
                                         multi_match=self.CBOT_MULTI_MATCH)
+        return {self.CME: mdf_cme, self.CBOT: mdf_cbot, self.NYMEX: mdf_nymex}
 
+    def save_to_xlsx(self, dfs_dict, outpath=None, override=True):
         outpath = self.matched_file if outpath is None else outpath
-        cp.XlsxWriter.save_sheets(outpath, {self.CME: mdf_cme, self.CBOT: mdf_cbot}, override=False)
+        cp.XlsxWriter.save_sheets(outpath, dfs_dict, override=override)
+        return outpath
 
 
 checked_path = os.getcwd()
@@ -566,4 +583,25 @@ cmeg_adv_files = [os.path.join(checked_path, report_files['cme']),
                   os.path.join(checked_path, report_files['nymex_comex'])]
 
 cmeg = CMEGMatcher(cmeg_adv_files, cmeg_prds_file, '2017')
-cmeg.run_pd_mtch(clean=True)
+
+cmeg.save_to_xlsx(cmeg.run_pd_mtch(clean=True))
+
+
+
+# region TODO: test
+# def __match_prods_by_commodity(self, df_prods, df_adv):
+#     prod_dict = {str(row[self.GLOBEX]): row for _, row in df_prods.iterrows()}
+#     prod_dict.update({str(row[self.CLEARING]): row for _, row in df_prods.iterrows()})
+#     matched_rows = [{**row, **prod_dict[str(row[self.COMMODITY])]} for _, row in df_adv.iterrows()
+#                     if str(row[self.COMMODITY]) in prod_dict]
+#     cols = list(df_adv.columns) + list(df_prods.columns)
+#     df = pd.DataFrame(matched_rows, columns=cols)
+#     # unmatched = [(i, str(entry)) for i, entry in df_adv[self.COMMODITY].iteritems() if
+#     #              str(entry) not in df_prods[self.GLOBEX].astype(str).unique()]
+#     # unmatched = [(i, entry) for i, entry in unmatched if entry not in df_prods[self.CLEARING].astype(str).unique()]
+#     # ytd = dtsp.find_first_n(list(df_adv.columns), lambda x: self.PATTERN_ADV_YTD in x)
+#     # indices = [i for i, _ in unmatched if df_adv.iloc[i][ytd] == 0]
+#     # df_adv.drop(df_adv.index[indices], inplace=True)
+#     # df_adv.reset_index(drop=0, inplace=True)
+#     return df
+# endregion

@@ -5,32 +5,25 @@ import os
 import re
 import inflect
 import itertools
+import math
+
+from productmatcher import *
 
 
-
-import datascraper as dtsp
-from whooshext import *
 
 # Parse the config files
 # cp.parse_save()
 
 
-reports_path = '/home/slan/Documents/exch_report/'
-configs_path = '/home/slan/Documents/config_files/'
-# checked_path = '/home/slan/Documents/checked_report/'
-checked_path = os.getcwd()
-
-exchanges = ['asx', 'bloomberg', 'cme', 'cbot', 'nymex_comex', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
-report_fmtname = 'Web_ADV_Report_{}.xlsx'
-
-report_files = {e: report_fmtname.format(e.upper()) for e in exchanges}
-
-
-# config_files = {e: e + '.xlsx' for e in exchanges}
+# reports_path = '/home/slan/Documents/exch_report/'
+# configs_path = '/home/slan/Documents/config_files/'
+# # checked_path = '/home/slan/Documents/checked_report/'
+# checked_path = os.getcwd()
 #
-# test_input = [(reports_path + report_files['cme'], 'Summary'), (configs_path + config_files['cme'], 'Config')]
-# test_output = test_input[0][0]
-
+# EXCHANGES = ['asx', 'bloomberg', 'cme', 'cbot', 'nymex_comex', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
+# REPORT_FMTNAME = 'Web_ADV_Report_{}.xlsx'
+#
+# REPORT_FILES = {e: REPORT_FMTNAME.format(e.upper()) for e in EXCHANGES}
 
 
 
@@ -44,6 +37,61 @@ def xl_consolidate(file2sheet, dest):
     wrt.save()
 
 
+class CMEGChecker(object):
+    EXCHANGES = ['cme', 'cbot', 'nymex_comex']
+    REPORT_FMTNAME = 'Web_ADV_Report_{}.xlsx'
+    PRODSLAT_FILE = 'Product_Slate.xls'
+
+    def __init__(self, checked_path=None):
+        self.report_files = [self.REPORT_FMTNAME.format(e.upper()) for e in self.EXCHANGES]
+        self.checked_path = checked_path if checked_path is not None else os.getcwd()
+        self.cmeg_prds_file = os.path.join(self.checked_path, self.PRODSLAT_FILE)
+        self.cmeg_adv_files = [os.path.join(self.checked_path, f) for f in self.report_files]
+        self.matcher = CMEGMatcher(self.cmeg_adv_files, self.cmeg_prds_file, '2017', self.checked_path)
+
+    def id_rows(self, df):
+        groups = df_groupby(df, [[self.matcher.PRODUCT, self.matcher.CLEARED_AS]])
+        dict_globex = dict()
+        header_ytd = self.matcher.get_ytd_header(df)
+        for group, subdf in groups.items():
+            tot_ytd = sum(subdf[header_ytd].unique())
+            for _, row in subdf.iterrows():
+                row.update(pd.Series([tot_ytd], index=[header_ytd]))
+                pd_code = self.get_prod_code(row)
+                if pd_code is not None:
+                    dict_globex.update({pd_code: row})
+
+            # subdf.drop_duplicates(self.matcher.F_PRODUCT_NAME, 'first', inplace=True)
+            # new_df = pd.DataFrame({header_ytd: [tot_ytd] * subdf.shape[0]})
+            # subdf.update(new_df)
+            # dict_globex.update({self.get_prod_code(row): row for _, row in subdf.iterrows() if self.get_prod_code(row)})
+        return groups, dict_globex
+
+    def get_prod_code(self, row):
+        if not pd.isnull(row[self.matcher.F_GLOBEX]):
+            return row[self.matcher.F_GLOBEX]
+        elif not pd.isnull(row[self.matcher.F_CLEARING]):
+            return row[self.matcher.F_CLEARING]
+        else:
+            return None
+
+    def run_pd_check(self):
+        dfs_dict = self.matcher.run_pd_mtch(clean=True)
+        self.id_rows(dfs_dict[self.matcher.CME])
+
+
+
+
+cmeg = CMEGChecker()
+# cmeg.run_pd_check()
+matched_file = os.path.join(cmeg.checked_path, 'CMEG_matched.xlsx')
+with open(matched_file, 'rb') as fh:
+    df_cme = pd.read_excel(fh, sheet_name=cmeg.matcher.CME)
+    # df_cbot = pd.read_excel(fh, sheet_name=cmeg.matcher.CBOT)
+    # df_nymex = pd.read_excel(fh, sheet_name=cmeg.matcher.NYMEX)
+
+cme_groups, cme_dict = cmeg.id_rows(df_cme)
+print()
 
 # xl_consolidate(test_input, test_output)
 # xl = pd.ExcelFile(test_input[0][0])
@@ -52,19 +100,6 @@ def xl_consolidate(file2sheet, dest):
 # exp = lambda x: x in products.tolist()
 # results = summary[list(filter(summary, 'Globex',  exp))]
 # print((summary[list(filter(summary, 'Globex',  exp))].head()))
-
-class WhooshExtension(object):
-    STEM_ANA = StemmingAnalyzer('[^ /\.\(\)]+')
-    CME_SPECIAL_MAPPING = {'midcurve': 'mc',
-                           'mc': 'midcurve',
-                           '$': 'USD'}
-
-    @staticmethod
-    def CMESpecialFilter(stream):
-        for token in stream:
-            if token.text in WhooshExtension.CME_SPECIAL_MAPPING:
-                token.text = WhooshExtension.CME_SPECIAL_MAPPING[token.text]
-            yield token
 
 
 

@@ -1,7 +1,7 @@
 from bs4 import BeautifulSoup
 import pandas as pd
 import openpyxl
-from openpyxl.cell import get_column_letter
+from openpyxl.utils import get_column_letter
 import os
 
 
@@ -48,7 +48,7 @@ class XlsxWriter(object):
     def auto_size_cols(ws):
         i = 0
         while i < ws.max_column:
-            max_len = max([len(str(row.value)) for row in ws.columns[i]])
+            max_len = max([len(str(row.value)) for row in list(ws.columns)[i]])
             ws.column_dimensions[get_column_letter(i + 1)].width = max_len + 2
             i += 1
 

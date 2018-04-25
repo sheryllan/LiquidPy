@@ -192,12 +192,12 @@ class SplitMergeFilter(Filter):
     PTN_SPLT_NUM = '[0-9]+|[^0-9]+'
     PTN_SPLT_WRDNUM = '[0-9]+|([A-Z]*[^A-Z0-9]*)'
 
-    PTN_MRG_WRD = '[A-Za-z]+'
-    PTN_MRG_NUM = '[0-9]+'
+    PTN_MRG_WRD = '[^0-9]+'
+    PTN_MRG_NUM = '[^A-Za-z]+'
 
     def __init__(self, delims_splt='\W+', delims_mrg='\W+', min_spltlen=1, original=False,
                  splitcase=False, splitnums=False, mergewords=False, mergenums=False,
-                 ignore_splt=False, ignore_mrg=True):
+                 ignore_splt=False, ignore_mrg=False):
         self.delims_splt = delims_splt
         self.delims_mrg = delims_mrg
         self.min_spltlen = min_spltlen
@@ -224,14 +224,11 @@ class SplitMergeFilter(Filter):
 
     def __call__(self, stream):
         for token in stream:
-            tk_text, tk_boost, tk_ignored = token.text, token.boost, token.ignored
-            if self.original:
-                yield token
-            for tksub in self.__split_merge(tk_text):
-                if not (self.original and tksub.text == tk_text):
-                    yield set_token(token, text=tksub.text,
-                                    boost=tksub.boost * tk_boost,
-                                    ignored=tk_ignored or tksub.ignored)
+            tk_cpy = TokenSub(token.text, token.boost, token.ignored)
+            processed = list(self.__split_merge(tk_cpy.text))
+            for tksub in self.__re_boost(tk_cpy, processed):
+                updated_tksub = update_tksub(tk_cpy, tksub, lambda o, n: o * n)
+                yield set_token(token, **updated_tksub._asdict())
 
     def __split(self, text, ignore=False):
         words = [word for word in re.split(self.delims_splt, text) if len(word) >= self.min_spltlen]
@@ -243,11 +240,11 @@ class SplitMergeFilter(Filter):
                     yield TokenSub(split, 1, split != word and ignore)
 
     def __merge(self, text, ignore=True):
+        string = re.sub(self.delims_mrg, '', text)
         if self.mrg_ptn is not None:
-            string = re.sub(self.delims_mrg, '', text)
             merges = self.__findall(self.mrg_ptn, string)
         else:
-            merges = re.split(self.delims_mrg, text)
+            merges = [string]
         for merge in merges:
             yield TokenSub(merge, 1, merge != text and ignore)
 
@@ -276,6 +273,19 @@ class SplitMergeFilter(Filter):
             results = [TokenSub(text)]
         return results
 
+    def __re_boost(self, original, processed):
+        if not self.original:
+            return processed
+
+        def boost_by(tokens, scale):
+            return (update_tksub(t, TokenSub(t.text, scale), lambda o, n: o * n) for t in tokens)
+
+        scale = 0.5
+        original_text = original.text
+        original = boost_by([original], scale)
+        processed = (t for t in boost_by(processed, scale) if t.text != original_text)
+        return chain(original, processed)
+
     def __findall(self, pattern, word):
         for mobj in re.finditer(pattern, word):
             text = mobj.group()
@@ -295,7 +305,8 @@ class SpecialWordFilter(Filter):
     def __call__(self, stream):
         memory = dict()
         prev_kws = list()
-        next_group = self.kws_treedict
+        kws_treedict = copy.deepcopy(self.kws_treedict)
+        next_group = kws_treedict
         token = None
         ismapped = False
         for token in stream:
@@ -307,11 +318,11 @@ class SpecialWordFilter(Filter):
             if tk_cpy.text in next_group:
                 prev_kws, next_group = self.__move_down(prev_kws, next_group, tk_cpy)
             else:
-                if prev_kws and next_group != self.kws_treedict:
-                    trans_tokens = self.__prev_tokens(prev_kws)
+                if prev_kws and next_group != kws_treedict:
+                    trans_tokens = self.__prev_tokens(prev_kws, kws_treedict, ismapped)
                     for tk in self.__gen_tokens(trans_tokens, memory, ismapped):
                         yield set_token(token, **tk._asdict())
-                    prev_kws, next_group = self.__clear()
+                    prev_kws, next_group = self.__clear(kws_treedict)
 
                 if tk_cpy.text in self.word_dict:
                     ismapped = True
@@ -331,8 +342,8 @@ class SpecialWordFilter(Filter):
                     memory.update({tk_cpy: (ismapped, True)})
                     yield set_token(token, **tk_cpy._asdict())
 
-        if prev_kws and next_group != self.kws_treedict and token is not None:
-            trans_tokens = self.__prev_tokens(prev_kws)
+        if prev_kws and next_group != kws_treedict and token is not None:
+            trans_tokens = self.__prev_tokens(prev_kws, kws_treedict, ismapped)
             for tk in self.__gen_tokens(trans_tokens, memory, ismapped):
                 yield set_token(token, **tk._asdict())
 
@@ -377,23 +388,23 @@ class SpecialWordFilter(Filter):
             prev_kws.append(None)
         return prev_kws, next_group
 
-    def __prev_tokens(self, prev_kws, ismapped=False):
+    def __prev_tokens(self, prev_kws, treedict, ismapped=False):
         if not prev_kws:
             return prev_kws
         last_idx = last_indexof(prev_kws, None)
         trans_tokens = prev_kws
         if last_idx is not None:
-            longest_kwtokens = self.__longest_kwtokens(prev_kws[0: last_idx], not ismapped)
+            longest_kwtokens = self.__longest_kwtokens(prev_kws[0: last_idx], treedict, not ismapped)
             longest_kwtokens = longest_kwtokens if ismapped \
                 else [update_tksub(to, tn, lambda x1, x2: x1 * x2) for to, tn in zip(*longest_kwtokens)]
             trans_tokens = longest_kwtokens + prev_kws[last_idx + 1:]
         return trans_tokens
 
-    def __clear(self):
-        return list(), self.kws_treedict
+    def __clear(self, kws_treedict):
+        return list(), kws_treedict
 
-    def __longest_kwtokens(self, tokens, keeporigs=False):
-        next_dict = self.kws_treedict
+    def __longest_kwtokens(self, tokens, treedict, keeporigs=False):
+        next_dict = treedict
         orig_tokens = list()
         for token in tokens:
             if token is None:
@@ -568,10 +579,10 @@ class AdvSearch(object):
 
         return search_func
 
-    def chain_search(self, searches):
+    def chain_search(self, searches, chain_condition=lambda r: False if r else True):
         results = None
         for search in searches:
-            if results:
+            if not chain_condition(results):
                 return results
             results = search()
         return results
@@ -696,36 +707,18 @@ params_dict = {'and': {FIELDNAME, SCHEMA, QSTRING, BOOST, TERMCLASS},
 reserved_params = set([QUERY] + dtsp.flatten_iter(params_dict.values()))
 
 
-def get_query_params(**kwargs):
-    essentials = [QUERY, FIELDNAME, SCHEMA, QSTRING]
+def get_query_params(query, **kwargs):
+    essentials = [FIELDNAME, SCHEMA, QSTRING]
     if any(k not in kwargs for k in essentials):
         raise KeyError('Input must have values for the keys: {}'.format(essentials))
 
     params = dict()
-    query = kwargs[QUERY]
     queryobj = query_dict[query]
-
     if query == 'andnot':
         kwargs[ANDWORDS] = kwargs[QSTRING] if ANDWORDS not in kwargs or not kwargs[ANDWORDS] \
             else ' '.join([kwargs[ANDWORDS], kwargs[QSTRING]])
 
     params.update({k: v for k, v in kwargs.items() if k in params_dict[query] or k not in reserved_params})
-
-    # params = dict()
-    # queryobj = query_dict[kwargs[QUERY]]
-    # if kwargs[QUERY] == 'every':
-    #     params = {FIELDNAME: kwargs[FIELDNAME]}
-    #     return queryobj, params
-    #
-    # params.update(kwargs)
-    # del params[QUERY]
-    # if kwargs[QUERY] == 'andnot':
-    #     kwargs[ANDWORDS] = kwargs[QSTRING] if ANDWORDS not in kwargs or not kwargs[ANDWORDS] \
-    #         else ' '.join([kwargs[ANDWORDS], kwargs[QSTRING]])
-    #     del params[QSTRING]
-    #     params.update({ANDWORDS: kwargs[ANDWORDS], NOTWORDS: kwargs[NOTWORDS]})
-    # elif kwargs[QUERY] == 'orofand':
-    #     del params[QSTRING]
     return queryobj, params
 
 
