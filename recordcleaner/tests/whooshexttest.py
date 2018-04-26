@@ -142,61 +142,61 @@ class CMEAnalyzerTests(ut.TestCase):
     #     self.assertListEqual(expected6, actual6)
 
 
-    def test_analyzer(self):
-        REGEX_TKN = RegexTokenizerExtra(self.REGTK_EXP, ignored=False, required=False)
-        SPLT_MRG_FLT = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True, ignore_mrg=True)
-        LWRCS_FLT = LowercaseFilter()
-
-        CME_STP_FLT = StopFilter(stoplist=self.STOP_LIST + self.CME_COMMON_WORDS, minsize=1)
-        CME_SP_FLT = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
-        CME_VW_FLT = VowelFilter(self.CME_KYWRD_EXCLU, lift_ignore=False)
-        CME_MULT_FLT = MultiFilterFixed(index=CME_VW_FLT)
-
-        ana = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_STP_FLT | CME_SP_FLT | CME_MULT_FLT | CME_STP_FLT
-        # ana = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_STP_FLT | CME_SP_FLT | CME_MULT_FLT
-        # ana = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_SP_FLT | CME_VW_FLT | STP_FLT
-        # ana = REGEX_TKN | IntraWordFilter(mergewords=True)
-
-        testcase1 = 'Nikkei/USD'
-        testcase2 = ' EOW1 S&P 500'
-        testcase3 = ' AUD/USD PQO 2pm Fix'
-        testcase4 = 'E-mini NASDAQ Biotechnology Index'
-        testcase5 = 'Nikkei/USD Futures'
-        testcase6 = 'S.AFRICAN RAND'
-        testcase7 = 'Chilean Peso/US Dollar (CLP/USD) Futures'
-        testcase8 = '(CLP/USD) Chilean Peso/US Dollar American'
-        # testcase9 = 'EURO MIDCURVE'
-        testcase9 = '10-Year T-Note Weekly Options Wk 2'
-        testcase10 = '2-YR NOTE'
-        testcase11 = 'S&P500 ENERGY SECTOR'
-
-        # result1 = [t.text for t in ana(testcase1)]
-        # result2 = [t.text for t in ana(testcase2)]
-        # result3 = [t.text for t in ana(testcase3)]
-        # result4 = [t.text for t in ana(testcase4, mode='index')]
-        # result5 = [t.text for t in ana(testcase5, mode='index')]
-        # result6 = [t.text for t in ana(testcase6, mode='index')]
-        result7 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase7, mode='index')]
-        # result8 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase8, mode='index')]
-
-        # result9 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase9, mode='index')]
-        # result10 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase10, mode='query')]
-        # result11 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase11, mode='query')]
-
-        # print(result4)
-        # print(result6)
-        # print(result5)
-        print(result7)
-        # print(result8)
-        # print(result9)
-        # print(result10)
-        # print(result11)
-
-        # expected1 = ['e', 'micro', 'emicro', 'aud', 'australian', 'dollar', 'usd', 'us', 'american', 'dollar']
-        # expected4 = ['e', 'mini', 'emini', 'nasdaq', 'biotechnology', 'btchnlgy', 'index']
-        #
-        # self.assertListEqual(expected1, result1)
-        # self.assertListEqual(expected4, result4)
+    # def test_analyzer(self):
+    #     REGEX_TKN = RegexTokenizerExtra(self.REGTK_EXP, ignored=False, required=False)
+    #     SPLT_MRG_FLT = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True, ignore_mrg=True)
+    #     LWRCS_FLT = LowercaseFilter()
+    #
+    #     CME_STP_FLT = StopFilter(stoplist=self.STOP_LIST + self.CME_COMMON_WORDS, minsize=1)
+    #     CME_SP_FLT = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
+    #     CME_VW_FLT = VowelFilter(self.CME_KYWRD_EXCLU, lift_ignore=False)
+    #     CME_MULT_FLT = MultiFilterFixed(index=CME_VW_FLT)
+    #
+    #     ana = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_STP_FLT | CME_SP_FLT | CME_MULT_FLT | CME_STP_FLT
+    #     # ana = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_STP_FLT | CME_SP_FLT | CME_MULT_FLT
+    #     # ana = REGEX_TKN | SPLT_MRG_FLT | LWRCS_FLT | CME_SP_FLT | CME_VW_FLT | STP_FLT
+    #     # ana = REGEX_TKN | IntraWordFilter(mergewords=True)
+    #
+    #     testcase1 = 'Nikkei/USD'
+    #     testcase2 = ' EOW1 S&P 500'
+    #     testcase3 = ' AUD/USD PQO 2pm Fix'
+    #     testcase4 = 'E-mini NASDAQ Biotechnology Index'
+    #     testcase5 = 'Nikkei/USD Futures'
+    #     testcase6 = 'S.AFRICAN RAND'
+    #     testcase7 = 'Chilean Peso/US Dollar (CLP/USD) Futures'
+    #     testcase8 = '(CLP/USD) Chilean Peso/US Dollar American'
+    #     # testcase9 = 'EURO MIDCURVE'
+    #     testcase9 = '10-Year T-Note Weekly Options Wk 2'
+    #     testcase10 = '2-YR NOTE'
+    #     testcase11 = 'S&P500 ENERGY SECTOR'
+    #
+    #     # result1 = [t.text for t in ana(testcase1)]
+    #     # result2 = [t.text for t in ana(testcase2)]
+    #     # result3 = [t.text for t in ana(testcase3)]
+    #     # result4 = [t.text for t in ana(testcase4, mode='index')]
+    #     # result5 = [t.text for t in ana(testcase5, mode='index')]
+    #     # result6 = [t.text for t in ana(testcase6, mode='index')]
+    #     result7 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase7, mode='index')]
+    #     # result8 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase8, mode='index')]
+    #
+    #     # result9 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase9, mode='index')]
+    #     # result10 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase10, mode='query')]
+    #     # result11 = [(t.text, t.boost, t.ignored, t.required) for t in ana(testcase11, mode='query')]
+    #
+    #     # print(result4)
+    #     # print(result6)
+    #     # print(result5)
+    #     print(result7)
+    #     # print(result8)
+    #     # print(result9)
+    #     # print(result10)
+    #     # print(result11)
+    #
+    #     # expected1 = ['e', 'micro', 'emicro', 'aud', 'australian', 'dollar', 'usd', 'us', 'american', 'dollar']
+    #     # expected4 = ['e', 'mini', 'emini', 'nasdaq', 'biotechnology', 'btchnlgy', 'index']
+    #     #
+    #     # self.assertListEqual(expected1, result1)
+    #     # self.assertListEqual(expected4, result4)
 
 
     # def test_composite_filter(self):
@@ -211,99 +211,120 @@ class CMEAnalyzerTests(ut.TestCase):
     #
     #     self.assertListEqual(expected4, result4)
 
-    # def test_ana_query_mode(self):
-    #     F_PRODUCT_NAME = 'Product_Name'
-    #     checked_path = os.getcwd()
-    #     cmeg_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
-    #     cmeg = CMEGMatcher(prods_file=cmeg_prds_file)
-    #
-    #
-    #     ix_cbot = open_dir('CBOT_Product_Index')
-    #     # ix_cme, ix_cbot, gdf_exch = cmeg.init_ix_cme_cbot(True)
-    #     # field_pdnm = {x[0]: x[1] for x in ix.schema.items()}[F_PRODUCT_NAME]
-    #     #
-    #     # pdnm1 = 'GBP/USD PQO 2pm Fix'
-    #     # pdnm2 = 'E-MINI EURO FX'
-    #     #
-    #     # rcd1 = 'Weekly Premium Quoted European Style Options on British Pound/US Dollar Futures - Wk 3'
-    #     # rcd2 = 'E-mini Euro FX Futures'
-    #     #
-    #     # ana = field_pdnm.analyzer
-    #     # tks2_index = [(t.text, t.boost, t.ignored, t.required) for t in ana(rcd2, mode='index')]
-    #     # tks2_query = [(t.text, t.boost, t.ignored, t.required) for t in ana(pdnm2, mode='query')]
-    #     # print(tks2_index)
-    #     # print(tks2_query)
-    #     # # tks_query = [t.text for t in ana(pdnm, mode='query')]
-    #     # # print(tks_query)
-    #     # # and_words, or_words = WhooshSnippet.tokenize_split(field_pdnm, pdnm1, lambda x: x.required)
-    #     # # query = WhooshSnippet.andmaybe_query(F_PRODUCT_NAME, and_words, or_words)
-    #     # # with ix.searcher() as searcher:
-    #     # #     results = searcher.search(query)
-    #     # #     if results:
-    #     # #         for r in results:
-    #     # #             print(r)
-    #     #
-    #     # and_words2, or_words2 = WhooshSnippet.tokenize_split(field_pdnm, pdnm2, lambda x: x.required)
-    #     # query2 = WhooshSnippet.andmaybe_query(F_PRODUCT_NAME, and_words2, or_words2)
-    #     #
-    #     # with ix.searcher() as searcher:
-    #     #     results = searcher.search(query2)
-    #     #     if results:
-    #     #         for r in results:
-    #     #             print(r)
-    #
-    #     field_pdnm = {x[0]: x[1] for x in ix_cbot.schema.items()}[F_PRODUCT_NAME]
-    #     ana = field_pdnm.analyzer
-    #     # pdnm1 = '2-YR NOTE'
-    #     # rcd1 = '2-Year T-Note Weekly Options Wk 1'
-    #     #
-    #     # tks1_index = [(t.text, t.boost, t.ignored, t.required) for t in ana(rcd1, mode='index')]
-    #     # tks1_query = [(t.text, t.boost, t.ignored, t.required) for t in ana(pdnm1, mode='query')]
-    #     # print(tks1_index)
-    #     # print(tks1_query)
-    #     #
-    #     # pdnm2 = 'ULTRA T-BOND'
-    #     # tks2_query = [(t.text, t.boost, t.ignored, t.required) for t in ana(pdnm2, mode='query')]
-    #     # print(tks2_query)
-    #     #
-    #     # pdnm3 = 'DEC-JULY WHEAT CAL SPRD'
-    #     # rcd3_1 = 'Chicago SRW Wheat Dec-July CSO'
-    #     # rcd3_2 = 'KC HRW Dec-Jul CSO'
-    #     # tks3_query = [(t.text, t.boost, t.ignored, t.required) for t in ana(pdnm3, mode='query')]
-    #     # print(tks3_query)
-    #     #
-    #     # tks3_1_index = [(t.text, t.boost, t.ignored, t.required) for t in ana(rcd3_1, mode='index')]
-    #     # tks3_2_index = [(t.text, t.boost, t.ignored, t.required) for t in ana(rcd3_2, mode='index')]
-    #     # print(tks3_1_index)
-    #     # print(tks3_2_index)
-    #     #
-    #     # # q_fz = exact_and_query(F_PRODUCT_NAME, ix_cbot.schema, pdnm3)
-    #     # q_fz = fuzzy_and_query(F_PRODUCT_NAME, ix_cbot.schema, pdnm3)
-    #     # q_flt = filter_query((cmeg.F_PRODUCT_GROUP, 'Agriculture'), (cmeg.F_CLEARED_AS, 'Options'))
-    #     # with ix_cbot.searcher() as searcher:
-    #     #     results = searcher.search(q_fz, filter=q_flt, limit=None)
-    #     #     if results:
-    #     #         for r in results:
-    #     #             print(r)
-    #
-    #     pdnm4 = 'KC HRW-Chicago SRW MGEX-Chicago SRW MGEX-KC  HRW'
-    #     rcd4_1 = 'KC HRW-Chicago SRW Wheat Intercommodity Spread Options'
-    #     rcd4_2 = 'MGEX-KC HRW Wheat Intercommodity Spread Options'
-    #     tks4_query = [(t.text, t.boost, t.ignored, t.required) for t in ana(pdnm4, mode='query')]
-    #     tks4_1_index = [(t.text, t.boost, t.ignored, t.required) for t in ana(rcd4_1, mode='index')]
-    #     tks4_2_index = [(t.text, t.boost, t.ignored, t.required) for t in ana(rcd4_2, mode='index')]
-    #     print(tks4_query)
-    #     print(tks4_1_index)
-    #     print(tks4_2_index)
-    #
-    #     # q_and = andnot_query(F_PRODUCT_NAME, ix_cbot.schema, pdnm4, 'wheat-corn')
-    #     q_or = or_query(F_PRODUCT_NAME, ix_cbot.refresh(), pdnm4)
-    #     q_flt = filter_query((cmeg.F_PRODUCT_GROUP,  'Agriculture'), (cmeg.F_CLEARED_AS, 'Options'))
-    #     with ix_cbot.searcher() as searcher:
-    #         results = searcher.search(q_or, filter=q_flt, limit=None)
-    #         if results:
-    #             for r in results:
-    #                 print(r)
+    def test_ana_query_mode(self):
+        F_PRODUCT_NAME = 'Product_Name'
+        checked_path = os.getcwd()
+        cmeg_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
+        cmeg = CMEGMatcher(prods_file=cmeg_prds_file)
+
+
+        ix_cbot = open_dir('CBOT_Product_Index')
+        ix_cme = open_dir('CME_Product_Index')
+        # ix_cme, ix_cbot, gdf_exch = cmeg.init_ix_cme_cbot(True)
+        field_pdnm = {x[0]: x[1] for x in ix_cme.schema.items()}[F_PRODUCT_NAME]
+        ana = field_pdnm.analyzer
+        pdnm3 = 'S.AFRICAN RAND'
+        rcd3_1 = 'U.S. Dollar/South African Rand Futures'
+        rcd3_2 = 'South African Rand Futures'
+        tks3_1_index = [(t.text, t.boost, t.ignored, t.required) for t in ana(rcd3_1, mode='index')]
+        tks3_2_index = [(t.text, t.boost, t.ignored, t.required) for t in ana(rcd3_2, mode='index')]
+        tks3_query = [(t.text, t.boost, t.ignored, t.required) for t in ana(pdnm3, mode='query')]
+
+        exp_tks3_1_index = [('u', 0.25, False, False), ('s', 0.25, False, False),
+                            ('american', 0.5, True, False), ('dollar', 1.0, True, False),
+                            ('south', 1.5, True, True), ('african', 1.5, True, True),
+                            ('rand', 1.5, True, True)]
+
+        # self.assertListEqual(exp_tks3_1_index, tks3_1_index)
+        print(tks3_1_index)
+        print(tks3_2_index)
+        print(tks3_query)
+
+        pdnm4 = 'FT-SE 100'
+        tks4_query = [(t.text, t.boost, t.ignored, t.required) for t in ana(pdnm4, mode='query')]
+        print(tks4_query)
+        # pdnm1 = 'GBP/USD PQO 2pm Fix'
+        # pdnm2 = 'E-MINI EURO FX'
+        #
+        # rcd1 = 'Weekly Premium Quoted European Style Options on British Pound/US Dollar Futures - Wk 3'
+        # rcd2 = 'E-mini Euro FX Futures'
+        #
+        # ana = field_pdnm.analyzer
+        # tks2_index = [(t.text, t.boost, t.ignored, t.required) for t in ana(rcd2, mode='index')]
+        # tks2_query = [(t.text, t.boost, t.ignored, t.required) for t in ana(pdnm2, mode='query')]
+        # print(tks2_index)
+        # print(tks2_query)
+        # # tks_query = [t.text for t in ana(pdnm, mode='query')]
+        # # print(tks_query)
+        # # and_words, or_words = WhooshSnippet.tokenize_split(field_pdnm, pdnm1, lambda x: x.required)
+        # # query = WhooshSnippet.andmaybe_query(F_PRODUCT_NAME, and_words, or_words)
+        # # with ix.searcher() as searcher:
+        # #     results = searcher.search(query)
+        # #     if results:
+        # #         for r in results:
+        # #             print(r)
+        #
+        # and_words2, or_words2 = WhooshSnippet.tokenize_split(field_pdnm, pdnm2, lambda x: x.required)
+        # query2 = WhooshSnippet.andmaybe_query(F_PRODUCT_NAME, and_words2, or_words2)
+        #
+        # with ix.searcher() as searcher:
+        #     results = searcher.search(query2)
+        #     if results:
+        #         for r in results:
+        #             print(r)
+
+        field_pdnm = {x[0]: x[1] for x in ix_cbot.schema.items()}[F_PRODUCT_NAME]
+        ana = field_pdnm.analyzer
+        # pdnm1 = '2-YR NOTE'
+        # rcd1 = '2-Year T-Note Weekly Options Wk 1'
+        #
+        # tks1_index = [(t.text, t.boost, t.ignored, t.required) for t in ana(rcd1, mode='index')]
+        # tks1_query = [(t.text, t.boost, t.ignored, t.required) for t in ana(pdnm1, mode='query')]
+        # print(tks1_index)
+        # print(tks1_query)
+        #
+        # pdnm2 = 'ULTRA T-BOND'
+        # tks2_query = [(t.text, t.boost, t.ignored, t.required) for t in ana(pdnm2, mode='query')]
+        # print(tks2_query)
+        #
+        # pdnm3 = 'DEC-JULY WHEAT CAL SPRD'
+        # rcd3_1 = 'Chicago SRW Wheat Dec-July CSO'
+        # rcd3_2 = 'KC HRW Dec-Jul CSO'
+        # tks3_query = [(t.text, t.boost, t.ignored, t.required) for t in ana(pdnm3, mode='query')]
+        # print(tks3_query)
+        #
+        # tks3_1_index = [(t.text, t.boost, t.ignored, t.required) for t in ana(rcd3_1, mode='index')]
+        # tks3_2_index = [(t.text, t.boost, t.ignored, t.required) for t in ana(rcd3_2, mode='index')]
+        # print(tks3_1_index)
+        # print(tks3_2_index)
+        #
+        # # q_fz = exact_and_query(F_PRODUCT_NAME, ix_cbot.schema, pdnm3)
+        # q_fz = fuzzy_and_query(F_PRODUCT_NAME, ix_cbot.schema, pdnm3)
+        # q_flt = filter_query((cmeg.F_PRODUCT_GROUP, 'Agriculture'), (cmeg.F_CLEARED_AS, 'Options'))
+        # with ix_cbot.searcher() as searcher:
+        #     results = searcher.search(q_fz, filter=q_flt, limit=None)
+        #     if results:
+        #         for r in results:
+        #             print(r)
+
+        pdnm4 = 'KC HRW-Chicago SRW MGEX-Chicago SRW MGEX-KC  HRW'
+        rcd4_1 = 'KC HRW-Chicago SRW Wheat Intercommodity Spread Options'
+        rcd4_2 = 'MGEX-KC HRW Wheat Intercommodity Spread Options'
+        tks4_query = [(t.text, t.boost, t.ignored, t.required) for t in ana(pdnm4, mode='query')]
+        tks4_1_index = [(t.text, t.boost, t.ignored, t.required) for t in ana(rcd4_1, mode='index')]
+        tks4_2_index = [(t.text, t.boost, t.ignored, t.required) for t in ana(rcd4_2, mode='index')]
+        print(tks4_query)
+        print(tks4_1_index)
+        print(tks4_2_index)
+
+        # q_and = andnot_query(F_PRODUCT_NAME, ix_cbot.schema, pdnm4, 'wheat-corn')
+        q_or = or_query(F_PRODUCT_NAME, ix_cbot.refresh(), pdnm4)
+        q_flt = filter_query((cmeg.F_PRODUCT_GROUP,  'Agriculture'), (cmeg.F_CLEARED_AS, 'Options'))
+        with ix_cbot.searcher() as searcher:
+            results = searcher.search(q_or, filter=q_flt, limit=None)
+            if results:
+                for r in results:
+                    print(r)
 
 
     # def test_match_prod_code(self):

@@ -349,6 +349,10 @@ class SpecialWordFilter(Filter):
 
     def __update_treedict(self, treedict, to_append):
         child = treedict[to_append[-1].text]
+        if len(to_append) == 1:
+            if None not in child:
+                child.update({None: to_append[0]})
+            return child
         dict_toupdate = treedict
         for item in to_append:
             dict_toupdate = dict_toupdate[item.text]
@@ -394,9 +398,8 @@ class SpecialWordFilter(Filter):
         last_idx = last_indexof(prev_kws, None)
         trans_tokens = prev_kws
         if last_idx is not None:
-            longest_kwtokens = self.__longest_kwtokens(prev_kws[0: last_idx], treedict, not ismapped)
-            longest_kwtokens = longest_kwtokens if ismapped \
-                else [update_tksub(to, tn, lambda x1, x2: x1 * x2) for to, tn in zip(*longest_kwtokens)]
+            longest_kwtokens = self.__longest_kwtokens(prev_kws[0: last_idx], treedict, True)
+            longest_kwtokens = [update_tksub(to, tn, lambda x1, x2: x1 * x2) for to, tn in zip(*longest_kwtokens)]
             trans_tokens = longest_kwtokens + prev_kws[last_idx + 1:]
         return trans_tokens
 

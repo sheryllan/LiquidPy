@@ -84,29 +84,37 @@ class Matcher(object):
         return False
 
     @staticmethod
-    def match_sgl_plrl(s1, s2, casesensitive=False):
+    def match_sgl_plrl(s1, s2, casesensitive=False, p=inflect.engine()):
         if not casesensitive:
             s1 = s1.lower()
             s2 = s2.lower()
-        p = inflect.engine()
-        return p.plural(s1) == s2
+        return s1 == s2 or p.plural(s1) == s2 or p.singular_noun(s1) == s2
 
     @staticmethod
-    def match_any_word(s1, s2, stemming=False, casesensitive=False):
+    def match_in_string(s_ref, s_sample, one=True, stemming=False, casesensitive=False, engine=inflect.engine()):
         if not casesensitive:
-            s1 = s1.lower()
-            s2 = s2.lower()
-        p = inflect.engine()
-        words1 = [(w, 1) for w in Matcher.get_words(s1)]
-        words2 = [(w, 2) for w in Matcher.get_words(s2)]
-        if stemming:
-            words1 = words1 + [(p.plural(w), 1) for w, i in words1]
-        words = set(words1 + words2)
-        words = itertools.groupby(words, key=lambda x: x[0])
-        for key, group in itertools.groupby(words, key=lambda x: x[0]):
-            if len(list(group)) == 2:
-                return True
-        return False
+            s_ref = s_ref.lower()
+            s_sample = s_sample.lower()
+
+        wds_sample = Matcher.get_words(s_sample)
+        wds_ref = Matcher.get_words(s_ref)
+        if not one:
+            wds_sample = [' '.join(wds_sample)]
+            wds_ref = ' '.join(wds_ref)
+
+        found = False
+        for w in wds_sample:
+            found = w in wds_ref
+            if len(w) < 3:
+                continue
+            if (not found) and stemming:
+                found = (engine.plural(w) in wds_ref)
+                if not found:
+                    sgl = engine.singular_noun(w)
+                    found = sgl in wds_ref if sgl else sgl
+            if found:
+                return found
+        return found
 
 
 class CMEGMatcher(object):
@@ -146,12 +154,16 @@ class CMEGMatcher(object):
     # region CME specific
     CME_EXACT_MAPPING = {
         ('EURO MIDCURVE', 'Interest Rate', 'Options'): 'Eurodollar MC',
-        ('NIKKEI 225 ($) STOCK', 'Equity Index', 'Futures'): 'Nikkei/USD Futures',
-        ('NIKKEI 225 (YEN) STOCK', 'Equity Index', 'Futures'): 'Nikkei/Yen Futures',
+        ('NIKKEI 225 ($) STOCK', 'Equity Index', 'Futures'): 'Nikkei/USD',
+        ('NIKKEI 225 (YEN) STOCK', 'Equity Index', 'Futures'): 'Nikkei/Yen',
+        ('FT-SE 100', 'Equity Index', 'Futures'): 'E-mini FTSE 100 Index (GBP)',
         ('BDI', 'FX', 'Futures'): 'CME Bloomberg Dollar Spot Index',
+        ('SKR/USD CROSS RATES', 'FX', 'Futures'): 'Swedish Krona',
+        ('NKR/USD CROSS RATE', 'FX', 'Futures'): 'Norwegian Krone',
+        ('S.AFRICAN RAND', 'FX', 'Futures'): 'South African Rand',
         ('CHINESE RENMINBI (CNH)', 'FX', 'Futures'): 'Standard-Size USD/Offshore RMB (CNH)',
-        ('MILK', 'Ag Products', 'Futures'): 'Class III Milk Futures',
-        ('MILK', 'Ag Products', 'Options'): 'Class III Milk Options'
+        ('MILK', 'Ag Products', 'Futures'): 'Class III Milk',
+        ('MILK', 'Ag Products', 'Options'): 'Class III Milk'
     }
 
     CME_NOTFOUND_PRODS = {('AUSTRALIAN DOLLAR', 'FX', 'Options'),
@@ -172,7 +184,7 @@ class CMEGMatcher(object):
                        ('EUR/USD PQO 2pm Fix', 'FX', 'Options'): {QUERY: 'andmaybe'},
                        ('CAD/USD PQO 2pm Fix', 'FX', 'Options'): {QUERY: 'andmaybe'},
                        ('CHF/USD PQO 2pm Fix', 'FX', 'Options'): {QUERY: 'andmaybe'},
-                       ('LV CATL CSO', 'Ag Products', 'Options'): {QUERY: 'andmaybe'}}
+                       ('LV CATL CSO', 'Ag Products', 'Options'): {QUERY: 'and'}}
 
     CRRNCY_TOKENSUB = {'aud': [TokenSub('australian', 1.5, True, True), TokenSub('dollar', 1, True, True)],
                        'gbp': [TokenSub('british', 1.5, True, True), TokenSub('pound', 1.5, True, True)],
@@ -251,11 +263,11 @@ class CMEGMatcher(object):
     # endregion
 
     # region CBOT specific
-    CBOT_EXACT_MAPPING = {('30-YR BOND', 'Interest Rate', 'Futures'): 'U.S. Treasury Bond Futures',
-                          ('30-YR BOND', 'Interest Rate', 'Options'): 'U.S. Treasury Bond Options',
-                          ('DOW-UBS COMMOD INDEX', 'Ag Products', 'Futures'): 'Bloomberg Commodity Index Futures',
+    CBOT_EXACT_MAPPING = {('30-YR BOND', 'Interest Rate', 'Futures'): 'U.S. Treasury Bond',
+                          ('30-YR BOND', 'Interest Rate', 'Options'): 'U.S. Treasury Bond',
+                          ('DOW-UBS COMMOD INDEX', 'Ag Products', 'Futures'): 'Bloomberg Commodity Index',
                           ('DJ_UBS ROLL SELECT INDEX FU', 'Ag Products', 'Futures'):
-                              'Bloomberg Roll Select Commodity Index Futures',
+                              'Bloomberg Roll Select Commodity Index',
                           ('SOYBN NEARBY+2 CAL SPRD', 'Ag Products', 'Options'): 'Consecutive Soybean CSO',
                           ('WHEAT NEARBY+2 CAL SPRD', 'Ag Products', 'Options'): 'Consecutive Wheat CSO',
                           ('CORN NEARBY+2 CAL SPRD', 'Ag Products', 'Options'): 'Consecutive Corn CSO'
@@ -342,34 +354,17 @@ class CMEGMatcher(object):
             df.drop(df.head(1).index, inplace=True)
             df.dropna(subset=list(df.columns)[0:4], how='all', inplace=True)
             df.reset_index(drop=0, inplace=True)
-            clean_1stcol = pd.Series([self.__clean_prod_name(r) for i, r in df.iterrows()], name=self.PRODUCT_NAME)
-            df.update(clean_1stcol)
         return df[self.COLS_PRODS]
 
-    def __clean_prod_name(self, row):
-        product = row[self.PRODUCT_NAME]
-        der_type = row[self.CLEARED_AS]
-        product = product.replace(der_type, '') if last_word(product) == der_type else product
-        return product.rstrip()
-
-    def __match_pdgp(self, s1, s2):
-        wds1 = Matcher.get_words(s1)
-        wds2 = Matcher.get_words(s2)
-        if len(wds1) == 1 and len(wds2) == 1:
-            return s1 == s2 or Matcher.match_sgl_plrl(wds1[0], wds2[0]) \
-                   or Matcher.match_first_n(wds1[0], wds2[0])
-        else:
-            return s1 == s2 or Matcher.match_any_word(s1, s2) \
-                   or Matcher.match_initials(s1, s2) or Matcher.match_first_n(s1, s2)
+    def __match_pdgp(self, s_ref, s_sample):
+        return s_ref == s_sample or Matcher.match_in_string(s_ref, s_sample, one=True, stemming=True) \
+               or Matcher.match_initials(s_ref, s_sample) or Matcher.match_first_n(s_ref, s_sample)
 
     def __match_in_string(self, guess, indexed, one=True):
         guess = guess.lower()
         p = inflect.engine()
-
         for idx in indexed:
-            idx_words = Matcher.get_words(idx.lower()) if one else [idx.lower()]
-            matched = any(i in guess if len(i) < 3 else i in guess or p.plural(i) in guess
-                          for i in idx_words)
+            matched = Matcher.match_in_string(guess, idx, one, stemming=True, engine=p)
             if matched:
                 return idx
         return None
@@ -389,7 +384,8 @@ class CMEGMatcher(object):
             for i, row in df_adv.iterrows():
                 results = self.__match_a_row(row, lexicons, exact_mapping, notfound, multi_match, ix.schema, adsearch)
                 rows_matched = self.__join_results(results, row)
-                df_matched = df_matched.append(pd.DataFrame(rows_matched), ignore_index=True)
+                df_toadd = pd.DataFrame(rows_matched, columns=df_matched.columns)
+                df_matched = df_matched.append(df_toadd, ignore_index=True)
                 matched = True if results else False
                 self.__prt_match_status(matched, rows_matched)
         return df_matched
@@ -519,7 +515,7 @@ class CMEGMatcher(object):
         regtk_exp = '[^\s/\(\)]+'
         regex_tkn = RegexTokenizerExtra(regtk_exp, ignored=False, required=False)
         lwc_flt = LowercaseFilter()
-        splt_mrg_flt = SplitMergeFilter(splitcase=True, splitnums=True, mergewords=True, mergenums=True, ignore_mrg=True)
+        splt_mrg_flt = SplitMergeFilter(mergewords=True, mergenums=True, ignore_mrg=True)
 
         stp_flt =StopFilter(stoplist=STOP_LIST + self.CME_COMMON_WORDS, minsize=1)
         sp_flt = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
@@ -570,21 +566,21 @@ class CMEGMatcher(object):
         return outpath
 
 
-checked_path = os.getcwd()
-
-exchanges = ['asx', 'bloomberg', 'cme', 'cbot', 'nymex_comex', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
-report_fmtname = 'Web_ADV_Report_{}.xlsx'
-
-report_files = {e: report_fmtname.format(e.upper()) for e in exchanges}
-
-cmeg_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
-cmeg_adv_files = [os.path.join(checked_path, report_files['cme']),
-                  os.path.join(checked_path, report_files['cbot']),
-                  os.path.join(checked_path, report_files['nymex_comex'])]
-
-cmeg = CMEGMatcher(cmeg_adv_files, cmeg_prds_file, '2017')
-
-cmeg.save_to_xlsx(cmeg.run_pd_mtch(clean=True))
+# checked_path = os.getcwd()
+#
+# exchanges = ['asx', 'bloomberg', 'cme', 'cbot', 'nymex_comex', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
+# report_fmtname = 'Web_ADV_Report_{}.xlsx'
+#
+# report_files = {e: report_fmtname.format(e.upper()) for e in exchanges}
+#
+# cmeg_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
+# cmeg_adv_files = [os.path.join(checked_path, report_files['cme']),
+#                   os.path.join(checked_path, report_files['cbot']),
+#                   os.path.join(checked_path, report_files['nymex_comex'])]
+#
+# cmeg = CMEGMatcher(cmeg_adv_files, cmeg_prds_file, '2017')
+#
+# cmeg.save_to_xlsx(cmeg.run_pd_mtch(clean=True))
 
 
 
@@ -604,4 +600,13 @@ cmeg.save_to_xlsx(cmeg.run_pd_mtch(clean=True))
 #     # df_adv.drop(df_adv.index[indices], inplace=True)
 #     # df_adv.reset_index(drop=0, inplace=True)
 #     return df
+# endregion
+
+# region unused
+# def __clean_prod_name(self, row):
+    #     product = row[self.PRODUCT_NAME]
+    #     der_type = row[self.CLEARED_AS]
+    #     product = product.replace(der_type, '') if last_word(product) == der_type else product
+    #     return product.rstrip()
+
 # endregion

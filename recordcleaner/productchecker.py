@@ -52,20 +52,31 @@ class CMEGChecker(object):
     def id_rows(self, df):
         groups = df_groupby(df, [[self.matcher.PRODUCT, self.matcher.CLEARED_AS]])
         dict_globex = dict()
+        dict_pdnm = dict()
         header_ytd = self.matcher.get_ytd_header(df)
         for group, subdf in groups.items():
             tot_ytd = sum(subdf[header_ytd].unique())
+            cleared_as = group[1]
             for _, row in subdf.iterrows():
+                if pd.isnull(row[self.matcher.F_PRODUCT_NAME]):
+                    continue
                 row.update(pd.Series([tot_ytd], index=[header_ytd]))
                 pd_code = self.get_prod_code(row)
+                if row[self.matcher.F_PRODUCT_NAME] in dict_pdnm:
+                    print()
+                    print('In group: {}'.format(group))
+                    print('duplicate PRODUCT_NAME: {}'.format(row[self.matcher.F_PRODUCT_NAME]))
+                dict_pdnm.update({row[self.matcher.F_PRODUCT_NAME]: row})
                 if pd_code is not None:
-                    dict_globex.update({pd_code: row})
+                    if (pd_code, cleared_as) in dict_globex:
+                        print('duplicate (pd_code, cleared_as): {}'.format((pd_code, cleared_as)))
+                    dict_globex.update({(pd_code, cleared_as): row})
 
             # subdf.drop_duplicates(self.matcher.F_PRODUCT_NAME, 'first', inplace=True)
             # new_df = pd.DataFrame({header_ytd: [tot_ytd] * subdf.shape[0]})
             # subdf.update(new_df)
             # dict_globex.update({self.get_prod_code(row): row for _, row in subdf.iterrows() if self.get_prod_code(row)})
-        return groups, dict_globex
+        return groups, dict_globex, dict_pdnm
 
     def get_prod_code(self, row):
         if not pd.isnull(row[self.matcher.F_GLOBEX]):
@@ -73,6 +84,7 @@ class CMEGChecker(object):
         elif not pd.isnull(row[self.matcher.F_CLEARING]):
             return row[self.matcher.F_CLEARING]
         else:
+            print('no code: {}'.format(row[self.matcher.F_PRODUCT_NAME]))
             return None
 
     def run_pd_check(self):
@@ -90,7 +102,7 @@ with open(matched_file, 'rb') as fh:
     # df_cbot = pd.read_excel(fh, sheet_name=cmeg.matcher.CBOT)
     # df_nymex = pd.read_excel(fh, sheet_name=cmeg.matcher.NYMEX)
 
-cme_groups, cme_dict = cmeg.id_rows(df_cme)
+cme_groups, cme_dict, cme_dict_pdnm = cmeg.id_rows(df_cme)
 print()
 
 # xl_consolidate(test_input, test_output)
