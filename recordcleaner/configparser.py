@@ -3,6 +3,7 @@ import pandas as pd
 import openpyxl
 from openpyxl.utils import get_column_letter
 import os
+import tempfile
 
 
 
@@ -83,13 +84,34 @@ tags = ['product']
 sheets = ['Config']
 
 
-def parse_save():
+def run_config_parse(exchs=None, dest=None, save=False):
+    exchs = exchanges if exchs is None else exchs
+    dest = tempfile.NamedTemporaryFile() if dest is None else dest
+    results = dict()
+    for exch in exchs:
+        src_path = base_path + source_files[exch]
+        columns = properties[exch]
+        data_parsed = XmlParser.fltr_attrs(XmlParser.parse(src_path, tags), columns)
+        sheet2data = {sheet: data_parsed for sheet in sheets}
+        if save:
+            outpath = XlsxWriter.save_sheets(dest, sheet2data, columns, True)
+            results.update({exch: outpath})
+        else:
+            results.update({exch: sheet2data})
+        return results
+
+
+def parse_save(save=True):
     for exch in exchanges:
         src_path = base_path + source_files[exch]
         dest_path = base_path + dest_files[exch]
         columns = properties[exch]
         data_parsed = XmlParser.fltr_attrs(XmlParser.parse(src_path, tags), columns)
-        dict = {sheet: data_parsed for sheet in sheets}
-        XlsxWriter.save_sheets(dest_path, dict, columns, True)
+        sheet2data = {sheet: data_parsed for sheet in sheets}
+        if save:
+            return XlsxWriter.save_sheets(dest_path, sheet2data, columns, True)
+        else:
+            return sheet2data
 
-#parse_save()
+# parse_save()
+

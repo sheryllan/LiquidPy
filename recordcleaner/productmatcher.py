@@ -337,8 +337,7 @@ class CMEGMatcher(object):
         return dtsp.find_first_n(headers, lambda x: self.PATTERN_ADV_YTD in x and self.year in x)
 
     def __from_adv(self, filename, cols=None, encoding='utf-8'):
-        with open(filename, 'rb') as fh:
-            df = pd.read_excel(fh, encoding=encoding)
+        df = pd.read_excel(filename, encoding=encoding)
         ytd = self.get_ytd_header(df)
         cols = self.COLS_ADV if cols is None else cols
         cols = cols + [ytd]
@@ -347,8 +346,7 @@ class CMEGMatcher(object):
 
     def __from_prods(self, filename, df=None, encoding='utf-8'):
         if df is None:
-            with open(filename, 'rb') as fh:
-                df = pd.read_excel(fh, encoding=encoding)
+            df = pd.read_excel(filename, encoding=encoding)
             df.dropna(axis=0, how='all', inplace=True)
             df.columns = df.iloc[0]
             df.drop(df.head(1).index, inplace=True)
