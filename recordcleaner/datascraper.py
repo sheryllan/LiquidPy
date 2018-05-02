@@ -24,13 +24,16 @@ TD_TAB = 'td'
 A_TAB = 'a'
 HREF_ATTR = 'href'
 
+PDF_SUFFIX = '.pdf'
+TXT_SUFFIX = '.txt'
+XLSX_SUFFIX = '.xlsx'
+
 
 def nonstr_iterable(arg):
     return isinstance(arg, collections.Iterable) and not isinstance(arg, str)
 
 
 def flatten_iter(items, incl_level=False):
-
     def flattern_iter_rcrs(items, flat_list, level):
         if not items:
             return flat_list
@@ -159,40 +162,33 @@ class TxtHelper(object):
 
 
 class CMEGScraper(object):
-    PDF_SUFFIX = '.pdf'
-    TXT_SUFFIX = '.txt'
-    XLSX_SUFFIX = '.xlsx'
-
     URL_CME_ADV = 'http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_ADV_Report_CME.pdf'
     URL_CBOT_ADV = 'http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_ADV_Report_CBOT.pdf'
     URL_NYMEX_COMEX_ADV = 'http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_ADV_Report_NYMEX_COMEX.pdf'
-
-    BASENAME_CME = rreplace(os.path.basename(URL_CME_ADV), PDF_SUFFIX, '', 1)
-    BASENAME_CBOT = rreplace(os.path.basename(URL_CBOT_ADV), PDF_SUFFIX, '', 1)
-    BASENAME_NYMEX_COMEX = rreplace(os.path.basename(URL_NYMEX_COMEX_ADV), PDF_SUFFIX, '', 1)
-
     URL_PRODSLATE = 'http://www.cmegroup.com/CmeWS/mvc/ProductSlate/V1/Download.xls'
-    DFLT_PROD_SLATE = 'Product_Slate.xls'
 
     PRODUCT = 'Product'
     PRODUCT_GROUP = 'Product Group'
     CLEARED_AS = 'Cleared As'
     OUTPUT_COLUMNS = [PRODUCT, PRODUCT_GROUP, CLEARED_AS]
 
-    DFLT_DL_PATH = os.getcwd()
-    DFLT_CME_ADV_XLSX = os.path.join(DFLT_DL_PATH, BASENAME_CME + XLSX_SUFFIX)
-    DFLT_CBOT_ADV_XLSX = os.path.join(DFLT_DL_PATH, BASENAME_CBOT + XLSX_SUFFIX)
-    DFLT_NYCO_ADV_XLSX = os.path.join(DFLT_DL_PATH, BASENAME_NYMEX_COMEX + XLSX_SUFFIX)
+    CME = 'CME'
+    CBOT = 'CBOT'
+    NYMEX = 'NYMEX'
+    COMEX = 'COMEX'
 
-    def __init__(self, download_path=None):
-        self.DFLT_DL_PATH = self.DFLT_DL_PATH if download_path is None else download_path
+    def default_adv_basenames(self):
+        basename_cme = rreplace(os.path.basename(self.URL_CME_ADV), PDF_SUFFIX, '', 1)
+        basename_cbot = rreplace(os.path.basename(self.URL_CBOT_ADV), PDF_SUFFIX, '', 1)
+        basename_nymex = rreplace(os.path.basename(self.URL_NYMEX_COMEX_ADV), PDF_SUFFIX, '', 1)
+        return basename_cme, basename_cbot, basename_nymex
 
-        self.DFLT_CME_ADV_XLSX = os.path.join(self.DFLT_DL_PATH, self.DFLT_CME_ADV_XLSX)
-        self.DFLT_CBOT_ADV_XLSX = os.path.join(self.DFLT_DL_PATH, self.DFLT_CBOT_ADV_XLSX)
-        self.DFLT_NYCO_ADV_XLSX = os.path.join(self.DFLT_DL_PATH, self.DFLT_NYCO_ADV_XLSX)
-
-        self.DFLT_PROD_SLATE = os.path.join(self.DFLT_DL_PATH, self.DFLT_PROD_SLATE)
-        self.report_name = None
+    def default_adv_xlsx(self):
+        basename_cme, basename_cbot, basename_nymex = self.default_adv_basenames()
+        adv_xlsx_cme = basename_cme + XLSX_SUFFIX
+        adv_xlsx_cbot = basename_cbot + XLSX_SUFFIX
+        adv_xlsx_nymex = basename_nymex + XLSX_SUFFIX
+        return adv_xlsx_cme, adv_xlsx_cbot, adv_xlsx_nymex
 
     # returns a dictionary with key: full group name, and value: (asset, instrument)
     def get_pdf_product_groups(self, sections):
@@ -213,7 +209,7 @@ class CMEGScraper(object):
             fr = PdfFileReader(fh)
             outlines = fr.getOutlines()
             flat_outlines = flatten_iter(outlines, True)
-            self.report_name = ' '.join([o.title for _, o in flat_outlines[0:2]]).replace('/', '-')
+            # self.report_name = ' '.join([o.title for _, o in flat_outlines[0:2]]).replace('/', '-')
             return self.get_pdf_product_groups([(l, o.title) for l, o in flat_outlines[2:]])
 
     def parse_from_txt(self, pdf_path, txt_path):
@@ -238,29 +234,36 @@ class CMEGScraper(object):
         else:
             return None
 
-    def to_xlsx_adv(self, pdfpath, txtpath, outpath):
+    def to_xlsx_adv(self, pdfpath, txtpath, outpath=None, sheetname=None):
         table = self.parse_from_txt(pdfpath, txtpath)
-        return configparser.XlsxWriter.save_sheets(outpath, {self.report_name: table})
+        if outpath is not None:
+            sheetname = 'Sheet1' if sheetname is None else sheetname
+            configparser.XlsxWriter.save_sheets(outpath, {sheetname: table})
+        return table
 
-    def download_to_xlsx_adv(self, url, outpath, dlpath=None):
+    def download_to_xlsx_adv(self, url, dlpath=None, outpath=None, sheetname=None):
         f_pdf = download(url, tempfile.NamedTemporaryFile()) if dlpath is None else download(url, dlpath)
         f_txt = tempfile.NamedTemporaryFile()
         try:
             run_pdftotext_cmd(f_pdf.name, f_txt.name)
-            self.to_xlsx_adv(f_pdf.name, f_txt.name, outpath)
+            result = self.to_xlsx_adv(f_pdf.name, f_txt.name, outpath, sheetname)
+        except Exception:
+            raise
         finally:
             f_pdf.close()
             f_txt.close()
-        return outpath
+        return result
 
-    def run_scraper(self):
-        with open(self.DFLT_PROD_SLATE, mode='wb') as ps:
-            download(self.URL_PRODSLATE, ps)
+    def run_scraper(self, path_prods=None, path_advs=None):
+        prods_file = tempfile.NamedTemporaryFile() if path_prods is None else path_prods
+        prods_file = download(self.URL_PRODSLATE, prods_file)
 
-        paths = [(self.URL_CME_ADV, self.DFLT_CME_ADV_XLSX),
-                 (self.URL_CBOT_ADV, self.DFLT_CBOT_ADV_XLSX),
-                 (self.URL_NYMEX_COMEX_ADV, self.DFLT_NYCO_ADV_XLSX)]
-        return [self.download_to_xlsx_adv(url, outpath) for url, outpath in paths]
+        df_cme = self.download_to_xlsx_adv(self.URL_CME_ADV, outpath=path_advs, sheetname=self.CME)
+        df_cbot = self.download_to_xlsx_adv(self.URL_CBOT_ADV, outpath=path_advs, sheetname=self.CBOT)
+        df_nymex = self.download_to_xlsx_adv(self.URL_NYMEX_COMEX_ADV, outpath=path_advs, sheetname=self.NYMEX)
+
+        adv_dict = {self.CME: df_cme, self.CBOT: df_cbot, self.NYMEX: df_nymex}
+        return prods_file.name, adv_dict
 
     def __get_output_headers(self, pdf_headers, pattern=None):
         pattern = '(\S+( \S+)*)+' if pattern is None else pattern
@@ -283,12 +286,6 @@ class CMEGScraper(object):
     def __parse_line(self, line, **kwargs):
         kw_pattern = 'pattern'
         kw_extras = 'extras'
-        # kw_sep = 'sep'
-        # line = line.rstrip()
-        # pattern = kwargs[kw_pattern] if kw_pattern in kwargs else '(?<! )+ {2,}|(?<=[0-9%,-])+ +?(?=[0-9%,-])+'
-        # sep = kwargs[kw_sep] if kw_sep in kwargs else '\t'
-        # repl = re.sub(pattern, sep, line)
-        # values = self.__text_to_num(repl.split(sep))
         pattern = kwargs[kw_pattern] if kw_pattern in kwargs else '(\S+( \S+)*)+'
         values = [v[0] for v in re.findall(pattern, line)]
         values = self.__text_to_num(values)
@@ -307,9 +304,6 @@ class CMEGScraper(object):
                 value = value.replace(',', '')
                 values[i] = float(value) if '.' in value else int(value)
         return values
-
-    # def tabula_parse(self):
-    #     tabula.convert_into(self.pdf_path_adv, 'CME_ADV.csv', output_format='csv', pages='all')
 
 
 class OSEScraper(object):
@@ -358,6 +352,8 @@ class OSEScraper(object):
     # returns the table in which first tr has first th of which text = title
     def filter_table(self, tables, title):
         return [tbl for tbl in tables if tbl.find(TR_TAB).find(TH_TAB, text=title)][0]
+
+   
 
     def parse_from_txt(self, txt_path=None):
         txt_path = self.txt_path_adv if txt_path is None else txt_path

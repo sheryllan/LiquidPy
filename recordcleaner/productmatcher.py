@@ -1,20 +1,9 @@
-import pandas as pd
-import numpy as np
-import configparser as cp
-import os
-import re
 import inflect
-import itertools
-import datetime
 from dateutil.relativedelta import relativedelta
-
-from whoosh.fields import *
-from whoosh.analysis import *
-from whoosh.query import *
-from whoosh import qparser
 from whoosh.searching import Hit
 
-import datascraper as dtsp
+from configparser import XlsxWriter
+from datascraper import CMEGScraper
 from whooshext import *
 
 
@@ -49,7 +38,7 @@ class Matcher(object):
 
     @staticmethod
     def get_words(string):
-        return re.split('[ ,\.\?;:]+', string)
+        return re.split('[ ,.?;:]+', string)
 
     @staticmethod
     def get_initials(string):
@@ -119,18 +108,16 @@ class Matcher(object):
 
 class CMEGMatcher(object):
     PATTERN_ADV_YTD = 'ADV Y.T.D'
-    INDEX_CME = 'CME_Product_Index'
-    INDEX_CBOT = 'CBOT_Product_Index'
-    CME = 'CME'
-    CBOT = 'CBOT'
-    NYMEX = 'NYMEX'
-    COMEX = 'COMEX'
+
+    CME = CMEGScraper.CME
+    CBOT = CMEGScraper.CBOT
+    NYMEX = CMEGScraper.NYMEX
+    COMEX = CMEGScraper.COMEX
 
     # region columns  & fields
-    PRODUCT = dtsp.CMEGScraper.PRODUCT
-    PRODUCT_GROUP = dtsp.CMEGScraper.PRODUCT_GROUP
-    CLEARED_AS = dtsp.CMEGScraper.CLEARED_AS
-    COLS_ADV = dtsp.CMEGScraper.OUTPUT_COLUMNS
+    PRODUCT = CMEGScraper.PRODUCT
+    PRODUCT_GROUP = CMEGScraper.PRODUCT_GROUP
+    CLEARED_AS = CMEGScraper.CLEARED_AS
 
     PRODUCT_NAME = 'Product Name'
     CLEARING = 'Clearing'
@@ -139,6 +126,9 @@ class CMEGMatcher(object):
     EXCHANGE = 'Exchange'
     COMMODITY = 'Commodity'
 
+    COLS_ADV_CME = CMEGScraper.OUTPUT_COLUMNS
+    COLS_ADV_CBOT = CMEGScraper.OUTPUT_COLUMNS
+    COLS_ADV_NYMEX = CMEGScraper.OUTPUT_COLUMNS + [COMMODITY]
     COLS_MAPPING = {PRODUCT: PRODUCT_NAME, PRODUCT_GROUP: PRODUCT_GROUP, CLEARED_AS: CLEARED_AS}
     COLS_PRODS = [PRODUCT_NAME, PRODUCT_GROUP, CLEARED_AS, CLEARING, GLOBEX, SUB_GROUP, EXCHANGE]
 
@@ -311,48 +301,27 @@ class CMEGMatcher(object):
                  SUB_GROUP: F_SUB_GROUP,
                  EXCHANGE: F_EXCHANGE}
 
-    def __init__(self, adv_files=None, prods_file=None, year=(datetime.datetime.now() - relativedelta(years=1)).year,
-                 out_path=None):
-        dflt_inpath = os.getcwd()
-        self.year = year
-        adv_files = [os.path.join(dflt_inpath, dtsp.CMEGScraper.DFLT_CME_ADV_XLSX),
-                     os.path.join(dflt_inpath, dtsp.CMEGScraper.DFLT_CBOT_ADV_XLSX),
-                     os.path.join(dflt_inpath, dtsp.CMEGScraper.DFLT_NYCO_ADV_XLSX)] \
-            if adv_files is None else adv_files
 
-        self.adv_cme = dtsp.find_first_n(adv_files, lambda x: self.CME.lower() in x.lower())
-        self.adv_cbot = dtsp.find_first_n(adv_files, lambda x: self.CBOT.lower() in x.lower())
-        self.adv_nymex_comex = dtsp.find_first_n(adv_files, lambda x: self.NYMEX.lower() in x.lower())
-
-        self.prods_file = os.path.join(dflt_inpath, dtsp.CMEGScraper.DFLT_PROD_SLATE) \
-            if prods_file is None else prods_file
-        self.out_path = out_path if out_path is not None else os.path.dirname(self.prods_file)
-
-        self.index_cme = os.path.join(self.out_path, self.INDEX_CME)
-        self.index_cbot = os.path.join(self.out_path, self.INDEX_CBOT)
-        self.matched_file = os.path.join(os.getcwd(), 'CMEG_matched.xlsx')
-
-    def get_ytd_header(self, df):
+    @staticmethod
+    def get_ytd_header(df, year=None):
+        year = (datetime.datetime.now() - relativedelta(years=1)).year if not year else year
         headers = list(df.columns.values)
-        return dtsp.find_first_n(headers, lambda x: self.PATTERN_ADV_YTD in x and self.year in x)
+        return find_first_n(headers, lambda x: CMEGMatcher.PATTERN_ADV_YTD in x and str(year) in x)
 
-    def __from_adv(self, filename, cols=None, encoding='utf-8'):
-        df = pd.read_excel(filename, encoding=encoding)
-        ytd = self.get_ytd_header(df)
-        cols = self.COLS_ADV if cols is None else cols
+    def __from_adv(self, df, cols, year=None):
+        year = (datetime.datetime.now() - relativedelta(years=1)).year if not year else year
+        ytd = CMEGMatcher.get_ytd_header(df, year)
         cols = cols + [ytd]
         df = df[cols]
         return df
 
-    def __from_prods(self, filename, df=None, encoding='utf-8'):
-        if df is None:
-            df = pd.read_excel(filename, encoding=encoding)
-            df.dropna(axis=0, how='all', inplace=True)
-            df.columns = df.iloc[0]
-            df.drop(df.head(1).index, inplace=True)
-            df.dropna(subset=list(df.columns)[0:4], how='all', inplace=True)
-            df.reset_index(drop=0, inplace=True)
-        return df[self.COLS_PRODS]
+    def __from_prods(self, df):
+        df.dropna(axis=0, how='all', inplace=True)
+        df.columns = df.iloc[0]
+        df.drop(df.head(1).index, inplace=True)
+        df.dropna(subset=list(df.columns)[0:4], how='all', inplace=True)
+        df.reset_index(drop=0, inplace=True)
+        return df[CMEGMatcher.COLS_PRODS]
 
     def __match_pdgp(self, s_ref, s_sample):
         return s_ref == s_sample or Matcher.match_in_string(s_ref, s_sample, one=True, stemming=True) \
@@ -375,8 +344,8 @@ class CMEGMatcher(object):
     def match_prod_code(self, df_adv, ix, exact_mapping=None, notfound=None, multi_match=None):
         df_matched = pd.DataFrame(columns=list(df_adv.columns) + ix.schema.stored_names())
         with ix.searcher() as searcher:
-            lexicons = get_idx_lexicon(searcher, self.F_PRODUCT_GROUP, self.F_CLEARED_AS,
-                                       **{self.F_PRODUCT_GROUP: self.F_SUB_GROUP})
+            lexicons = get_idx_lexicon(searcher, CMEGMatcher.F_PRODUCT_GROUP, CMEGMatcher.F_CLEARED_AS,
+                                       **{CMEGMatcher.F_PRODUCT_GROUP: CMEGMatcher.F_SUB_GROUP})
             adsearch = AdvSearch(searcher)
 
             for i, row in df_adv.iterrows():
@@ -389,13 +358,13 @@ class CMEGMatcher(object):
         return df_matched
 
     def __match_a_row(self, row, lexicons, exact_mapping, notfound, multi_match, schema, adsearch):
-        pd_id = (row[self.PRODUCT], row[self.PRODUCT_GROUP], row[self.CLEARED_AS])
+        pd_id = (row[CMEGMatcher.PRODUCT], row[CMEGMatcher.PRODUCT_GROUP], row[CMEGMatcher.CLEARED_AS])
         if notfound is not None and pd_id in notfound:
             return None
-        pdnm = exact_mapping[pd_id] if pd_id in exact_mapping else row[self.PRODUCT]
+        pdnm = exact_mapping[pd_id] if pd_id in exact_mapping else row[CMEGMatcher.PRODUCT]
         is_one = True if multi_match is None or pd_id not in multi_match else False
         grouping_q = self.__get_grouping_query(row, pdnm, lexicons)
-        qparams = {FIELDNAME: self.F_PRODUCT_NAME,
+        qparams = {FIELDNAME: CMEGMatcher.F_PRODUCT_NAME,
                    SCHEMA: schema,
                    QSTRING: pdnm}
         min_dist = True
@@ -406,7 +375,7 @@ class CMEGMatcher(object):
         if is_one:
             results = self.__search_for_one(adsearch, qparams, grouping_q, callback)
             if results and min_dist:
-                results = min_dist_rslt(results, pdnm, self.F_PRODUCT_NAME, schema, minboost=0.2)[0]
+                results = min_dist_rslt(results, pdnm, CMEGMatcher.F_PRODUCT_NAME, schema, minboost=0.2)[0]
         else:
             q_configs = multi_match[pd_id]
             qparams.update(q_configs)
@@ -414,12 +383,14 @@ class CMEGMatcher(object):
         return results
 
     def __get_grouping_query(self, row, pdnm, lexicons):
-        prods_pdgps, prods_subgps = lexicons[self.F_PRODUCT_GROUP], lexicons[self.F_SUB_GROUP]
-        prods_clras = lexicons[self.F_CLEARED_AS]
-        pdgp = dtsp.find_first_n(prods_pdgps, lambda x: self.__match_pdgp(x, row[self.PRODUCT_GROUP]))
-        clras = self.__verify_clearedas(pdnm, row[self.CLEARED_AS], prods_clras)
+        prods_pdgps, prods_subgps = lexicons[CMEGMatcher.F_PRODUCT_GROUP], lexicons[CMEGMatcher.F_SUB_GROUP]
+        prods_clras = lexicons[CMEGMatcher.F_CLEARED_AS]
+        pdgp = find_first_n(prods_pdgps, lambda x: self.__match_pdgp(x, row[CMEGMatcher.PRODUCT_GROUP]))
+        clras = self.__verify_clearedas(pdnm, row[CMEGMatcher.CLEARED_AS], prods_clras)
         subgp = self.__match_in_string(pdnm, prods_subgps[pdgp], False)
-        return filter_query((self.F_PRODUCT_GROUP, pdgp), (self.F_CLEARED_AS, clras), (self.F_SUB_GROUP, subgp))
+        return filter_query((CMEGMatcher.F_PRODUCT_GROUP, pdgp),
+                            (CMEGMatcher.F_CLEARED_AS, clras),
+                            (CMEGMatcher.F_SUB_GROUP, subgp))
 
     def __search_for_one(self, adsearch, qparams, grouping_q, callback):
         src_and = adsearch.search(*get_query_params('and', **qparams),
@@ -460,9 +431,9 @@ class CMEGMatcher(object):
     def __prt_match_status(self, matched, rows_matched):
         for r in rows_matched:
             if not matched:
-                print('Failed matching {}'.format(r[self.PRODUCT]))
+                print('Failed matching {}'.format(r[CMEGMatcher.PRODUCT]))
             else:
-                print('Successful matching {} with {}'.format(r[self.PRODUCT], r[self.F_PRODUCT_NAME]))
+                print('Successful matching {} with {}'.format(r[CMEGMatcher.PRODUCT], r[CMEGMatcher.F_PRODUCT_NAME]))
 
     def __join_results(self, results, df):
         joined_dicts = []
@@ -481,10 +452,10 @@ class CMEGMatcher(object):
         return joined_dicts
 
     def __match_prods_by_commodity(self, df_prods, df_adv):
-        prod_dict = {str(row[self.GLOBEX]): row for _, row in df_prods.iterrows()}
-        prod_dict.update({str(row[self.CLEARING]): row for _, row in df_prods.iterrows()})
-        matched_rows = [{**row, **prod_dict[str(row[self.COMMODITY])]} for _, row in df_adv.iterrows()
-                        if str(row[self.COMMODITY]) in prod_dict]
+        prod_dict = {str(row[CMEGMatcher.GLOBEX]): row for _, row in df_prods.iterrows()}
+        prod_dict.update({str(row[CMEGMatcher.CLEARING]): row for _, row in df_prods.iterrows()})
+        matched_rows = [{**row, **prod_dict[str(row[CMEGMatcher.COMMODITY])]} for _, row in df_adv.iterrows()
+                        if str(row[CMEGMatcher.COMMODITY]) in prod_dict]
         cols = list(df_adv.columns) + list(df_prods.columns)
         df = pd.DataFrame(matched_rows, columns=cols)
         return df
@@ -495,19 +466,19 @@ class CMEGMatcher(object):
         lwc_flt = LowercaseFilter()
         splt_mrg_flt = SplitMergeFilter(splitcase=True, splitnums=True, ignore_splt=True)
 
-        stp_flt = StopFilter(stoplist=STOP_LIST + self.CBOT_COMMON_WORDS, minsize=1)
-        sp_flt = SpecialWordFilter(self.CBOT_SPECIAL_MAPPING)
+        stp_flt = StopFilter(stoplist=STOP_LIST + CMEGMatcher.CBOT_COMMON_WORDS, minsize=1)
+        sp_flt = SpecialWordFilter(CMEGMatcher.CBOT_SPECIAL_MAPPING)
         vw_flt = VowelFilter(lift_ignore=False)
         multi_flt = MultiFilterFixed(index=vw_flt)
         ana = regex_tkn | splt_mrg_flt | lwc_flt | stp_flt | sp_flt | multi_flt | stp_flt
 
-        return {self.F_PRODUCT_NAME: TEXT(stored=True, analyzer=ana),
-                self.F_PRODUCT_GROUP: ID(stored=True, unique=True),
-                self.F_CLEARED_AS: ID(stored=True, unique=True),
-                self.F_CLEARING: ID(stored=True, unique=True),
-                self.F_GLOBEX: ID(stored=True, unique=True),
-                self.F_SUB_GROUP: ID(stored=True, unique=True),
-                self.F_EXCHANGE: ID}
+        return {CMEGMatcher.F_PRODUCT_NAME: TEXT(stored=True, analyzer=ana),
+                CMEGMatcher.F_PRODUCT_GROUP: ID(stored=True, unique=True),
+                CMEGMatcher.F_CLEARED_AS: ID(stored=True, unique=True),
+                CMEGMatcher.F_CLEARING: ID(stored=True, unique=True),
+                CMEGMatcher.F_GLOBEX: ID(stored=True, unique=True),
+                CMEGMatcher.F_SUB_GROUP: ID(stored=True, unique=True),
+                CMEGMatcher.F_EXCHANGE: ID}
 
     def get_cme_fields(self):
         regtk_exp = '[^\s/\(\)]+'
@@ -515,53 +486,56 @@ class CMEGMatcher(object):
         lwc_flt = LowercaseFilter()
         splt_mrg_flt = SplitMergeFilter(mergewords=True, mergenums=True, ignore_mrg=True)
 
-        stp_flt =StopFilter(stoplist=STOP_LIST + self.CME_COMMON_WORDS, minsize=1)
-        sp_flt = SpecialWordFilter(self.CME_KEYWORD_MAPPING)
-        vw_flt = VowelFilter(self.CME_KYWRD_EXCLU, lift_ignore=False)
+        stp_flt =StopFilter(stoplist=STOP_LIST + CMEGMatcher.CME_COMMON_WORDS, minsize=1)
+        sp_flt = SpecialWordFilter(CMEGMatcher.CME_KEYWORD_MAPPING)
+        vw_flt = VowelFilter(CMEGMatcher.CME_KYWRD_EXCLU, lift_ignore=False)
         multi_flt = MultiFilterFixed(index=vw_flt)
         ana = regex_tkn | splt_mrg_flt | lwc_flt | stp_flt | sp_flt | multi_flt | stp_flt
 
-        return {self.F_PRODUCT_NAME: TEXT(stored=True, analyzer=ana),
-                self.F_PRODUCT_GROUP: ID(stored=True, unique=True),
-                self.F_CLEARED_AS: ID(stored=True, unique=True),
-                self.F_CLEARING: ID(stored=True, unique=True),
-                self.F_GLOBEX: ID(stored=True, unique=True),
-                self.F_SUB_GROUP: ID(stored=True, unique=True),
-                self.F_EXCHANGE: ID}
+        return {CMEGMatcher.F_PRODUCT_NAME: TEXT(stored=True, analyzer=ana),
+                CMEGMatcher.F_PRODUCT_GROUP: ID(stored=True, unique=True),
+                CMEGMatcher.F_CLEARED_AS: ID(stored=True, unique=True),
+                CMEGMatcher.F_CLEARING: ID(stored=True, unique=True),
+                CMEGMatcher.F_GLOBEX: ID(stored=True, unique=True),
+                CMEGMatcher.F_SUB_GROUP: ID(stored=True, unique=True),
+                CMEGMatcher.F_EXCHANGE: ID}
 
-    def init_ix_cme_cbot(self, clean=False):
-        df_prods = self.__from_prods(self.prods_file)
-        df_ix = df_prods.rename(columns=self.COL2FIELD)
-        gdf_exch = {exch: df.reset_index(drop=0) for exch, df in df_groupby(df_ix, [self.EXCHANGE]).items()}
-        ix_cme = setup_ix(self.get_cme_fields(), gdf_exch[self.CME], self.index_cme, clean)
-        ix_cbot = setup_ix(self.get_cbot_fields(), gdf_exch[self.CBOT], self.index_cbot, clean)
-        return ix_cme, ix_cbot, gdf_exch
+    def __prepfor_index(self, df_prods):
+        df_trunc = self.__from_prods(df_prods)
+        df_ix = df_trunc.rename(columns=CMEGMatcher.COL2FIELD)
+        return {exch: df.reset_index(drop=0) for exch, df in df_groupby(df_ix, [CMEGMatcher.EXCHANGE]).items()}
+
+    def init_ix_cme_cbot(self, gdf_exch, ixname_cme, ixname_cbot, clean=False):
+        ix_cme = setup_ix(self.get_cme_fields(), gdf_exch[CMEGMatcher.CME], ixname_cme, clean)
+        ix_cbot = setup_ix(self.get_cbot_fields(), gdf_exch[CMEGMatcher.CBOT], ixname_cbot, clean)
+        return ix_cme, ix_cbot
 
     def match_nymex_comex(self, df_adv, gdf_exch):
-        df_nymex_comex_prods = gdf_exch[self.NYMEX].append(gdf_exch[self.COMEX], ignore_index=True)
+        df_nymex_comex_prods = gdf_exch[CMEGMatcher.NYMEX].append(gdf_exch[CMEGMatcher.COMEX], ignore_index=True)
         df_nymex_comex_prods.reset_index(drop=True, inplace=True)
         if 'index' in df_nymex_comex_prods.columns:
             df_nymex_comex_prods.drop(['index'], axis=1, inplace=True)
         df_adv = self.__match_prods_by_commodity(df_nymex_comex_prods, df_adv)
         return df_adv
 
-    def run_pd_mtch(self, clean=False):
-        dfs_adv = {self.CME: self.__from_adv(self.adv_cme, self.COLS_ADV),
-                   self.CBOT: self.__from_adv(self.adv_cbot, self.COLS_ADV),
-                   self.NYMEX: self.__from_adv(self.adv_nymex_comex, self.COLS_ADV + [self.COMMODITY])}
+    def run_pd_mtch(self, dfs_adv, df_prods, ix_names, year=None, clean=False):
+        df_cme = self.__from_adv(dfs_adv[CMEGMatcher.CME], CMEGMatcher.COLS_ADV_CME, year)
+        df_cbot = self.__from_adv(dfs_adv[CMEGMatcher.CBOT], CMEGMatcher.COLS_ADV_CBOT, year)
+        df_nymex = self.__from_adv(dfs_adv[CMEGMatcher.NYMEX], CMEGMatcher.COLS_ADV_NYMEX, year)
+        gdf_exch = self.__prepfor_index(df_prods)
 
-        ix_cme, ix_cbot, gdf_exch = self.init_ix_cme_cbot(clean)
-        mdf_nymex = self.match_nymex_comex(dfs_adv[self.NYMEX], gdf_exch)
-        mdf_cme = self.match_prod_code(dfs_adv[self.CME], ix_cme, self.CME_EXACT_MAPPING, self.CME_NOTFOUND_PRODS,
-                                       self.CME_MULTI_MATCH)
-        mdf_cbot = self.match_prod_code(dfs_adv[self.CBOT], ix_cbot, self.CBOT_EXACT_MAPPING,
-                                        multi_match=self.CBOT_MULTI_MATCH)
-        return {self.CME: mdf_cme, self.CBOT: mdf_cbot, self.NYMEX: mdf_nymex}
+        ix_cme, ix_cbot = self.init_ix_cme_cbot(gdf_exch, *ix_names, clean)
+        mdf_nymex = self.match_nymex_comex(df_nymex, gdf_exch)
+        mdf_cme = self.match_prod_code(df_cme, ix_cme, CMEGMatcher.CME_EXACT_MAPPING,
+                                       CMEGMatcher.CME_NOTFOUND_PRODS, CMEGMatcher.CME_MULTI_MATCH)
+        mdf_cbot = self.match_prod_code(df_cbot, ix_cbot, CMEGMatcher.CBOT_EXACT_MAPPING,
+                                        multi_match=CMEGMatcher.CBOT_MULTI_MATCH)
+        return {CMEGMatcher.CME: mdf_cme, CMEGMatcher.CBOT: mdf_cbot, CMEGMatcher.NYMEX: mdf_nymex}
 
-    def save_to_xlsx(self, dfs_dict, outpath=None, override=True):
-        outpath = self.matched_file if outpath is None else outpath
-        cp.XlsxWriter.save_sheets(outpath, dfs_dict, override=override)
-        return outpath
+    # def save_to_xlsx(self, dfs_dict, outpath=None, override=True):
+    #     outpath = 'CMEG_matched.xlsx' if outpath is None else outpath
+    #     XlsxWriter.save_sheets(outpath, dfs_dict, override=override)
+    #     return outpath
 
 
 # checked_path = os.getcwd()
@@ -593,7 +567,7 @@ class CMEGMatcher(object):
 #     # unmatched = [(i, str(entry)) for i, entry in df_adv[self.COMMODITY].iteritems() if
 #     #              str(entry) not in df_prods[self.GLOBEX].astype(str).unique()]
 #     # unmatched = [(i, entry) for i, entry in unmatched if entry not in df_prods[self.CLEARING].astype(str).unique()]
-#     # ytd = dtsp.find_first_n(list(df_adv.columns), lambda x: self.PATTERN_ADV_YTD in x)
+#     # ytd = find_first_n(list(df_adv.columns), lambda x: self.PATTERN_ADV_YTD in x)
 #     # indices = [i for i, _ in unmatched if df_adv.iloc[i][ytd] == 0]
 #     # df_adv.drop(df_adv.index[indices], inplace=True)
 #     # df_adv.reset_index(drop=0, inplace=True)

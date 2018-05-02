@@ -1,16 +1,7 @@
-import pandas as pd
-import numpy as np
-import configparser as cp
-import os
-import re
-import inflect
-import itertools
-import math
 from sortedcontainers import SortedDict
+
+import configparser as cp
 from productmatcher import *
-
-from configparser import XlsxWriter
-
 
 # Parse the config files
 # cp.parse_save()
@@ -71,6 +62,10 @@ def aggregate_todict(df, group_key, aggr_col, aggr_func, dict_keyfunc):
     return groups, output_dict
 
 
+def df_todict(df, keyfunc):
+    return {keyfunc(row): row for _, row in df.iterrows()}
+
+
 def divide_dict_by(orig_dict, key_cols, left_sort=False, right_sort=False):
     left_dict = SortedDict() if left_sort else dict()
     right_dict = SortedDict() if right_sort else dict()
@@ -98,71 +93,90 @@ def hierarch_groupby(orig_dict, key_funcs, sort=False):
 
 
 class CMEGChecker(object):
-    EXCHANGES = ['cme', 'cbot', 'nymex_comex']
-    REPORT_FMTNAME = 'Web_ADV_Report_{}.xlsx'
-    PRODSLAT_FILE = 'Product_Slate.xls'
-
-    def __init__(self, checked_path=None):
-        self.report_files = [self.REPORT_FMTNAME.format(e.upper()) for e in self.EXCHANGES]
-        self.checked_path = checked_path if checked_path is not None else os.getcwd()
-        self.cmeg_prds_file = os.path.join(self.checked_path, self.PRODSLAT_FILE)
-        self.cmeg_adv_files = [os.path.join(self.checked_path, f) for f in self.report_files]
-        self.matcher = CMEGMatcher(self.cmeg_adv_files, self.cmeg_prds_file, '2017', self.checked_path)
 
     def get_prod_code(self, row):
-        if not pd.isnull(row[self.matcher.F_GLOBEX]):
-            return row[self.matcher.F_GLOBEX]
-        elif not pd.isnull(row[self.matcher.F_CLEARING]):
-            return row[self.matcher.F_CLEARING]
+        if not pd.isnull(row[CMEGMatcher.F_GLOBEX]):
+            return row[CMEGMatcher.F_GLOBEX]
+        elif not pd.isnull(row[CMEGMatcher.F_CLEARING]):
+            return row[CMEGMatcher.F_CLEARING]
         else:
-            print('no code: {}'.format(row[self.matcher.F_PRODUCT_NAME]))
+            print('no code: {}'.format(row[CMEGMatcher.F_PRODUCT_NAME]))
             return None
 
     def get_prod_key(self, row):
-        if pd.isnull(row[self.matcher.F_PRODUCT_NAME]):
+        if pd.isnull(row[CMEGMatcher.F_PRODUCT_NAME]):
             return None
         pd_code = self.get_prod_code(row)
         if pd_code is not None:
-            return pd_code, row[self.matcher.CLEARED_AS]
+            return pd_code, row[CMEGMatcher.CLEARED_AS]
         return None
 
-    def run_pd_check(self, vol_threshold=1000, outpath=None):
-        dfs_dict = self.matcher.run_pd_mtch(clean=True)
+    def check_prod_by(self, agg_dict, threshold, rec_condition, config_keys):
+        prods_wanted = list()
+        for k, row in agg_dict.items():
+            if not rec_condition(row, threshold):
+                continue
+            pdnm = row[CMEGMatcher.F_PRODUCT_NAME]
+            cf_key = (k[0], k[1][0].upper())
+            recorded = cf_key in config_keys
+            result = {PRODCODE: k[0], TYPE: k[1], PRODUCT: pdnm, RECORDED: recorded}
+            prods_wanted.append(result)
+            print(result)
+        return prods_wanted
+
+    def get_config_keys(self, exch_cols_dict):
+        config_data = {ex: data[cp.sheets[0]] for ex, data in cp.run_config_parse(exch_cols_dict.keys()).items()}
+        config_exch_dict = dict()
+        for exch, cols in exch_cols_dict.items():
+            keys = {tuple(cfg_dict[col] for col in cols) for cfg_dict in config_data[exch]}
+            config_exch_dict.update({exch: keys})
+        return config_exch_dict
+
+    def check_cme_cbot(self, dfs_dict, config_keys, vol_threshold):
+        df_cme, df_cbot = dfs_dict[CMEGMatcher.CME], dfs_dict[CMEGMatcher.CBOT]
+
         group_key = [[CMEGMatcher.PRODUCT, CMEGMatcher.CLEARED_AS]]
         aggr_func = sum_unique
         dict_keyfunc = self.get_prod_key
 
-        config_exchs = ['cme']
-        config_data = {ex: data[cp.sheets[0]] for ex, data in cp.run_config_parse(config_exchs).items()}
-        type = cp.properties[config_exchs[0]][0]
-        commodity = cp.properties[config_exchs[0]][1]
-        config_rowdict = {(cfg_dict[commodity], cfg_dict[type]) for cfg_dict in config_data[config_exchs[0]]}
+        ytd_cme = CMEGMatcher.get_ytd_header(df_cme)
+        ytd_cbot = CMEGMatcher.get_ytd_header(df_cbot)
+        _, aggdict_cme = aggregate_todict(df_cme, group_key, ytd_cme, aggr_func, dict_keyfunc)
+        _, aggdict_cbot = aggregate_todict(df_cbot, group_key, ytd_cbot, aggr_func, dict_keyfunc)
 
-        exchanges = [CMEGMatcher.CME, CMEGMatcher.CBOT, CMEGMatcher.NYMEX]
-        prods_wanted = list()
-        for exch in exchanges:
-            df = dfs_dict[exch]
-            ytd = self.matcher.get_ytd_header(df)
-            _, agg_dict = aggregate_todict(df, group_key, ytd, aggr_func, dict_keyfunc)
+        prods_cme = self.check_prod_by(aggdict_cme, vol_threshold, lambda row, threshold: row[ytd_cme] >= threshold,
+                                       config_keys)
+        prods_cbot = self.check_prod_by(aggdict_cbot, vol_threshold, lambda row, threshold: row[ytd_cbot] >= threshold,
+                                        config_keys)
 
-            for k, row in agg_dict.items():
-                if row[ytd] < vol_threshold:
-                    continue
-                pdnm = row[CMEGMatcher.F_PRODUCT_NAME]
-                cf_key = (k[0], k[1][0].upper())
-                recorded = cf_key in config_rowdict
-                result = {PRODCODE: k[0], TYPE: k[0], PRODUCT: pdnm, RECORDED: recorded}
-                prods_wanted.append(result)
-                print(result)
+        return {CMEGMatcher.CME: prods_cme, CMEGMatcher.CBOT: prods_cbot}
 
-            if outpath is not None:
-                outdf_cols = [PRODCODE, TYPE, PRODUCT, RECORDED]
-                outdf = pd.DataFrame(prods_wanted, columns=outdf_cols)
-                XlsxWriter.save_sheets(outpath, {'Products': outdf})
+    def check_nymex(self, dfs_dict, config_keys, vol_threshold):
+        df_nymex = dfs_dict[CMEGMatcher.NYMEX]
+        dict_nymex = df_todict(df_nymex, self.get_prod_key)
+        ytd_nymex = CMEGMatcher.get_ytd_header(df_nymex)
+        prods_nymex = self.check_prod_by(dict_nymex, vol_threshold, lambda row, threshold: row[ytd_nymex] >= threshold,
+                                         config_keys)
+        return {CMEGMatcher.NYMEX: prods_nymex}
+
+    def run_pd_check(self, dfs_dict, vol_threshold=1000, outpath=None):
+        cme = 'cme'
+        config_props = cp.properties[cme]
+        exch_cols_dict = {cme: [config_props[1], config_props[0]]}
+        config_keys = self.get_config_keys(exch_cols_dict)[cme]
+
+        prods_cme_cbot = self.check_cme_cbot(dfs_dict, config_keys, vol_threshold)
+        prods_nymex = self.check_nymex(dfs_dict, config_keys, vol_threshold)
+        prods_cmeg = {**prods_cme_cbot, **prods_nymex}
+
+        if outpath is not None:
+            outdf_cols = [PRODCODE, TYPE, PRODUCT, RECORDED]
+            outdf_dict = {exch: pd.DataFrame(prods, columns=outdf_cols) for exch, prods in prods_cmeg.items()}
+            return cp.XlsxWriter.save_sheets(outpath, outdf_dict)
+        return prods_cmeg
 
 
-cmeg_checker = CMEGChecker()
-cmeg_checker.run_pd_check(outpath='CMEG_checked.xlsx')
+
 
 
 # xl_consolidate(test_input, test_output)

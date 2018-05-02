@@ -1,13 +1,8 @@
 import os
-import re
 import pandas as pd
-import itertools
-import warnings
 from collections import namedtuple
 from collections import OrderedDict
 from collections import Mapping
-from collections import deque
-import copy
 
 from whoosh.fields import *
 from whoosh.analysis import *
@@ -17,7 +12,9 @@ from whoosh import writing
 from whoosh.query import *
 from whoosh import qparser
 
-import datascraper as dtsp
+from datascraper import flatten_iter
+from datascraper import find_first_n
+from datascraper import to_list
 
 
 def create_index(ix_path, fields, clean=False):
@@ -61,7 +58,7 @@ def update_doc(ix, doc):
 
 
 def get_field(schema, fieldname):
-    return dtsp.find_first_n(schema.items(), lambda x: x[0] == fieldname)[1]
+    return find_first_n(schema.items(), lambda x: x[0] == fieldname)[1]
 
 
 def join_words(words, minlen=2):
@@ -319,7 +316,7 @@ class SpecialWordFilter(Filter):
                 prev_kws, next_group = self.__move_down(prev_kws, next_group, tk_cpy)
             else:
                 if prev_kws and next_group != kws_treedict:
-                    trans_tokens = self.__prev_tokens(prev_kws, kws_treedict, ismapped)
+                    trans_tokens = self.__prev_tokens(prev_kws, kws_treedict)
                     for tk in self.__gen_tokens(trans_tokens, memory, ismapped):
                         yield set_token(token, **tk._asdict())
                     prev_kws, next_group = self.__clear(kws_treedict)
@@ -343,7 +340,7 @@ class SpecialWordFilter(Filter):
                     yield set_token(token, **tk_cpy._asdict())
 
         if prev_kws and next_group != kws_treedict and token is not None:
-            trans_tokens = self.__prev_tokens(prev_kws, kws_treedict, ismapped)
+            trans_tokens = self.__prev_tokens(prev_kws, kws_treedict)
             for tk in self.__gen_tokens(trans_tokens, memory, ismapped):
                 yield set_token(token, **tk._asdict())
 
@@ -363,7 +360,7 @@ class SpecialWordFilter(Filter):
 
         def update_rcrs(value, items):
             if not isinstance(value, dict) and isinstance(value, list):
-                item_list = dtsp.to_list(items)
+                item_list = to_list(items)
                 return item_list + [v for v in value if v not in item_list]
 
             for k, v in value.items():
@@ -379,7 +376,7 @@ class SpecialWordFilter(Filter):
         if not isinstance(tk_cpy, TokenSub):
             raise TypeError('The first argument must be of type TokenSub')
 
-        values = dtsp.to_list(self.word_dict[tk_cpy.text])
+        values = to_list(self.word_dict[tk_cpy.text])
         return [TokenSub(tk.text, val.boost * tk_cpy.boost,
                         val.ignored or tk_cpy.ignored,
                         val.required or tk_cpy.required)
@@ -392,7 +389,7 @@ class SpecialWordFilter(Filter):
             prev_kws.append(None)
         return prev_kws, next_group
 
-    def __prev_tokens(self, prev_kws, treedict, ismapped=False):
+    def __prev_tokens(self, prev_kws, treedict):
         if not prev_kws:
             return prev_kws
         last_idx = last_indexof(prev_kws, None)
@@ -435,7 +432,7 @@ class SpecialWordFilter(Filter):
         return all_in, all_mapped, all_notmapped, all_yielded, all_notyielded
 
     def __gen_tokens(self, trans_tokens, memory=None, ismapped=False):
-        trans_tokens = dtsp.to_list(trans_tokens)
+        trans_tokens = to_list(trans_tokens)
         if memory is not None:
             all_in, all_mapped, all_notmapped, all_yielded, all_notyielded = self.__multi_all(trans_tokens, memory)
             to_yield = not all_in or (all_in and
@@ -617,7 +614,7 @@ def and_query(fieldname, schema, qstring, boost=1, termclass=Term, **kwargs):
     terms = []
     if termclass == Term:
         parser = qparser.QueryParser(fieldname, schema=schema)
-        terms = dtsp.to_list(parser.term_query(fieldname, qstring, termclass=termclass, boost=boost))
+        terms = to_list(parser.term_query(fieldname, qstring, termclass=termclass, boost=boost))
     elif termclass == FuzzyTerm:
         terms = fuzzy_terms(fieldname, schema, qstring, **kwargs)
     return And(terms, boost=boost)
@@ -707,7 +704,7 @@ params_dict = {'and': {FIELDNAME, SCHEMA, QSTRING, BOOST, TERMCLASS},
                'orofand': {FIELDNAME, SCHEMA, ANDLIST, BOOST, TERMCLASS},
                'every': {FIELDNAME}}
 
-reserved_params = set([QUERY] + dtsp.flatten_iter(params_dict.values()))
+reserved_params = set([QUERY] + flatten_iter(params_dict.values()))
 
 
 def get_query_params(query, **kwargs):
@@ -802,10 +799,3 @@ def get_query_params(query, **kwargs):
 
 # endregion
 
-# STD_ANA = StandardAnalyzer('[^\s/]+', stoplist=STOP_LIST, minsize=1)
-
-# ana = STD_ANA | SplitFilter(origin=False, mergewords=True, mergenums=True) | VowelFilter(CurrencyConverter.get_cnvtd_kws()) | CurrencyConverter()
-# ana = FancyAnalyzer()
-# print([t.text for t in ana('Premium-Quoted European Style on Australian Dollar/US Dollar  CHINESE RENMINBI (CNH) E-MICRO CAD/USD aud')])
-# print([t.text for t in ana(' E-MINI S&P500*30 ECapTotal5-3-city')])
-# print([t.text for t in ana('  E-MICRO AUD/USD')])
