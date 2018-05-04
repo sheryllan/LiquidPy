@@ -12,6 +12,7 @@ import tabula
 from bs4 import BeautifulSoup
 from PyPDF2 import PdfFileReader
 import jaconv
+import math
 
 import configparser
 
@@ -159,6 +160,31 @@ class TxtHelper(object):
                 merged[clonger] = vlonger
                 i += 1
         return [v for k, v in sorted(merged.items(), key=lambda x: func(x[0]))]
+
+
+    @classmethod
+    def calc_sqr_offset(cls, cols1, cols2, alignment='centre'):
+        func = TxtHelper.alignment_func[alignment]
+        result = 0
+        for c1, c2 in zip(cols1, cols2):
+            result += func(c1, c2)**2
+        return result
+
+
+    @classmethod
+    def align_by_mse(cls, headers, data, alignment='centre'):
+        min_offset = math.inf
+        aligned_cols = None
+        col_num = len(data)
+        for i, header in enumerate(headers):
+            cords_cols = [(h.start(), h.end()) for h in headers[i: i + col_num]]
+            cords_data = [(d.start(), d.end()) for d in data]
+            offset = cls.calc_sqr_offset(cords_cols, cords_data, alignment)
+            if offset < min_offset:
+                min_offset = offset
+                aligned_cols = {header.group(): dt.group() for header, dt in zip(headers[i: i + col_num], data)}
+        return aligned_cols
+
 
 
 class CMEGScraper(object):
@@ -353,28 +379,75 @@ class OSEScraper(object):
     def filter_table(self, tables, title):
         return [tbl for tbl in tables if tbl.find(TR_TAB).find(TH_TAB, text=title)][0]
 
-   
+    @staticmethod
+    def get_ascii_words(string, pattern_ascii='([A-Za-z0-9/\(\)\.%&$,-]|(?<! ) (?! ))+'):
+        pattern_words = '(^|(?<=((?<!\S) ))){}($|(?=( (?!\S))))'
+        pattern_ascii_words = pattern_words.format(pattern_ascii)
+        return list(re.finditer(pattern_ascii_words, string))
 
-    def parse_from_txt(self, txt_path=None):
+    @staticmethod
+    def is_header(line, pattern_data='([A-Za-z0-9/\(\)\.%&$,-]|(?<! ) (?! ))+',
+                  pattern_header='[A-Za-z]+', min_colnum=4):
+        matches = OSEScraper.get_ascii_words(line, pattern_data)
+        if len(matches) < min_colnum:
+            return False
+        isheader = all(re.search(pattern_header, m.group()) for m in matches)
+        if isheader:
+            return matches
+
+    @staticmethod
+    def get_col_header(lines, pattern_data='([A-Za-z0-9/\(\)\.%&$,-]|(?<! ) (?! ))+',
+                       pattern_header='[A-Za-z]+', min_colnum=4):
+        for line in lines:
+            isheader = OSEScraper.is_header(line, pattern_data, pattern_header, min_colnum)
+            if isheader:
+                return isheader
+        return None
+
+    def parse_from_txt(self, txt_path=None, alignment='centre'):
         txt_path = self.txt_path_adv if txt_path is None else txt_path
         with open(txt_path) as fh:
             lines = fh.readlines()
-            pattern_data = '([A-Za-z0-9/\(\)\.%&$,-]+( [A-Za-z0-9/\(\)\.%&$,-]+)*)+'
         if lines:
-            for line in lines:
-                ln = jaconv.z2h(line, kana=False, digit=True, ascii=True)
-                mobj = re.search(pattern_data, ln)
-                if mobj:
-                    print(mobj.group())
-
+            lines = iter(fh.readlines())
+            headers, data_row = None, dict()
+            line = next(lines)
+            while not headers:
+                ln_convt = jaconv.z2h(line, kana=False, digit=True, ascii=True)
+                headers = self.is_header(ln_convt)
+                line = next(lines)
+            results = pd.DataFrame(columns=headers)
+            done_looping = False
+            while not done_looping:
+                try:
+                    ln_convt = jaconv.z2h(line, kana=False, digit=True, ascii=True)
+                    data_piece = OSEScraper.get_ascii_words(ln_convt)
+                    aligned_cols = TxtHelper.align_by_mse(headers, data_piece, alignment)
+                    if any(c in data_row for c in aligned_cols):
+                        results.append(pd.DataFrame([data_row]))
+                        data_row = aligned_cols
+                    else:
+                        data_row.update(aligned_cols)
+                    line = next(lines)
+                except StopIteration:
+                    if data_row:
+                        results.append(pd.DataFrame([data_row]))
+                    done_looping = True
         else:
             return None
 
     def tabula_parse(self, infile=None, outfile=None):
         infile = self.pdf_path_adv if infile is None else infile
         outfile = self.CSV_ADV if outfile is None else outfile
-        tabula.convert_into(infile, outfile, output_format='csv', pages='all')
-        # df = tabula.read_pdf(self.pdf_path_adv, pages=2)
+        with open(infile, mode='rb') as fh:
+            fr = PdfFileReader(fh)
+            outlines = fr.getOutlines()
+            num_pages = fr.getNumPages()
+            page1 = fr.getPage(0)
+            layout1 = fr.getPageLayout()
+
+        # tabula.convert_into(infile, outfile, output_format='csv', pages='all')
+        df = tabula.read_pdf(self.pdf_path_adv, pages=2)
         print('\n[*] Successfully convert {} to {}'.format(infile, outfile))
 
     def download_to_xlsx_adv(self, outpath=None):
