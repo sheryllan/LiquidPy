@@ -3,6 +3,8 @@ beautifulsoup4==4.6.0
 certifi==2018.1.18
 chardet==3.0.4
 et-xmlfile==1.0.1
+gitdb2==2.0.3
+GitPython==2.1.9
 idna==2.6
 inflect==0.2.5
 jaconv==0.2.3
@@ -21,6 +23,8 @@ python-dateutil==2.7.2
 pytz==2018.4
 requests==2.18.4
 six==1.11.0
+smmap2==2.0.3
+sortedcontainers==1.5.10
 tabula-py==1.0.0
 urllib3==1.22
 Whoosh==2.7.4

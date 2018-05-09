@@ -1,23 +1,20 @@
-import collections
+import os
+import math
 import os
 import re
-import urllib.error
-import urllib.parse
-import urllib.request
-import subprocess
 import tempfile
+from datetime import datetime
+from subprocess import Popen, PIPE
 
-import pandas as pd
-import tabula
-from bs4 import BeautifulSoup
-from PyPDF2 import PdfFileReader
 import jaconv
-import math
+import pandas as pd
+from PyPDF2 import PdfFileReader
+from PyPDF2.generic import Destination
+from dateutil.relativedelta import relativedelta
 
-import configparser
+from configparser import XlsxWriter
+from utils import *
 
-USER_AGENT = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.0.7; X11; Linux x86_64) ' \
-             'Gecko/2009021910 Firefox/3.0.7 Chrome/23.0.1271.64 Safari/537.11'
 TABLE_TAB = 'table'
 TR_TAB = 'tr'
 TH_TAB = 'th'
@@ -30,87 +27,23 @@ TXT_SUFFIX = '.txt'
 XLSX_SUFFIX = '.xlsx'
 
 
-def nonstr_iterable(arg):
-    return isinstance(arg, collections.Iterable) and not isinstance(arg, str)
+def last_year():
+    return (datetime.now() - relativedelta(years=1)).year
 
 
-def flatten_iter(items, incl_level=False):
-    def flattern_iter_rcrs(items, flat_list, level):
-        if not items:
-            return flat_list
-
-        if nonstr_iterable(items) and list(items):
-            level = None if level is None else level + 1
-            for sublist in items:
-                flat_list = flattern_iter_rcrs(sublist, flat_list, level)
-        else:
-            level_item = items if level is None else (level, items)
-            flat_list.append(level_item)
-        return flat_list
-
-    flat_list = list()
-    level = -1 if incl_level else None
-    return flattern_iter_rcrs(items, flat_list, level)
-
-
-def to_list(x):
-    return [x] if not nonstr_iterable(x) else list(x)
-
-
-def find_first_n(arry, condition, n=1):
-    result = list()
-    for a in arry:
-        if n == 0:
-            break
-        if condition(a):
-            result.append(a)
-            n -= 1
-    return result if len(result) != 1 else result[0]
-
-
-def download(url, fh):
-    request = urllib.request.Request(url, headers={'User-Agent': USER_AGENT})
-    try:
-        response = urllib.request.urlopen(request)
-        print(('\n[*] Downloading from: {}'.format(url)))
-        fh.write(response.read())
-        fh.flush()
-        print('\n[*] Successfully downloaded to ' + fh.name)
-        return fh
-    except urllib.error.HTTPError as e:
-        print(e.fp.read())
-
-
-def make_soup(url):
-    request = urllib.request.Request(url, headers={'User-Agent': USER_AGENT})
-    html = urllib.request.urlopen(request)
-    soup = BeautifulSoup(html, 'html.parser')
-    return soup
-
-
-def swap(a, b):
-    tmp = a
-    a = b
-    b = tmp
-    return a, b
-
-
-def to_dict(items, tkey, tval):
-    return {tkey(x): tval(x) for x in items}
-
-
-def rreplace(s, old, new, occurrence):
-    li = s.rsplit(old, occurrence)
-    return new.join(li)
-
-
-def run_pdftotext_cmd(pdf, txt=None):
-    txt = re.sub('\.pdf$', pdf, '.txt') if txt is None else txt
-    out, err = subprocess.Popen(["pdftotext", "-layout", pdf, txt]).communicate()
+def run_pdftotext_cmd(pdf, txt=None, encoding='utf-8', **kwargs):
+    # txt = re.sub('\.pdf$', pdf, '.txt') if txt is None else txt
+    txt = '-' if txt is None else txt
+    args = ['pdftotext', pdf, txt, '-layout']
+    args.extend(flatten_iter(('-' + str(k), str(v)) for k, v in kwargs.items()))
+    out, err = Popen(args, stdout=PIPE).communicate()
+    if out:
+        out = out.decode(encoding)
+        out = out.splitlines()
     if err is not None:
         raise RuntimeError(err)
-    print('\n[*] Successfully convert {} to {}'.format(pdf, txt))
-    return txt
+    print('\n[*] Successfully convert {} to {}'.format(pdf, 'stdout' if txt == '-' else txt))
+    return out if txt == '-' else txt
 
 
 class TxtHelper(object):
@@ -173,10 +106,12 @@ class TxtHelper(object):
 
     @classmethod
     def align_by_mse(cls, headers, data, alignment='centre'):
+        if not data:
+            return None
         min_offset = math.inf
         aligned_cols = None
         col_num = len(data)
-        for i, header in enumerate(headers):
+        for i in range(0, len(headers) - col_num + 1):
             cords_cols = [(h.start(), h.end()) for h in headers[i: i + col_num]]
             cords_data = [(d.start(), d.end()) for d in data]
             offset = cls.calc_sqr_offset(cords_cols, cords_data, alignment)
@@ -184,7 +119,6 @@ class TxtHelper(object):
                 min_offset = offset
                 aligned_cols = {header.group(): dt.group() for header, dt in zip(headers[i: i + col_num], data)}
         return aligned_cols
-
 
 
 class CMEGScraper(object):
@@ -234,16 +168,14 @@ class CMEGScraper(object):
         with open(path, mode='rb') as fh:
             fr = PdfFileReader(fh)
             outlines = fr.getOutlines()
-            flat_outlines = flatten_iter(outlines, True)
+            flat_outlines = flatten_iter(outlines, True, (str, Destination))
             # self.report_name = ' '.join([o.title for _, o in flat_outlines[0:2]]).replace('/', '-')
             return self.get_pdf_product_groups([(l, o.title) for l, o in flat_outlines[2:]])
 
-    def parse_from_txt(self, pdf_path, txt_path):
+    def parse_from_txt(self, pdf_path, lines):
         product_groups = self.read_pdf_metadata(pdf_path)
-        with open(txt_path) as fh:
-            lines = fh.readlines()
-            pattern_data = '^ ?((\S+ )+ {2,}){2,}.*$'
-            pattern_headers = '^ {10,}((\S+ )+ {2,}){2,}.*$'
+        pattern_data = '^ ?((\S+ )+ {2,}){2,}.*$'
+        pattern_headers = '^ {10,}((\S+ )+ {2,}){2,}.*$'
         if lines:
             header_line = find_first_n(lines, lambda x: re.match(pattern_headers, x) is not None, 2)
             df = pd.DataFrame(columns=self.__get_output_headers(header_line))
@@ -260,24 +192,18 @@ class CMEGScraper(object):
         else:
             return None
 
-    def to_xlsx_adv(self, pdfpath, txtpath, outpath=None, sheetname=None):
-        table = self.parse_from_txt(pdfpath, txtpath)
+    def to_xlsx_adv(self, pdfpath, txt, outpath=None, sheetname=None):
+        table = self.parse_from_txt(pdfpath, txt)
         if outpath is not None:
             sheetname = 'Sheet1' if sheetname is None else sheetname
-            configparser.XlsxWriter.save_sheets(outpath, {sheetname: table})
+            XlsxWriter.save_sheets(outpath, {sheetname: table})
         return table
 
-    def download_to_xlsx_adv(self, url, dlpath=None, outpath=None, sheetname=None):
-        f_pdf = download(url, tempfile.NamedTemporaryFile()) if dlpath is None else download(url, dlpath)
-        f_txt = tempfile.NamedTemporaryFile()
-        try:
-            run_pdftotext_cmd(f_pdf.name, f_txt.name)
-            result = self.to_xlsx_adv(f_pdf.name, f_txt.name, outpath, sheetname)
-        except Exception:
-            raise
-        finally:
-            f_pdf.close()
-            f_txt.close()
+    def download_to_xlsx_adv(self, url, outpath=None, sheetname=None):
+        f_pdf = download(url, tempfile.NamedTemporaryFile())
+        txt = run_pdftotext_cmd(f_pdf.name)
+        result = self.to_xlsx_adv(f_pdf.name, txt, outpath, sheetname)
+        f_pdf.close()
         return result
 
     def run_scraper(self, path_prods=None, path_advs=None):
@@ -336,20 +262,14 @@ class OSEScraper(object):
     URL_OSE = 'http://www.jpx.co.jp'
     URL_VOLUME = URL_OSE + '/english/markets/statistics-derivatives/trading-volume/01.html'
 
-    PDF_ADV = 'OSE_Average_Daily_Volume.pdf'
-    CSV_ADV = 'OSE_Average_Daily_Volume.csv'
-    TXT_ADV = 'OSE_Average_Daily_Volume.txt'
-
-    YEAR_INTERESTED = '2017'
     TABLE_TITLE = 'Year'
 
-    def __init__(self, download_path=None):
-        self.download_path = os.getcwd() if download_path is None else download_path
-        self.pdf_path_adv = os.path.join(self.download_path, self.PDF_ADV)
-        self.csv_path_adv = os.path.join(self.download_path, self.CSV_ADV)
-        self.txt_path_adv = os.path.join(self.download_path, self.TXT_ADV)
+    TYPE = 'Type'
+    VOLUME = 'Trading Volume(units)'
+    DAILY_AVG = 'Daily Average'
 
-    def find_report_url(self):
+    def find_report_url(self, year=last_year()):
+        year_str = str(year)
         soup = make_soup(self.URL_VOLUME)
 
         tables = soup.find_all(TABLE_TAB)
@@ -357,20 +277,16 @@ class OSEScraper(object):
         ths = table.find(TR_TAB).find_all(TH_TAB)
 
         # find in headers for the column of the year
-        col_idx = self.get_indexes(ths, lambda x: x.text == self.YEAR_INTERESTED)[0]
+        col_idx = self.get_indexes(ths, lambda x: x.text == year_str)[0]
 
         trs = table.find_all(TR_TAB)
         td_rows = [tr for tr in trs if tr.find_all(TD_TAB)]
         tds = [tr.find_all(TD_TAB)[col_idx] for tr in td_rows]
 
         links = [str(td.find(href=True)[HREF_ATTR]) for td in tds]
-        pattern = r'^(?=.*{}.*\.pdf).*$'.format(self.YEAR_INTERESTED)
+        pattern = r'^(?=.*{}.*\.pdf).*$'.format(year_str)
         file_url = find_first_n(links, lambda x: re.match(pattern, x))
         return self.URL_OSE + file_url
-
-    def download_adv(self, path=None):
-        path = self.pdf_path_adv if path is None else path
-        return download(self.find_report_url(), path)
 
     def get_indexes(self, arry, condition):
         return [i for i, a in enumerate(arry) if condition(a)]
@@ -404,62 +320,81 @@ class OSEScraper(object):
                 return isheader
         return None
 
-    def parse_from_txt(self, txt_path=None, alignment='centre'):
-        txt_path = self.txt_path_adv if txt_path is None else txt_path
-        with open(txt_path) as fh:
-            lines = fh.readlines()
-        if lines:
-            lines = iter(fh.readlines())
-            headers, data_row = None, dict()
-            line = next(lines)
-            while not headers:
+    def parse_from_txt(self, lines=None, alignment='centre'):
+            header_mtchobjs, data_row = None, dict()
+            lines = iter(lines)
+            line = next(lines, None)
+
+            while line is not None and not header_mtchobjs:
                 ln_convt = jaconv.z2h(line, kana=False, digit=True, ascii=True)
-                headers = self.is_header(ln_convt)
-                line = next(lines)
+                header_mtchobjs = self.is_header(ln_convt)
+                line = next(lines, None)
+            headers = [h.group() for h in header_mtchobjs]
             results = pd.DataFrame(columns=headers)
-            done_looping = False
-            while not done_looping:
-                try:
-                    ln_convt = jaconv.z2h(line, kana=False, digit=True, ascii=True)
-                    data_piece = OSEScraper.get_ascii_words(ln_convt)
-                    aligned_cols = TxtHelper.align_by_mse(headers, data_piece, alignment)
-                    if any(c in data_row for c in aligned_cols):
-                        results.append(pd.DataFrame([data_row]))
-                        data_row = aligned_cols
-                    else:
-                        data_row.update(aligned_cols)
-                    line = next(lines)
-                except StopIteration:
-                    if data_row:
-                        results.append(pd.DataFrame([data_row]))
-                    done_looping = True
-        else:
-            return None
+            while line is not None:
+                ln_convt = jaconv.z2h(line, kana=False, digit=True, ascii=True)
+                data_piece = OSEScraper.get_ascii_words(ln_convt)
+                aligned_cols = TxtHelper.align_by_mse(header_mtchobjs, data_piece, alignment)
+                if aligned_cols and any(c in data_row for c in aligned_cols):
+                    results = results.append(pd.DataFrame([data_row], columns=headers))
+                    data_row = aligned_cols
+                elif aligned_cols:
+                    data_row.update(aligned_cols)
+                line = next(lines, None)
+            if data_row:
+                results = results.append(pd.DataFrame([data_row], columns=headers))
+            return results
 
-    def tabula_parse(self, infile=None, outfile=None):
-        infile = self.pdf_path_adv if infile is None else infile
-        outfile = self.CSV_ADV if outfile is None else outfile
-        with open(infile, mode='rb') as fh:
-            fr = PdfFileReader(fh)
-            outlines = fr.getOutlines()
-            num_pages = fr.getNumPages()
-            page1 = fr.getPage(0)
-            layout1 = fr.getPageLayout()
 
-        # tabula.convert_into(infile, outfile, output_format='csv', pages='all')
-        df = tabula.read_pdf(self.pdf_path_adv, pages=2)
-        print('\n[*] Successfully convert {} to {}'.format(infile, outfile))
+    # def tabula_parse(self, infile=None, outfile=None):
+    #     infile = self.pdf_path_adv if infile is None else infile
+    #     outfile = self.CSV_ADV if outfile is None else outfile
+    #     with open(infile, mode='rb') as fh:
+    #         fr = PdfFileReader(fh)
+    #         outlines = fr.getOutlines()
+    #         num_pages = fr.getNumPages()
+    #         page1 = fr.getPage(0)
+    #         layout1 = fr.getPageLayout()
+    #
+    #     # tabula.convert_into(infile, outfile, output_format='csv', pages='all')
+    #     df = tabula.read_pdf(self.pdf_path_adv, pages=2)
+    #     print('\n[*] Successfully convert {} to {}'.format(infile, outfile))
 
-    def download_to_xlsx_adv(self, outpath=None):
-        outpath = self.csv_path_adv if outpath is None else outpath
-        f_pdf = self.download_adv(tempfile.NamedTemporaryFile())
-        f_txt = tempfile.NamedTemporaryFile()
-        try:
-            run_pdftotext_cmd(f_pdf.name, f_txt.name)
-            self.parse_from_txt(f_txt.name)
-            # self.tabula_parse(f_pdf.name, outpath)
-        finally:
-            f_pdf.close()
+    def parse_by_pages(self, pdf_name, end_page, start_page=1, outpath=None, sheetname=None):
+        tables = list()
+        for page in range(start_page, end_page + 1):
+            txt = run_pdftotext_cmd(pdf_name, f=page, l=page)
+            df = self.parse_from_txt(txt)
+            tables.append(df)
+        results = pd.concat(tables)
+        if outpath:
+            sheetname = 'Sheet1' if sheetname is None else sheetname
+            return XlsxWriter.save_sheets(outpath, {sheetname: results})
+        return results
+
+    def run_scraper(self, year=last_year()):
+        dl_url = self.find_report_url(year)
+        f_pdf = download(dl_url, tempfile.NamedTemporaryFile())
+        num_pages = PdfFileReader(f_pdf).getNumPages()
+        results = self.parse_by_pages(f_pdf.name, num_pages)
+        f_pdf.close()
+        return results
+
+    def filter_adv(self, df):
+        df_adv = pd.DataFrame(columns=df.columns.values)
+        last_type = None
+        for i, row in df.iterrows():
+            if pd.isnull(row[OSEScraper.TYPE]):
+                continue
+            if OSEScraper.DAILY_AVG not in row[OSEScraper.TYPE]:
+                last_type = row[OSEScraper.TYPE]
+            elif last_type is not None and not pd.isnull(last_type):
+                row[OSEScraper.TYPE] = last_type
+                df_adv = df_adv.append(row, ignore_index=True)
+                last_type = None
+        return df_adv
+
+
 
 # download_path = os.getcwd()
 # # # download_path = '/home/slan/Documents/downloads/'
@@ -469,7 +404,12 @@ class OSEScraper(object):
 
 
 # ose = OSEScraper()
-# ose.download_to_xlsx_adv()
+# df_all = ose.run_scraper()
+# ose.filter_adv(df_all)
+# output = run_pdftotext_cmd('OSE_Average_Daily_Volume.pdf', f=1, l=1)
+#
+# df = ose.parse_from_txt('OSE_Average_Daily_Volume.txt')
+# XlsxWriter.save_sheets('OSE_adv_parsed.xlsx', {'sheet1': df})
 # ose.download_adv()
 # ose.parse_pdf_adv()
 # ose.tabula_parse()

@@ -1,10 +1,9 @@
-from bs4 import BeautifulSoup
 import pandas as pd
 import openpyxl
 from openpyxl.utils import get_column_letter
 import os
 import tempfile
-
+from utils import *
 
 
 class XmlParser(object):
@@ -83,6 +82,15 @@ param_keys = ['tags', 'fields', 'sheet']
 tags = ['product']
 sheets = ['Config']
 
+repo_url = 'http://stash.liquid-capital.liquidcap.com/projects/PPT/repos/reactor/browse/files/TNG/products'
+
+
+
+def get_raw_file(filename):
+    full_url = '/'.join([repo_url, filename])
+    f_temp = tempfile.NamedTemporaryFile()
+    download(full_url, f_temp)
+
 
 def run_config_parse(exchs=None, dest=None, save=False):
     exchs = exchanges if exchs is None else exchs
@@ -114,4 +122,4 @@ def parse_save(save=True):
             return sheet2data
 
 # parse_save()
-
+get_raw_file('asx.xml')

@@ -12,7 +12,7 @@ def cmeg_check(outpath=None):
     with TemporaryDirectory() as ixfolder_cme, TemporaryDirectory() as ixfolder_cbot:
         dfs_matched = matcher.run_pd_mtch(dfs_adv, df_prods, (ixfolder_cme, ixfolder_cbot), 2017, True)
         checker = CMEGChecker()
-        checker.run_pd_check(dfs_matched, outpath)
+        checker.run_pd_check(dfs_matched, outpath=outpath)
 
 
 outpath='CMEG_checked.xlsx'

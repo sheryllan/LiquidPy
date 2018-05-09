@@ -2,7 +2,6 @@ import inflect
 from dateutil.relativedelta import relativedelta
 from whoosh.searching import Hit
 
-from configparser import XlsxWriter
 from datascraper import CMEGScraper
 from whooshext import *
 
@@ -12,8 +11,8 @@ def last_word(string):
     return words[-1]
 
 
-def filter(df, col, exp):
-    return df[col].map(exp)
+# def filter(df, col, exp):
+#     return df[col].map(exp)
 
 
 def df_groupby(df, cols):
