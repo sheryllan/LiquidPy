@@ -6,15 +6,6 @@ from datascraper import CMEGScraper
 from whooshext import *
 
 
-def last_word(string):
-    words = string.split()
-    return words[-1]
-
-
-# def filter(df, col, exp):
-#     return df[col].map(exp)
-
-
 def df_groupby(df, cols):
     if not cols:
         return df
@@ -32,7 +23,8 @@ STOP_LIST = ['and', 'is', 'it', 'an', 'as', 'at', 'have', 'in', 'yet', 'if', 'fr
              'this', 'of', 'will', 'can', 'the', 'or', 'are']
 
 
-class Matcher(object):
+
+class MatchHelper(object):
     vowels = ('a', 'e', 'i', 'o', 'u')
 
     @staticmethod
@@ -41,7 +33,7 @@ class Matcher(object):
 
     @staticmethod
     def get_initials(string):
-        words = Matcher.get_words(string)
+        words = MatchHelper.get_words(string)
         initials = list()
         for word in words:
             if word[0:2].lower() == 'ex':
@@ -55,8 +47,8 @@ class Matcher(object):
         if not casesensitive:
             s1 = s1.lower()
             s2 = s2.lower()
-        return ''.join(Matcher.get_initials(s1)) == s2 \
-               or ''.join(Matcher.get_initials(s2)) == s1
+        return ''.join(MatchHelper.get_initials(s1)) == s2 \
+               or ''.join(MatchHelper.get_initials(s2)) == s1
 
     @staticmethod
     def match_first_n(s1, s2, n=2, casesensitive=False):
@@ -84,8 +76,8 @@ class Matcher(object):
             s_ref = s_ref.lower()
             s_sample = s_sample.lower()
 
-        wds_sample = Matcher.get_words(s_sample)
-        wds_ref = Matcher.get_words(s_ref)
+        wds_sample = MatchHelper.get_words(s_sample)
+        wds_ref = MatchHelper.get_words(s_ref)
         if not one:
             wds_sample = [' '.join(wds_sample)]
             wds_ref = ' '.join(wds_ref)
@@ -323,20 +315,20 @@ class CMEGMatcher(object):
         return df[CMEGMatcher.COLS_PRODS]
 
     def __match_pdgp(self, s_ref, s_sample):
-        return s_ref == s_sample or Matcher.match_in_string(s_ref, s_sample, one=True, stemming=True) \
-               or Matcher.match_initials(s_ref, s_sample) or Matcher.match_first_n(s_ref, s_sample)
+        return s_ref == s_sample or MatchHelper.match_in_string(s_ref, s_sample, one=True, stemming=True) \
+               or MatchHelper.match_initials(s_ref, s_sample) or MatchHelper.match_first_n(s_ref, s_sample)
 
     def __match_in_string(self, guess, indexed, one=True):
         guess = guess.lower()
         p = inflect.engine()
         for idx in indexed:
-            matched = Matcher.match_in_string(guess, idx, one, stemming=True, engine=p)
+            matched = MatchHelper.match_in_string(guess, idx, one, stemming=True, engine=p)
             if matched:
                 return idx
         return None
 
     def __verify_clearedas(self, prodname, row_clras, clras_set):
-        clras = Matcher.get_words(prodname)[-1]
+        clras = MatchHelper.get_words(prodname)[-1]
         found_clras = self.__match_in_string(clras, clras_set)
         return found_clras if found_clras is not None else row_clras
 

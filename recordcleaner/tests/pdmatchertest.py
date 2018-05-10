@@ -1,7 +1,7 @@
 import unittest as ut
 import pandas as pd
 
-from productmatcher import Matcher
+from productmatcher import MatchHelper
 from productmatcher import CMEGMatcher
 
 import productchecker as pdck
@@ -16,14 +16,14 @@ class MatcherTester(ut.TestCase):
         tc_ref2 = 'Equities'
 
         # test all
-        self.assertTrue(Matcher.match_in_string(tc_ref1, tc_sample1, False, True))
+        self.assertTrue(MatchHelper.match_in_string(tc_ref1, tc_sample1, False, True))
 
         # test any
-        self.assertTrue(Matcher.match_in_string(tc_ref2, tc_sample2, stemming=True))
-        self.assertFalse(Matcher.match_in_string(tc_ref2, tc_sample2, False, True))
+        self.assertTrue(MatchHelper.match_in_string(tc_ref2, tc_sample2, stemming=True))
+        self.assertFalse(MatchHelper.match_in_string(tc_ref2, tc_sample2, False, True))
 
         # test stemming
-        self.assertFalse(Matcher.match_in_string(tc_ref2, tc_sample2, True, False))
+        self.assertFalse(MatchHelper.match_in_string(tc_ref2, tc_sample2, True, False))
 
     def test_hierarch_groupby(self):
         ytd = 'ADV Y.T.D 2017'

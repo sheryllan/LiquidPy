@@ -92,6 +92,10 @@ def hierarch_groupby(orig_dict, key_funcs, sort=False):
     return output_dict
 
 
+def get_cf_type(rp_type):
+    return cp.INSTRUMENT_TYPES.keys(), lambda x: MatchHelper.match_in_string(x, rp_type, one=False, stemming=True)
+
+
 class CMEGChecker(object):
 
     def get_prod_code(self, row):
@@ -111,21 +115,25 @@ class CMEGChecker(object):
             return pd_code, row[CMEGMatcher.CLEARED_AS]
         return None
 
+    def __is_recorded(self, key, config_keys):
+        cf_type = get_cf_type(key[1])
+        new_key = (key[0], cf_type)
+        return new_key in config_keys
+
     def check_prod_by(self, agg_dict, threshold, rec_condition, config_keys):
         prods_wanted = list()
         for k, row in agg_dict.items():
             if not rec_condition(row, threshold):
                 continue
             pdnm = row[CMEGMatcher.F_PRODUCT_NAME]
-            cf_key = (k[0], k[1][0].upper())
-            recorded = cf_key in config_keys
+            recorded = self.__is_recorded(k, config_keys)
             result = {PRODCODE: k[0], TYPE: k[1], PRODUCT: pdnm, RECORDED: recorded}
             prods_wanted.append(result)
             print(result)
         return prods_wanted
 
     def get_config_keys(self, exch_cols_dict):
-        config_data = {ex: data[cp.sheets[0]] for ex, data in cp.run_config_parse(exch_cols_dict.keys()).items()}
+        config_data = {ex: data[cp.SHEETS[0]] for ex, data in cp.run_config_parse(exch_cols_dict.keys()).items()}
         config_exch_dict = dict()
         for exch, cols in exch_cols_dict.items():
             keys = {tuple(cfg_dict[col] for col in cols) for cfg_dict in config_data[exch]}
@@ -161,7 +169,7 @@ class CMEGChecker(object):
 
     def run_pd_check(self, dfs_dict, vol_threshold=1000, outpath=None):
         cme = 'cme'
-        config_props = cp.properties[cme]
+        config_props = cp.PROPERTIES[cme]
         exch_cols_dict = {cme: [config_props[1], config_props[0]]}
         config_keys = self.get_config_keys(exch_cols_dict)[cme]
 
@@ -174,6 +182,14 @@ class CMEGChecker(object):
             outdf_dict = {exch: pd.DataFrame(prods, columns=outdf_cols) for exch, prods in prods_cmeg.items()}
             return cp.XlsxWriter.save_sheets(outpath, outdf_dict)
         return prods_cmeg
+
+
+
+class OSEChecker(object):
+    def __init__(self):
+        self.cfg_properties = cp.PROPERTIES['ose']
+
+    # def run_pd_check(self, df):
 
 
 
