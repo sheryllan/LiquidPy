@@ -93,7 +93,14 @@ def hierarch_groupby(orig_dict, key_funcs, sort=False):
 
 
 def get_cf_type(rp_type):
-    return cp.INSTRUMENT_TYPES.keys(), lambda x: MatchHelper.match_in_string(x, rp_type, one=False, stemming=True)
+    cf_type = find_first_n(cp.INSTRUMENT_TYPES.keys(),
+                           lambda x: MatchHelper.match_in_string(x, rp_type, one=False, stemming=True))
+    return cf_type if cf_type else None
+
+
+def get_config_keys(exch, cols, name='configkey'):
+    config_data = cp.parse_config(exch)[cols]
+    return set(key for key in config_data.itertuples(False, name))
 
 
 class CMEGChecker(object):
@@ -132,14 +139,6 @@ class CMEGChecker(object):
             print(result)
         return prods_wanted
 
-    def get_config_keys(self, exch_cols_dict):
-        config_data = {ex: data[cp.SHEETS[0]] for ex, data in cp.run_config_parse(exch_cols_dict.keys()).items()}
-        config_exch_dict = dict()
-        for exch, cols in exch_cols_dict.items():
-            keys = {tuple(cfg_dict[col] for col in cols) for cfg_dict in config_data[exch]}
-            config_exch_dict.update({exch: keys})
-        return config_exch_dict
-
     def check_cme_cbot(self, dfs_dict, config_keys, vol_threshold):
         df_cme, df_cbot = dfs_dict[CMEGMatcher.CME], dfs_dict[CMEGMatcher.CBOT]
 
@@ -170,8 +169,7 @@ class CMEGChecker(object):
     def run_pd_check(self, dfs_dict, vol_threshold=1000, outpath=None):
         cme = 'cme'
         config_props = cp.PROPERTIES[cme]
-        exch_cols_dict = {cme: [config_props[1], config_props[0]]}
-        config_keys = self.get_config_keys(exch_cols_dict)[cme]
+        config_keys = get_config_keys(cme, [config_props[1], config_props[0]])
 
         prods_cme_cbot = self.check_cme_cbot(dfs_dict, config_keys, vol_threshold)
         prods_nymex = self.check_nymex(dfs_dict, config_keys, vol_threshold)
@@ -189,6 +187,7 @@ class OSEChecker(object):
     def __init__(self):
         self.cfg_properties = cp.PROPERTIES['ose']
 
+
     # def run_pd_check(self, df):
 
 
@@ -203,7 +202,8 @@ class OSEChecker(object):
 # results = summary[list(filter(summary, 'Globex',  exp))]
 # print((summary[list(filter(summary, 'Globex',  exp))].head()))
 
-
+cmechecker = CMEGChecker()
+cmechecker.run_pd_check(dict())
 
 
 

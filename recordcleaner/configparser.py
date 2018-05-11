@@ -63,11 +63,9 @@ class XlsxWriter(object):
         return path
 
 
-
 BASE_PATH = '/home/slan/Documents/config_files/'
 EXCHANGES = ['asx', 'cme', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
 source_files = {e: e + '.xml' for e in EXCHANGES}
-dest_files = {e: e + '.xlsx' for e in EXCHANGES}
 
 PROPERTIES = {'asx': ['type', 'commodity_code', 'reactor_name'],
               'cme': ['type', 'commodity_name', 'reactor_name'],
@@ -78,9 +76,8 @@ PROPERTIES = {'asx': ['type', 'commodity_code', 'reactor_name'],
               'sgx': ['typecode', 'symbo', 'reactor_name']
               }
 TYPE_COLNUM = 0
-PARAM_KEYS = ['tags', 'fields', 'sheet']
+# PARAM_KEYS = ['tags', 'fields', 'sheet']
 TAGS = ['product']
-SHEETS = ['Config']
 
 REPO_URL = 'http://stash.liquid-capital.liquidcap.com/projects/PPT/repos/reactor/browse/files/TNG/products'
 
@@ -90,6 +87,13 @@ INSTRUMENT_TYPES = {'F': 'Futures',
                     'E': 'Equities'}
 
 
+def get_default_destfiles():
+    return {e: BASE_PATH + e + '.xlsx' for e in EXCHANGES}
+
+
+def get_src_file(exch):
+    return BASE_PATH + source_files[exch]
+
 
 def get_raw_file(filename):
     full_url = '/'.join([REPO_URL, filename])
@@ -97,40 +101,28 @@ def get_raw_file(filename):
     download(full_url, f_temp)
 
 
-def run_config_parse(exchs=None, dest=None, save=False):
-    exchs = EXCHANGES if exchs is None else exchs
+def parse_config(exch, outpath=None, sheetname=None):
+    src_path = get_src_file(exch)
+    columns = PROPERTIES[exch]
+    data_parsed = XmlParser.fltr_attrs(XmlParser.parse(src_path, TAGS), columns)
+    df_parsed = pd.DataFrame(data_parsed, columns=columns)
+    type_col = columns[TYPE_COLNUM]
+    df_parsed[type_col] = df_parsed[type_col].apply(lambda x: INSTRUMENT_TYPES[x])
+    if outpath is not None:
+        sheetname = 'configs' if sheetname is None else sheetname
+        return XlsxWriter.save_sheets(outpath, {sheetname: df_parsed}, columns, True)
+    return df_parsed
+
+
+def run_all_configs_parse(dest_files=None, sheetname=None):
     results = dict()
-    for exch in exchs:
-        src_path = BASE_PATH + source_files[exch]
-        columns = PROPERTIES[exch]
-        data_parsed = XmlParser.fltr_attrs(XmlParser.parse(src_path, TAGS), columns)
-        df_parsed = pd.DataFrame(data_parsed, columns=columns)
-        type_col = columns[TYPE_COLNUM]
-        df_parsed[type_col] = df_parsed[type_col].apply(lambda x: INSTRUMENT_TYPES[x])
-        sheet2data = {sheet: df_parsed for sheet in SHEETS}
-        if save:
-            outpath = tempfile.NamedTemporaryFile() if dest is None else dest[exch]
-            outpath = XlsxWriter.save_sheets(outpath, sheet2data, columns, True)
-            results.update({exch: outpath})
-        else:
-            results.update({exch: sheet2data})
+    for exch in EXCHANGES:
+        outpath = dest_files[exch] if dest_files is not None else None
+        df_parsed = parse_config(exch, outpath, sheetname)
+        results.update({exch: df_parsed})
     return results
 
 
-def parse_save(save=True):
-    dest_paths = {exch: BASE_PATH + dest_files[exch] for exch in EXCHANGES}
-    run_config_parse(EXCHANGES, dest_paths, save)
-    # for exch in EXCHANGES:
-    #     src_path = BASE_PATH + source_files[exch]
-    #     dest_files = BASE_PATH + dest_files[exch]
-    #     columns = PROPERTIES[exch]
-    #     data_parsed = XmlParser.fltr_attrs(XmlParser.parse(src_path, TAGS), columns)
-    #     sheet2data = {sheet: data_parsed for sheet in SHEETS}
-    #     if save:
-    #         return XlsxWriter.save_sheets(dest_files, sheet2data, columns, True)
-    #     else:
-    #         return sheet2data
+# run_all_configs_parse(get_default_destfiles())
 
-
-parse_save()
 # get_raw_file('asx.xml')

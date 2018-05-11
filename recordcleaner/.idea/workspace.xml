@@ -2,11 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="b667f01e-19f6-4de8-b17b-85ece66739ef" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
       <change beforePath="$PROJECT_DIR$/configparser.py" afterPath="$PROJECT_DIR$/configparser.py" />
       <change beforePath="$PROJECT_DIR$/productchecker.py" afterPath="$PROJECT_DIR$/productchecker.py" />
-      <change beforePath="$PROJECT_DIR$/productmatcher.py" afterPath="$PROJECT_DIR$/productmatcher.py" />
-      <change beforePath="$PROJECT_DIR$/tests/pdmatchertest.py" afterPath="$PROJECT_DIR$/tests/pdmatchertest.py" />
     </list>
     <ignored path="$PROJECT_DIR$/.idea/shelf/" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -21,8 +18,8 @@
       <file leaf-file-name="configparser.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/configparser.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="158">
-              <caret line="116" column="18" lean-forward="true" selection-start-line="116" selection-start-column="18" selection-end-line="116" selection-end-column="18" />
+            <state relative-caret-position="141">
+              <caret line="107" column="0" lean-forward="false" selection-start-line="107" selection-start-column="0" selection-end-line="107" selection-end-column="0" />
               <folding>
                 <element signature="e#0#19#0" expanded="true" />
               </folding>
@@ -45,8 +42,8 @@
       <file leaf-file-name="utils.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/utils.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="198">
-              <caret line="16" column="52" lean-forward="false" selection-start-line="16" selection-start-column="52" selection-end-line="16" selection-end-column="52" />
+            <state relative-caret-position="352">
+              <caret line="45" column="17" lean-forward="false" selection-start-line="45" selection-start-column="11" selection-end-line="45" selection-end-column="17" />
               <folding>
                 <element signature="e#0#18#0" expanded="true" />
               </folding>
@@ -54,14 +51,24 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="productchecker.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="productchecker.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/productchecker.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-850">
-              <caret line="122" column="71" lean-forward="true" selection-start-line="122" selection-start-column="71" selection-end-line="122" selection-end-column="71" />
+            <state relative-caret-position="-767">
+              <caret line="64" column="4" lean-forward="false" selection-start-line="64" selection-start-column="4" selection-end-line="64" selection-end-column="4" />
               <folding>
                 <element signature="e#0#39#0" expanded="true" />
               </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="whooshext.py" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/whooshext.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="342">
+              <caret line="143" column="35" lean-forward="false" selection-start-line="143" selection-start-column="11" selection-end-line="143" selection-end-column="35" />
+              <folding />
             </state>
           </provider>
         </entry>
@@ -81,16 +88,6 @@
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="12150">
               <caret line="678" column="0" lean-forward="false" selection-start-line="678" selection-start-column="0" selection-end-line="678" selection-end-column="0" />
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="subprocess.py" pinned="false" current-in-tab="false">
-        <entry file="file:///usr/lib/python3.6/subprocess.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="22932">
-              <caret line="1274" column="0" lean-forward="false" selection-start-line="1274" selection-start-column="0" selection-end-line="1274" selection-end-column="0" />
               <folding />
             </state>
           </provider>
@@ -170,8 +167,8 @@
         <option value="$PROJECT_DIR$/checkscripts.py" />
         <option value="$PROJECT_DIR$/datascraper.py" />
         <option value="$PROJECT_DIR$/utils.py" />
-        <option value="$PROJECT_DIR$/configparser.py" />
         <option value="$PROJECT_DIR$/productmatcher.py" />
+        <option value="$PROJECT_DIR$/configparser.py" />
         <option value="$PROJECT_DIR$/productchecker.py" />
       </list>
     </option>
@@ -234,7 +231,7 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Python.configparser">
+  <component name="RunManager" selected="Python.productchecker">
     <configuration name="checkscripts" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -289,6 +286,24 @@
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />
     </configuration>
+    <configuration name="productchecker" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <module name="recordcleaner" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/productchecker.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+    </configuration>
     <configuration name="Unittests for datascrapertest.OSEScraperTests" type="tests" factoryName="Unittests" temporary="true" nameIsGenerated="true">
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -303,34 +318,20 @@
       <option name="_new_target" value="&quot;datascrapertest.OSEScraperTests&quot;" />
       <option name="_new_targetType" value="&quot;PYTHON&quot;" />
     </configuration>
-    <configuration name="Unittests for datascrapertest.OSEScraperTests.test_get_col_header" type="tests" factoryName="Unittests" temporary="true" nameIsGenerated="true">
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs />
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/tests" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <module name="recordcleaner" />
-      <option name="_new_additionalArguments" value="&quot;&quot;" />
-      <option name="_new_target" value="&quot;datascrapertest.OSEScraperTests.test_get_col_header&quot;" />
-      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
-    </configuration>
     <list size="5">
       <item index="0" class="java.lang.String" itemvalue="Python.checkscripts" />
       <item index="1" class="java.lang.String" itemvalue="Python.datascraper" />
-      <item index="2" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.OSEScraperTests.test_get_col_header" />
-      <item index="3" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.OSEScraperTests" />
-      <item index="4" class="java.lang.String" itemvalue="Python.configparser" />
+      <item index="2" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.OSEScraperTests" />
+      <item index="3" class="java.lang.String" itemvalue="Python.configparser" />
+      <item index="4" class="java.lang.String" itemvalue="Python.productchecker" />
     </list>
     <recent_temporary>
       <list size="5">
-        <item index="0" class="java.lang.String" itemvalue="Python.configparser" />
-        <item index="1" class="java.lang.String" itemvalue="Python.checkscripts" />
-        <item index="2" class="java.lang.String" itemvalue="Python.datascraper" />
-        <item index="3" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.OSEScraperTests" />
-        <item index="4" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.OSEScraperTests.test_get_col_header" />
+        <item index="0" class="java.lang.String" itemvalue="Python.productchecker" />
+        <item index="1" class="java.lang.String" itemvalue="Python.configparser" />
+        <item index="2" class="java.lang.String" itemvalue="Python.checkscripts" />
+        <item index="3" class="java.lang.String" itemvalue="Python.datascraper" />
+        <item index="4" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.OSEScraperTests" />
       </list>
     </recent_temporary>
   </component>
@@ -364,9 +365,9 @@
     <layout>
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3291262" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
-      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.32003987" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32003987" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32924527" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32901296" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
+      <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.32901296" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32901296" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.17074743" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="R Packages" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
@@ -417,21 +418,16 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/productchecker.py</url>
-          <line>125</line>
-          <option name="timeStamp" value="55" />
+          <line>173</line>
+          <option name="timeStamp" value="64" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/productchecker.py</url>
-          <line>154</line>
-          <option name="timeStamp" value="56" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/configparser.py</url>
-          <line>116</line>
-          <option name="timeStamp" value="59" />
+          <line>102</line>
+          <option name="timeStamp" value="65" />
         </line-breakpoint>
       </breakpoints>
-      <option name="time" value="61" />
+      <option name="time" value="67" />
     </breakpoint-manager>
     <watches-manager />
   </component>
@@ -779,14 +775,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/whooshext.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="12474">
-          <caret line="709" column="0" lean-forward="false" selection-start-line="709" selection-start-column="0" selection-end-line="709" selection-end-column="0" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file:///usr/lib/python3.6/subprocess.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="22932">
@@ -827,16 +815,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/utils.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="198">
-          <caret line="16" column="52" lean-forward="false" selection-start-line="16" selection-start-column="52" selection-end-line="16" selection-end-column="52" />
-          <folding>
-            <element signature="e#0#18#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/datascraper.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="18">
@@ -857,10 +835,20 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/utils.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="352">
+          <caret line="45" column="17" lean-forward="false" selection-start-line="45" selection-start-column="11" selection-end-line="45" selection-end-column="17" />
+          <folding>
+            <element signature="e#0#18#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/configparser.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="158">
-          <caret line="116" column="18" lean-forward="true" selection-start-line="116" selection-start-column="18" selection-end-line="116" selection-end-column="18" />
+        <state relative-caret-position="141">
+          <caret line="107" column="0" lean-forward="false" selection-start-line="107" selection-start-column="0" selection-end-line="107" selection-end-column="0" />
           <folding>
             <element signature="e#0#19#0" expanded="true" />
           </folding>
@@ -869,11 +857,19 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/productchecker.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-850">
-          <caret line="122" column="71" lean-forward="true" selection-start-line="122" selection-start-column="71" selection-end-line="122" selection-end-column="71" />
+        <state relative-caret-position="-767">
+          <caret line="64" column="4" lean-forward="false" selection-start-line="64" selection-start-column="4" selection-end-line="64" selection-end-column="4" />
           <folding>
             <element signature="e#0#39#0" expanded="true" />
           </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/whooshext.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="342">
+          <caret line="143" column="35" lean-forward="false" selection-start-line="143" selection-start-column="11" selection-end-line="143" selection-end-column="35" />
+          <folding />
         </state>
       </provider>
     </entry>
