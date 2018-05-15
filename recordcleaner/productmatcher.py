@@ -1,9 +1,13 @@
+import pandas as pd
 import inflect
 from dateutil.relativedelta import relativedelta
 from whoosh.searching import Hit
 
 from datascraper import CMEGScraper
-from whooshext import *
+from extrawhoosh.query import *
+from extrawhoosh.analysis import *
+from extrawhoosh.indexing import *
+from extrawhoosh.searching import *
 
 
 def df_groupby(df, cols):
@@ -21,7 +25,6 @@ def df_groupby(df, cols):
 STOP_LIST = ['and', 'is', 'it', 'an', 'as', 'at', 'have', 'in', 'yet', 'if', 'from', 'for', 'when',
              'by', 'to', 'you', 'be', 'we', 'that', 'may', 'not', 'with', 'tbd', 'a', 'on', 'your',
              'this', 'of', 'will', 'can', 'the', 'or', 'are']
-
 
 
 class MatchHelper(object):
@@ -332,15 +335,14 @@ class CMEGMatcher(object):
         found_clras = self.__match_in_string(clras, clras_set)
         return found_clras if found_clras is not None else row_clras
 
-    def match_prod_code(self, df_adv, ix, exact_mapping=None, notfound=None, multi_match=None):
+    def match_by_prodname(self, df_adv, ix, exact_mapping=None, notfound=None, multi_match=None):
         df_matched = pd.DataFrame(columns=list(df_adv.columns) + ix.schema.stored_names())
         with ix.searcher() as searcher:
             lexicons = get_idx_lexicon(searcher, CMEGMatcher.F_PRODUCT_GROUP, CMEGMatcher.F_CLEARED_AS,
                                        **{CMEGMatcher.F_PRODUCT_GROUP: CMEGMatcher.F_SUB_GROUP})
-            adsearch = AdvSearch(searcher)
 
             for i, row in df_adv.iterrows():
-                results = self.__match_a_row(row, lexicons, exact_mapping, notfound, multi_match, ix.schema, adsearch)
+                results = self.__match_a_row(row, lexicons, exact_mapping, notfound, multi_match, ix.schema, searcher)
                 rows_matched = self.__join_results(results, row)
                 df_toadd = pd.DataFrame(rows_matched, columns=df_matched.columns)
                 df_matched = df_matched.append(df_toadd, ignore_index=True)
@@ -348,7 +350,7 @@ class CMEGMatcher(object):
                 self.__prt_match_status(matched, rows_matched)
         return df_matched
 
-    def __match_a_row(self, row, lexicons, exact_mapping, notfound, multi_match, schema, adsearch):
+    def __match_a_row(self, row, lexicons, exact_mapping, notfound, multi_match, schema, searcher):
         pd_id = (row[CMEGMatcher.PRODUCT], row[CMEGMatcher.PRODUCT_GROUP], row[CMEGMatcher.CLEARED_AS])
         if notfound is not None and pd_id in notfound:
             return None
@@ -364,13 +366,13 @@ class CMEGMatcher(object):
             min_dist = val
 
         if is_one:
-            results = self.__search_for_one(adsearch, qparams, grouping_q, callback)
+            results = self.__search_for_one(searcher, qparams, grouping_q, callback)
             if results and min_dist:
                 results = min_dist_rslt(results, pdnm, CMEGMatcher.F_PRODUCT_NAME, schema, minboost=0.2)[0]
         else:
             q_configs = multi_match[pd_id]
             qparams.update(q_configs)
-            results = self.__search_for_all(adsearch, qparams, grouping_q, callback)
+            results = self.__search_for_all(searcher, qparams, grouping_q, callback)
         return results
 
     def __get_grouping_query(self, row, pdnm, lexicons):
@@ -383,32 +385,37 @@ class CMEGMatcher(object):
                             (CMEGMatcher.F_CLEARED_AS, clras),
                             (CMEGMatcher.F_SUB_GROUP, subgp))
 
-    def __search_for_one(self, adsearch, qparams, grouping_q, callback):
-        src_and = adsearch.search(*get_query_params('and', **qparams),
-                                  lambda: callback(True),
-                                  filter=grouping_q,
-                                  limit=None)
-        src_fuzzy = adsearch.search(*get_query_params('and', **{**qparams, TERMCLASS: FuzzyTerm}),
-                                    lambda: callback(False),
-                                    filter=grouping_q,
-                                    limit=None)
-        src_andmaybe = adsearch.search(*get_query_params('andmaybe', **qparams),
-                                       lambda: callback(True),
-                                       filter=grouping_q,
-                                       limit=None)
-        return adsearch.chain_search([src_and, src_fuzzy, src_andmaybe])
-
-    def __search_for_all(self, adsearch, qparams, grouping_q, callback):
-        query = qparams[QUERY]
-        src = adsearch.search(*get_query_params(**qparams),
+    def __search_for_one(self, searcher, qparams, grouping_q, callback):
+        src_and = search_func(searcher,
+                              *get_query_params('and', **qparams),
                               lambda: callback(True),
                               filter=grouping_q,
                               limit=None)
+        src_fuzzy = search_func(searcher,
+                                *get_query_params('and', **{**qparams, TERMCLASS: FuzzyTerm}),
+                                lambda: callback(False),
+                                filter=grouping_q,
+                                limit=None)
+        src_andmaybe = search_func(searcher,
+                                   *get_query_params('andmaybe', **qparams),
+                                   lambda: callback(True),
+                                   filter=grouping_q,
+                                   limit=None)
+        return chain_search([src_and, src_fuzzy, src_andmaybe])
 
-        src_fuzzy = adsearch.search(*get_query_params(**{**qparams, TERMCLASS: FuzzyTerm}),
-                                    lambda: callback(False),
-                                    filter=grouping_q,
-                                    limit=None)
+    def __search_for_all(self, searcher, qparams, grouping_q, callback):
+        query = qparams[QUERY]
+        src = search_func(searcher,
+                          *get_query_params(**qparams),
+                          lambda: callback(True),
+                          filter=grouping_q,
+                          limit=None)
+
+        src_fuzzy = search_func(searcher,
+                                *get_query_params(**{**qparams, TERMCLASS: FuzzyTerm}),
+                                lambda: callback(False),
+                                filter=grouping_q,
+                                limit=None)
 
         def chain_condition(r):
             if not r:
@@ -417,7 +424,7 @@ class CMEGMatcher(object):
                 return True
             return False
 
-        return adsearch.chain_search([src, src_fuzzy], chain_condition)
+        return chain_search([src, src_fuzzy], chain_condition)
 
     def __prt_match_status(self, matched, rows_matched):
         for r in rows_matched:
@@ -517,33 +524,27 @@ class CMEGMatcher(object):
 
         ix_cme, ix_cbot = self.init_ix_cme_cbot(gdf_exch, *ix_names, clean)
         mdf_nymex = self.match_nymex_comex(df_nymex, gdf_exch)
-        mdf_cme = self.match_prod_code(df_cme, ix_cme, CMEGMatcher.CME_EXACT_MAPPING,
-                                       CMEGMatcher.CME_NOTFOUND_PRODS, CMEGMatcher.CME_MULTI_MATCH)
-        mdf_cbot = self.match_prod_code(df_cbot, ix_cbot, CMEGMatcher.CBOT_EXACT_MAPPING,
-                                        multi_match=CMEGMatcher.CBOT_MULTI_MATCH)
+        mdf_cme = self.match_by_prodname(df_cme, ix_cme, CMEGMatcher.CME_EXACT_MAPPING,
+                                         CMEGMatcher.CME_NOTFOUND_PRODS, CMEGMatcher.CME_MULTI_MATCH)
+        mdf_cbot = self.match_by_prodname(df_cbot, ix_cbot, CMEGMatcher.CBOT_EXACT_MAPPING,
+                                          multi_match=CMEGMatcher.CBOT_MULTI_MATCH)
         return {CMEGMatcher.CME: mdf_cme, CMEGMatcher.CBOT: mdf_cbot, CMEGMatcher.NYMEX: mdf_nymex}
 
-    # def save_to_xlsx(self, dfs_dict, outpath=None, override=True):
-    #     outpath = 'CMEG_matched.xlsx' if outpath is None else outpath
-    #     XlsxWriter.save_sheets(outpath, dfs_dict, override=override)
-    #     return outpath
 
-
-# checked_path = os.getcwd()
-#
 # exchanges = ['asx', 'bloomberg', 'cme', 'cbot', 'nymex_comex', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
 # report_fmtname = 'Web_ADV_Report_{}.xlsx'
 #
 # report_files = {e: report_fmtname.format(e.upper()) for e in exchanges}
 #
-# cmeg_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
-# cmeg_adv_files = [os.path.join(checked_path, report_files['cme']),
-#                   os.path.join(checked_path, report_files['cbot']),
-#                   os.path.join(checked_path, report_files['nymex_comex'])]
+# cmeg_prds_file = 'Product_Slate.xls'
+# cmeg_adv_files = {CMEGMatcher.CME: report_files['cme'],
+#                   CMEGMatcher.CBOT: report_files['cbot'],
+#                   CMEGMatcher.NYMEX: report_files['nymex_comex']}
 #
-# cmeg = CMEGMatcher(cmeg_adv_files, cmeg_prds_file, '2017')
-#
-# cmeg.save_to_xlsx(cmeg.run_pd_mtch(clean=True))
+# cmeg = CMEGMatcher()
+# dfs_adv = {k: pd.read_excel(v) for k, v in cmeg_adv_files.items()}
+# df_prods = pd.read_excel(cmeg_prds_file)
+# cmeg.run_pd_mtch(dfs_adv, df_prods, ('CME_Product_Index', 'CBOT_Product_Index'), clean=True)
 
 
 

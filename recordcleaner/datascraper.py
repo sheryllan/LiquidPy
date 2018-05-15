@@ -1,7 +1,5 @@
-import os
 import math
 import os
-import re
 import tempfile
 from datetime import datetime
 from subprocess import Popen, PIPE
@@ -13,14 +11,7 @@ from PyPDF2.generic import Destination
 from dateutil.relativedelta import relativedelta
 
 from configparser import XlsxWriter
-from utils import *
-
-TABLE_TAB = 'table'
-TR_TAB = 'tr'
-TH_TAB = 'th'
-TD_TAB = 'td'
-A_TAB = 'a'
-HREF_ATTR = 'href'
+from commonlib.websourcing import *
 
 PDF_SUFFIX = '.pdf'
 TXT_SUFFIX = '.txt'
@@ -270,30 +261,20 @@ class OSEScraper(object):
 
     def find_report_url(self, year=last_year()):
         year_str = str(year)
-        soup = make_soup(self.URL_VOLUME)
-
-        tables = soup.find_all(TABLE_TAB)
-        table = self.filter_table(tables, self.TABLE_TITLE)
-        ths = table.find(TR_TAB).find_all(TH_TAB)
+        tbparser = HtmlTableParser(self.URL_VOLUME, self.filter_table)
+        headers = tbparser.get_tb_headers()
 
         # find in headers for the column of the year
-        col_idx = self.get_indexes(ths, lambda x: x.text == year_str)[0]
+        col_idx = headers.index(year_str)
+        tds = tbparser.get_td_rows(lambda x: x[col_idx])
 
-        trs = table.find_all(TR_TAB)
-        td_rows = [tr for tr in trs if tr.find_all(TD_TAB)]
-        tds = [tr.find_all(TD_TAB)[col_idx] for tr in td_rows]
-
-        links = [str(td.find(href=True)[HREF_ATTR]) for td in tds]
         pattern = r'^(?=.*{}.*\.pdf).*$'.format(year_str)
-        file_url = find_first_n(links, lambda x: re.match(pattern, x))
+        file_url = find_link(tds, pattern)
         return self.URL_OSE + file_url
 
-    def get_indexes(self, arry, condition):
-        return [i for i, a in enumerate(arry) if condition(a)]
-
     # returns the table in which first tr has first th of which text = title
-    def filter_table(self, tables, title):
-        return [tbl for tbl in tables if tbl.find(TR_TAB).find(TH_TAB, text=title)][0]
+    def filter_table(self, tables):
+        return [tbl for tbl in tables if tbl.find(TR_TAB).find(TH_TAB, text=self.TABLE_TITLE)][0]
 
     @staticmethod
     def get_ascii_words(string, pattern_ascii='([A-Za-z0-9/\(\)\.%&$,-]|(?<! ) (?! ))+'):
@@ -345,21 +326,6 @@ class OSEScraper(object):
                 results = results.append(pd.DataFrame([data_row], columns=headers))
             return results
 
-
-    # def tabula_parse(self, infile=None, outfile=None):
-    #     infile = self.pdf_path_adv if infile is None else infile
-    #     outfile = self.CSV_ADV if outfile is None else outfile
-    #     with open(infile, mode='rb') as fh:
-    #         fr = PdfFileReader(fh)
-    #         outlines = fr.getOutlines()
-    #         num_pages = fr.getNumPages()
-    #         page1 = fr.getPage(0)
-    #         layout1 = fr.getPageLayout()
-    #
-    #     # tabula.convert_into(infile, outfile, output_format='csv', pages='all')
-    #     df = tabula.read_pdf(self.pdf_path_adv, pages=2)
-    #     print('\n[*] Successfully convert {} to {}'.format(infile, outfile))
-
     def parse_by_pages(self, pdf_name, end_page, start_page=1, outpath=None, sheetname=None):
         tables = list()
         for page in range(start_page, end_page + 1):
@@ -404,6 +370,7 @@ class OSEScraper(object):
 
 
 # ose = OSEScraper()
+# rp_url = ose.find_report_url()
 # df_all = ose.run_scraper()
 # ose.filter_adv(df_all)
 # output = run_pdftotext_cmd('OSE_Average_Daily_Volume.pdf', f=1, l=1)

@@ -2,6 +2,7 @@ from sortedcontainers import SortedDict
 
 import configparser as cp
 from productmatcher import *
+from commonlib.iohelper import XlsxWriter
 
 # Parse the config files
 # cp.parse_save()
@@ -32,11 +33,11 @@ def sum_unique(subdf, aggr_col):
 
 # parameter file2sheet is a tuple
 def xl_consolidate(file2sheet, dest):
-    wrt = cp.XlsxWriter.create_xlwriter(dest, False)
+    wrt = XlsxWriter.create_xlwriter(dest, False)
     for fl, sht in file2sheet:
         xl = pd.ExcelFile(fl)
         dt = xl.parse(sht)
-        cp.XlsxWriter.to_xlsheet(dt, wrt, sht)
+        XlsxWriter.to_xlsheet(dt, wrt, sht)
     wrt.save()
 
 
@@ -178,7 +179,7 @@ class CMEGChecker(object):
         if outpath is not None:
             outdf_cols = [PRODCODE, TYPE, PRODUCT, RECORDED]
             outdf_dict = {exch: pd.DataFrame(prods, columns=outdf_cols) for exch, prods in prods_cmeg.items()}
-            return cp.XlsxWriter.save_sheets(outpath, outdf_dict)
+            return XlsxWriter.save_sheets(outpath, outdf_dict)
         return prods_cmeg
 
 
@@ -202,8 +203,8 @@ class OSEChecker(object):
 # results = summary[list(filter(summary, 'Globex',  exp))]
 # print((summary[list(filter(summary, 'Globex',  exp))].head()))
 
-cmechecker = CMEGChecker()
-cmechecker.run_pd_check(dict())
+# cmechecker = CMEGChecker()
+# cmechecker.run_pd_check(dict())
 
 
 

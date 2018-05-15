@@ -1,16 +1,8 @@
-import collections
-import urllib.error
-import urllib.parse
-import urllib.request
-
-from bs4 import BeautifulSoup
-
-USER_AGENT = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.0.7; X11; Linux x86_64) ' \
-             'Gecko/2009021910 Firefox/3.0.7 Chrome/23.0.1271.64 Safari/537.11'
+from collections import Iterable
 
 
 def nontypes_iterable(arg, excl_types=(str,)):
-    return isinstance(arg, collections.Iterable) and not isinstance(arg, excl_types)
+    return isinstance(arg, Iterable) and not isinstance(arg, excl_types)
 
 
 def flatten_iter(items, incl_level=False, types=(str,)):
@@ -46,26 +38,6 @@ def find_first_n(arry, condition, n=1):
     return result if len(result) != 1 else result[0]
 
 
-def download(url, fh):
-    request = urllib.request.Request(url, headers={'User-Agent': USER_AGENT})
-    try:
-        response = urllib.request.urlopen(request)
-        print(('\n[*] Downloading from: {}'.format(url)))
-        fh.write(response.read())
-        fh.flush()
-        print('\n[*] Successfully downloaded to ' + fh.name)
-        return fh
-    except urllib.error.HTTPError as e:
-        print(e.fp.read())
-
-
-def make_soup(url):
-    request = urllib.request.Request(url, headers={'User-Agent': USER_AGENT})
-    html = urllib.request.urlopen(request)
-    soup = BeautifulSoup(html, 'html.parser')
-    return soup
-
-
 def swap(a, b):
     tmp = a
     a = b
@@ -80,3 +52,18 @@ def to_dict(items, tkey, tval):
 def rreplace(s, old, new, occurrence):
     li = s.rsplit(old, occurrence)
     return new.join(li)
+
+
+def last_indexof(items, target):
+    j = None
+    for i in range(len(items) - 1, -1, -1):
+        if items[i] == target:
+            j = i
+            break
+    return j
+
+
+def get_indexes(arry, condition):
+    return [i for i, a in enumerate(arry) if condition(a)]
+
+

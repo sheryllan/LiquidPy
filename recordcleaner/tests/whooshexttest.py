@@ -4,7 +4,10 @@ import unittest as ut
 import pandas as pd
 import itertools
 
-from whooshext import *
+from extrawhoosh.query import *
+from extrawhoosh.analysis import *
+from extrawhoosh.indexing import *
+from extrawhoosh.searching import *
 from whoosh.index import open_dir
 from whoosh.query import *
 from whoosh import qparser
@@ -215,7 +218,7 @@ class CMEAnalyzerTests(ut.TestCase):
         F_PRODUCT_NAME = 'Product_Name'
         checked_path = os.getcwd()
         cmeg_prds_file = os.path.join(checked_path, 'Product_Slate.xls')
-        cmeg = CMEGMatcher(prods_file=cmeg_prds_file)
+        cmeg = CMEGMatcher()
 
 
         ix_cbot = open_dir('CBOT_Product_Index')
@@ -321,7 +324,7 @@ class CMEAnalyzerTests(ut.TestCase):
         q_or = or_query(F_PRODUCT_NAME, ix_cbot.refresh(), pdnm4)
         q_flt = filter_query((cmeg.F_PRODUCT_GROUP,  'Agriculture'), (cmeg.F_CLEARED_AS, 'Options'))
         with ix_cbot.searcher() as searcher:
-            results = searcher.search(q_or, filter=q_flt, limit=None)
+            results = search_func(q_or, filter=q_flt, limit=None)
             if results:
                 for r in results:
                     print(r)
