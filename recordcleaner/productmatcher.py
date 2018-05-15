@@ -113,16 +113,11 @@ class CMEGMatcher(object):
     PRODUCT_GROUP = CMEGScraper.PRODUCT_GROUP
     CLEARED_AS = CMEGScraper.CLEARED_AS
 
-    PRODUCT_NAME = 'Product Name'
-    CLEARING = 'Clearing'
-    GLOBEX = 'Globex'
-    SUB_GROUP = 'Sub Group'
-    EXCHANGE = 'Exchange'
-    COMMODITY = 'Commodity'
 
-    COLS_ADV_CME = CMEGScraper.OUTPUT_COLUMNS
-    COLS_ADV_CBOT = CMEGScraper.OUTPUT_COLUMNS
-    COLS_ADV_NYMEX = CMEGScraper.OUTPUT_COLUMNS + [COMMODITY]
+
+    COLS_ADV_CME = CMEGScraper.STATIC_OUTCOLS_ADV
+    COLS_ADV_CBOT = CMEGScraper.STATIC_OUTCOLS_ADV
+    COLS_ADV_NYMEX = CMEGScraper.STATIC_OUTCOLS_ADV + [COMMODITY]
     COLS_MAPPING = {PRODUCT: PRODUCT_NAME, PRODUCT_GROUP: PRODUCT_GROUP, CLEARED_AS: CLEARED_AS}
     COLS_PRODS = [PRODUCT_NAME, PRODUCT_GROUP, CLEARED_AS, CLEARING, GLOBEX, SUB_GROUP, EXCHANGE]
 
@@ -296,11 +291,15 @@ class CMEGMatcher(object):
                  EXCHANGE: F_EXCHANGE}
 
 
-    @staticmethod
-    def get_ytd_header(df, year=None):
-        year = (datetime.datetime.now() - relativedelta(years=1)).year if not year else year
-        headers = list(df.columns.values)
-        return find_first_n(headers, lambda x: CMEGMatcher.PATTERN_ADV_YTD in x and str(year) in x)
+    def __init__(self):
+
+
+
+    # @staticmethod
+    # def get_ytd_header(df, year=None):
+    #     year = (datetime.datetime.now() - relativedelta(years=1)).year if not year else year
+    #     headers = list(df.columns.values)
+    #     return find_first_n(headers, lambda x: CMEGMatcher.PATTERN_ADV_YTD in x and str(year) in x)
 
     def __from_adv(self, df, cols, year=None):
         year = (datetime.datetime.now() - relativedelta(years=1)).year if not year else year

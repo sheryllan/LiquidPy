@@ -2,6 +2,7 @@ import math
 import os
 import tempfile
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 from subprocess import Popen, PIPE
 
 import jaconv
@@ -22,7 +23,30 @@ def last_year():
     return (datetime.now() - relativedelta(years=1)).year
 
 
-def run_pdftotext_cmd(pdf, txt=None, encoding='utf-8', **kwargs):
+def first_nonna_index(df):
+    return pd.isnull(df).any(0).nonzero()[0][0]
+
+
+def filter_df(df, filterfunc):
+    cols = filterfunc(df.columns)
+    return df[cols]
+
+
+def set_df_col(df):
+    header_index = first_nonna_index(df)
+    if header_index != 0:
+        df.columns = df.iloc[header_index]
+        df.drop(header_index, inplace=True)
+    return df
+
+
+def clean_df(df, nonna_subset):
+    df.dropna(subset=nonna_subset, how='all', inplace=True)
+    df.reset_index(drop=0, inplace=True)
+    return df
+
+
+def run_pdftotext(pdf, txt=None, encoding='utf-8', **kwargs):
     # txt = re.sub('\.pdf$', pdf, '.txt') if txt is None else txt
     txt = '-' if txt is None else txt
     args = ['pdftotext', pdf, txt, '-layout']
@@ -121,12 +145,26 @@ class CMEGScraper(object):
     PRODUCT = 'Product'
     PRODUCT_GROUP = 'Product Group'
     CLEARED_AS = 'Cleared As'
-    OUTPUT_COLUMNS = [PRODUCT, PRODUCT_GROUP, CLEARED_AS]
+    PATTERN_ADV_YTD = 'ADV Y.T.D'
+    STATIC_OUTCOLS_ADV = [PRODUCT, PRODUCT_GROUP, CLEARED_AS]
+
+    PRODUCT_NAME = 'Product Name'
+    CLEARING = 'Clearing'
+    GLOBEX = 'Globex'
+    SUB_GROUP = 'Sub Group'
+    EXCHANGE = 'Exchange'
+    COMMODITY = 'Commodity'
+    OUT_COLS_PRODS = [PRODUCT_NAME, PRODUCT_GROUP, CLEARED_AS, CLEARING, GLOBEX, SUB_GROUP, EXCHANGE]
 
     CME = 'CME'
     CBOT = 'CBOT'
     NYMEX = 'NYMEX'
     COMEX = 'COMEX'
+
+    def get_ytd_header(self, df, year=None):
+        year = last_year() if not year else year
+        headers = list(df.columns.values)
+        return find_first_n(headers, lambda x: CMEGScraper.PATTERN_ADV_YTD in x and str(year) in x)
 
     def default_adv_basenames(self):
         basename_cme = rreplace(os.path.basename(self.URL_CME_ADV), PDF_SUFFIX, '', 1)
@@ -155,16 +193,15 @@ class CMEGScraper(object):
             prev_level = level
         return result
 
-    def read_pdf_metadata(self, path):
-        with open(path, mode='rb') as fh:
-            fr = PdfFileReader(fh)
-            outlines = fr.getOutlines()
-            flat_outlines = flatten_iter(outlines, True, (str, Destination))
-            # self.report_name = ' '.join([o.title for _, o in flat_outlines[0:2]]).replace('/', '-')
-            return self.get_pdf_product_groups([(l, o.title) for l, o in flat_outlines[2:]])
+    def read_pdf_metadata(self, fh):
+        fr = PdfFileReader(fh)
+        outlines = fr.getOutlines()
+        flat_outlines = flatten_iter(outlines, True, (str, Destination))
+        # self.report_name = ' '.join([o.title for _, o in flat_outlines[0:2]]).replace('/', '-')
+        return self.get_pdf_product_groups([(l, o.title) for l, o in flat_outlines[2:]])
 
-    def parse_from_txt(self, pdf_path, lines):
-        product_groups = self.read_pdf_metadata(pdf_path)
+    def parse_from_txt(self, pdf, lines):
+        product_groups = self.read_pdf_metadata(pdf)
         pattern_data = '^ ?((\S+ )+ {2,}){2,}.*$'
         pattern_headers = '^ {10,}((\S+ )+ {2,}){2,}.*$'
         if lines:
@@ -183,35 +220,51 @@ class CMEGScraper(object):
         else:
             return None
 
-    def to_xlsx_adv(self, pdfpath, txt, outpath=None, sheetname=None):
-        table = self.parse_from_txt(pdfpath, txt)
+
+    # def to_xlsx_adv(self, pdfpath, txt, outpath=None, sheetname=None):
+    #     table = self.parse_from_txt(pdfpath, txt)
+    #     if outpath is not None:
+    #         sheetname = 'Sheet1' if sheetname is None else sheetname
+    #         XlsxWriter.save_sheets(outpath, {sheetname: table})
+    #     return table
+
+    def download_parse_prods(self, outpath=None, filter_cols=None):
+        with tempfile.NamedTemporaryFile() as prods_file:
+            xls = pd.ExcelFile(download(self.URL_PRODSLATE, prods_file), on_demand=True)
+            df_prods = pd.read_excel(xls)
+            nonna_subset = [CMEGScraper.PRODUCT_NAME, CMEGScraper.PRODUCT_GROUP, CMEGScraper.CLEARED_AS]
+            df_clean = clean_df(set_df_col(df_prods), nonna_subset)
+            df_result = df_clean[filter_cols] if filter_cols is not None else df_clean
+            if outpath is not None:
+                sheetname = xls.sheet_names[0]
+                return XlsxWriter.save_sheets(outpath, {sheetname: df_result})
+            return df_result
+
+    def download_parse_adv(self, url, outpath=None, sheetname=None):
+        f_pdf = download(url, tempfile.NamedTemporaryFile())
+        txt = run_pdftotext(f_pdf.name)
+        table = self.parse_from_txt(f_pdf, txt)
+        f_pdf.close()
         if outpath is not None:
             sheetname = 'Sheet1' if sheetname is None else sheetname
-            XlsxWriter.save_sheets(outpath, {sheetname: table})
+            return XlsxWriter.save_sheets(outpath, {sheetname: table})
         return table
 
-    def download_to_xlsx_adv(self, url, outpath=None, sheetname=None):
-        f_pdf = download(url, tempfile.NamedTemporaryFile())
-        txt = run_pdftotext_cmd(f_pdf.name)
-        result = self.to_xlsx_adv(f_pdf.name, txt, outpath, sheetname)
-        f_pdf.close()
-        return result
-
     def run_scraper(self, path_prods=None, path_advs=None):
-        prods_file = tempfile.NamedTemporaryFile() if path_prods is None else path_prods
-        prods_file = download(self.URL_PRODSLATE, prods_file)
+        df_prods = self.download_parse_prods(path_prods)
 
-        df_cme = self.download_to_xlsx_adv(self.URL_CME_ADV, outpath=path_advs, sheetname=self.CME)
-        df_cbot = self.download_to_xlsx_adv(self.URL_CBOT_ADV, outpath=path_advs, sheetname=self.CBOT)
-        df_nymex = self.download_to_xlsx_adv(self.URL_NYMEX_COMEX_ADV, outpath=path_advs, sheetname=self.NYMEX)
+
+        df_cme = self.download_parse_adv(self.URL_CME_ADV, outpath=path_advs, sheetname=self.CME)
+        df_cbot = self.download_parse_adv(self.URL_CBOT_ADV, outpath=path_advs, sheetname=self.CBOT)
+        df_nymex = self.download_parse_adv(self.URL_NYMEX_COMEX_ADV, outpath=path_advs, sheetname=self.NYMEX)
 
         adv_dict = {self.CME: df_cme, self.CBOT: df_cbot, self.NYMEX: df_nymex}
-        return prods_file.name, adv_dict
+        return df_prods, adv_dict
 
     def __get_output_headers(self, pdf_headers, pattern=None):
         pattern = '(\S+( \S+)*)+' if pattern is None else pattern
-        heading_cols = self.OUTPUT_COLUMNS[0:1]
-        tailing_cols = self.OUTPUT_COLUMNS[1:3]
+        heading_cols = self.STATIC_OUTCOLS_ADV[0:1]
+        tailing_cols = self.STATIC_OUTCOLS_ADV[1:3]
         to_cord = lambda mobj: (mobj.start(), mobj.end())
         to_group = lambda mobj: mobj.group()
         headers = [to_dict(re.finditer(pattern, string), to_cord, to_group) for string in pdf_headers]
@@ -329,7 +382,7 @@ class OSEScraper(object):
     def parse_by_pages(self, pdf_name, end_page, start_page=1, outpath=None, sheetname=None):
         tables = list()
         for page in range(start_page, end_page + 1):
-            txt = run_pdftotext_cmd(pdf_name, f=page, l=page)
+            txt = run_pdftotext(pdf_name, f=page, l=page)
             df = self.parse_from_txt(txt)
             tables.append(df)
         results = pd.concat(tables)
