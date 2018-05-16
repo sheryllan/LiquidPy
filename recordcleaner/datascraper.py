@@ -1,18 +1,15 @@
 import math
-import os
 import tempfile
 from datetime import datetime
-from dateutil.relativedelta import relativedelta
 from subprocess import Popen, PIPE
 
 import jaconv
 import pandas as pd
 from PyPDF2 import PdfFileReader
-from PyPDF2.generic import Destination
 from dateutil.relativedelta import relativedelta
 
-from configparser import XlsxWriter
 from commonlib.websourcing import *
+from configparser import XlsxWriter
 
 PDF_SUFFIX = '.pdf'
 TXT_SUFFIX = '.txt'
@@ -61,7 +58,7 @@ def run_pdftotext(pdf, txt=None, encoding='utf-8', **kwargs):
     return out if txt == '-' else txt
 
 
-class TxtHelper(object):
+class TxtFormatter(object):
     alignment_metric = {'left': lambda x: x[0],
                         'right': lambda x: x[1],
                         'centre': lambda x: (x[0] + x[1]) / 2}
@@ -78,41 +75,50 @@ class TxtHelper(object):
         offsets = {left: 'left', right: 'right', centre: 'centre'}
         return offsets[min(offsets)]
 
+    @classmethod
+    def sort_robjs(cls, robjs):
+        return sorted(robjs, key=lambda x: x.start())
+
     # r1, r2 are dictionaries with (x0, x1) as keys
+    # @classmethod
+    # def merge_2rows(cls, rlonger, rshorter, alignment, atol, merge):
+    #     if len(rlonger) < len(rshorter):
+    #         rlonger, rshorter = swap(rlonger, rshorter)
+    #     func = cls.alignment_metric[alignment]
+    #     rlonger = list(sorted(rlonger.items(), key=lambda x: func(x[0])))
+    #     rshorter = list(sorted(rshorter.items(), key=lambda x: func(x[0])))
+    #     merged = dict()
+    #     i, j = 0, 0
+    #     while i < len(rlonger):
+    #         clonger, vlonger = rlonger[i]
+    #         if j < len(rshorter):
+    #             cshorter, vshorter = rshorter[j]
+    #             while abs(func(clonger) - func(cshorter)) > atol:
+    #                 if func(clonger) < func(cshorter):
+    #                     merged[clonger] = vlonger
+    #                     i += 1
+    #                     clonger, vlonger = rlonger[i]
+    #                 else:
+    #                     merged[cshorter] = vshorter
+    #                     j += 1
+    #                     cshorter, vshorter = rshorter[j]
+    #             merged[clonger] = merge(vshorter, vlonger)
+    #             i += 1
+    #             j += 1
+    #         else:
+    #             merged[clonger] = vlonger
+    #             i += 1
+    #     return [v for k, v in sorted(merged.items(), key=lambda x: func(x[0]))]
+
     @classmethod
-    def merge_2rows(cls, rlonger, rshorter, alignment, atol, merge):
-        if len(rlonger) < len(rshorter):
-            rlonger, rshorter = swap(rlonger, rshorter)
-        func = cls.alignment_metric[alignment]
-        rlonger = list(sorted(rlonger.items(), key=lambda x: func(x[0])))
-        rshorter = list(sorted(rshorter.items(), key=lambda x: func(x[0])))
-        merged = dict()
-        i, j = 0, 0
-        while i < len(rlonger):
-            clonger, vlonger = rlonger[i]
-            if j < len(rshorter):
-                cshorter, vshorter = rshorter[j]
-                while abs(func(clonger) - func(cshorter)) > atol:
-                    if func(clonger) < func(cshorter):
-                        merged[clonger] = vlonger
-                        i += 1
-                        clonger, vlonger = rlonger[i]
-                    else:
-                        merged[cshorter] = vshorter
-                        j += 1
-                        cshorter, vshorter = rshorter[j]
-                merged[clonger] = merge(vshorter, vlonger)
-                i += 1
-                j += 1
-            else:
-                merged[clonger] = vlonger
-                i += 1
-        return [v for k, v in sorted(merged.items(), key=lambda x: func(x[0]))]
+    def merge_2rows(cls, rlonger, rshorter, mergfunc, alignment='centre'):
+        aligned_cols = TxtFormatter.align_by_min_tot_offset(rlonger, rshorter, alignment)
+        return [mergfunc(l, s) for l, s in aligned_cols]
 
 
     @classmethod
-    def calc_sqr_offset(cls, cols1, cols2, alignment='centre'):
-        func = TxtHelper.alignment_func[alignment]
+    def sqr_offset(cls, cols1, cols2, alignment='centre'):
+        func = TxtFormatter.alignment_func[alignment]
         result = 0
         for c1, c2 in zip(cols1, cols2):
             result += func(c1, c2)**2
@@ -120,186 +126,71 @@ class TxtHelper(object):
 
 
     @classmethod
-    def align_by_mse(cls, headers, data, alignment='centre'):
-        if not data:
+    def align_by_mse(cls, robjs_baseline, robjs_instance, alignment='centre'):
+        if not robjs_baseline or not robjs_instance:
             return None
         min_offset = math.inf
         aligned_cols = None
-        col_num = len(data)
-        for i in range(0, len(headers) - col_num + 1):
-            cords_cols = [(h.start(), h.end()) for h in headers[i: i + col_num]]
-            cords_data = [(d.start(), d.end()) for d in data]
-            offset = cls.calc_sqr_offset(cords_cols, cords_data, alignment)
+        col_num = len(robjs_instance)
+        for i in range(0, len(robjs_baseline) - col_num + 1):
+            cords_cols = [(h.start(), h.end()) for h in robjs_baseline[i: i + col_num]]
+            cords_instance = [(d.start(), d.end()) for d in robjs_instance]
+            offset = cls.sqr_offset(cords_cols, cords_instance, alignment)
             if offset < min_offset:
                 min_offset = offset
-                aligned_cols = {header.group(): dt.group() for header, dt in zip(headers[i: i + col_num], data)}
+                aligned_cols = {obj_base.group(): obj_inst.group()
+                                for obj_base, obj_inst in zip(robjs_baseline[i: i + col_num], robjs_instance)}
         return aligned_cols
 
-
-class CMEGScraper(object):
-    URL_CME_ADV = 'http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_ADV_Report_CME.pdf'
-    URL_CBOT_ADV = 'http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_ADV_Report_CBOT.pdf'
-    URL_NYMEX_COMEX_ADV = 'http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_ADV_Report_NYMEX_COMEX.pdf'
-    URL_PRODSLATE = 'http://www.cmegroup.com/CmeWS/mvc/ProductSlate/V1/Download.xls'
-
-    PRODUCT = 'Product'
-    PRODUCT_GROUP = 'Product Group'
-    CLEARED_AS = 'Cleared As'
-    PATTERN_ADV_YTD = 'ADV Y.T.D'
-    STATIC_OUTCOLS_ADV = [PRODUCT, PRODUCT_GROUP, CLEARED_AS]
-
-    PRODUCT_NAME = 'Product Name'
-    CLEARING = 'Clearing'
-    GLOBEX = 'Globex'
-    SUB_GROUP = 'Sub Group'
-    EXCHANGE = 'Exchange'
-    COMMODITY = 'Commodity'
-    OUT_COLS_PRODS = [PRODUCT_NAME, PRODUCT_GROUP, CLEARED_AS, CLEARING, GLOBEX, SUB_GROUP, EXCHANGE]
-
-    CME = 'CME'
-    CBOT = 'CBOT'
-    NYMEX = 'NYMEX'
-    COMEX = 'COMEX'
-
-    def get_ytd_header(self, df, year=None):
-        year = last_year() if not year else year
-        headers = list(df.columns.values)
-        return find_first_n(headers, lambda x: CMEGScraper.PATTERN_ADV_YTD in x and str(year) in x)
-
-    def default_adv_basenames(self):
-        basename_cme = rreplace(os.path.basename(self.URL_CME_ADV), PDF_SUFFIX, '', 1)
-        basename_cbot = rreplace(os.path.basename(self.URL_CBOT_ADV), PDF_SUFFIX, '', 1)
-        basename_nymex = rreplace(os.path.basename(self.URL_NYMEX_COMEX_ADV), PDF_SUFFIX, '', 1)
-        return basename_cme, basename_cbot, basename_nymex
-
-    def default_adv_xlsx(self):
-        basename_cme, basename_cbot, basename_nymex = self.default_adv_basenames()
-        adv_xlsx_cme = basename_cme + XLSX_SUFFIX
-        adv_xlsx_cbot = basename_cbot + XLSX_SUFFIX
-        adv_xlsx_nymex = basename_nymex + XLSX_SUFFIX
-        return adv_xlsx_cme, adv_xlsx_cbot, adv_xlsx_nymex
-
-    # returns a dictionary with key: full group name, and value: (asset, instrument)
-    def get_pdf_product_groups(self, sections):
-        prev_level = sections[0][0]
-        asset = sections[0][1]
-        result = dict()
-        for level, title in sections[1:]:
-            if level < prev_level:
-                asset = title
+    @classmethod
+    def __find_turning_idx(cls, cs, cords_longer, dist_func, start=0, end=None):
+        end = len(cords_longer) if end is None else end
+        min_dist = math.inf
+        i = start
+        for i in range(start, end):
+            distance = abs(dist_func(cs, cords_longer[i]))
+            if distance >= min_dist:
+                return i - 1
             else:
-                instrument = title
-                result[('{} {}'.format(asset, instrument))] = (asset, instrument)
-            prev_level = level
-        return result
+                min_dist = distance
+        return i
 
-    def read_pdf_metadata(self, fh):
-        fr = PdfFileReader(fh)
-        outlines = fr.getOutlines()
-        flat_outlines = flatten_iter(outlines, True, (str, Destination))
-        # self.report_name = ' '.join([o.title for _, o in flat_outlines[0:2]]).replace('/', '-')
-        return self.get_pdf_product_groups([(l, o.title) for l, o in flat_outlines[2:]])
+    @classmethod
+    def __rearrange_prev_idxes(cls, prev_idxes, i_turning):
+        if not prev_idxes:
+            return prev_idxes, i_turning
+        il_curr, is_curr = i_turning, len(prev_idxes)
+        if i_turning > prev_idxes[is_curr - 1]:
+            return prev_idxes, i_turning
+        while i_turning <= is_curr:
+            i_turning += 1
 
-    def parse_from_txt(self, pdf, lines):
-        product_groups = self.read_pdf_metadata(pdf)
-        pattern_data = '^ ?((\S+ )+ {2,}){2,}.*$'
-        pattern_headers = '^ {10,}((\S+ )+ {2,}){2,}.*$'
-        if lines:
-            header_line = find_first_n(lines, lambda x: re.match(pattern_headers, x) is not None, 2)
-            df = pd.DataFrame(columns=self.__get_output_headers(header_line))
-            group, clearing = None, None
-            for line in lines:
-                if 'total' in line.lower():
-                    break
-                line = line.rstrip()
-                if line.lstrip() in product_groups:
-                    group, clearing = product_groups[line.lstrip()]
-                elif re.match(pattern_data, line) is not None:
-                    df = self.__append_to_df(df, line, group, clearing)
-            return df
-        else:
-            return None
+        new_idxes = [idx if idx < i_turning else i_turning - is_curr + i for i, idx in enumerate(prev_idxes)]
+        return new_idxes, i_turning
 
 
-    # def to_xlsx_adv(self, pdfpath, txt, outpath=None, sheetname=None):
-    #     table = self.parse_from_txt(pdfpath, txt)
-    #     if outpath is not None:
-    #         sheetname = 'Sheet1' if sheetname is None else sheetname
-    #         XlsxWriter.save_sheets(outpath, {sheetname: table})
-    #     return table
+    @classmethod
+    def align_by_min_tot_offset(cls, rlonger, rshorter, alignment='centre'):
+        if len(rlonger) < len(rshorter):
+            rlonger, rshorter = swap(rlonger, rshorter)
+        rlonger = TxtFormatter.sort_robjs(rlonger)
+        rshorter = TxtFormatter.sort_robjs(rshorter)
+        cords_longer = [(r.start(), r.end()) for r in rlonger]
+        cords_shorter = [(r.start(), r.end()) for r in rshorter]
+        func = TxtFormatter.alignment_func[alignment]
+        num_remaining = len(cords_shorter)
+        aligned_idxes = list()
+        for is_curr, cs in enumerate(cords_shorter):
+            num_remaining -= 1
+            il_end = len(cords_longer) - num_remaining
+            il_turning = TxtFormatter.__find_turning_idx(cs, cords_longer, func, end=il_end)
+            aligned_idxes, il_turning = TxtFormatter.__rearrange_prev_idxes(aligned_idxes, il_turning)
+            aligned_idxes.append(il_turning)
 
-    def download_parse_prods(self, outpath=None, filter_cols=None):
-        with tempfile.NamedTemporaryFile() as prods_file:
-            xls = pd.ExcelFile(download(self.URL_PRODSLATE, prods_file), on_demand=True)
-            df_prods = pd.read_excel(xls)
-            nonna_subset = [CMEGScraper.PRODUCT_NAME, CMEGScraper.PRODUCT_GROUP, CMEGScraper.CLEARED_AS]
-            df_clean = clean_df(set_df_col(df_prods), nonna_subset)
-            df_result = df_clean[filter_cols] if filter_cols is not None else df_clean
-            if outpath is not None:
-                sheetname = xls.sheet_names[0]
-                return XlsxWriter.save_sheets(outpath, {sheetname: df_result})
-            return df_result
-
-    def download_parse_adv(self, url, outpath=None, sheetname=None):
-        f_pdf = download(url, tempfile.NamedTemporaryFile())
-        txt = run_pdftotext(f_pdf.name)
-        table = self.parse_from_txt(f_pdf, txt)
-        f_pdf.close()
-        if outpath is not None:
-            sheetname = 'Sheet1' if sheetname is None else sheetname
-            return XlsxWriter.save_sheets(outpath, {sheetname: table})
-        return table
-
-    def run_scraper(self, path_prods=None, path_advs=None):
-        df_prods = self.download_parse_prods(path_prods)
+        return [(rlonger[i].group(), rshorter[aligned_idxes.index(i)].group() if i in aligned_idxes else None)
+                for i in range(0, len(rlonger))]
 
 
-        df_cme = self.download_parse_adv(self.URL_CME_ADV, outpath=path_advs, sheetname=self.CME)
-        df_cbot = self.download_parse_adv(self.URL_CBOT_ADV, outpath=path_advs, sheetname=self.CBOT)
-        df_nymex = self.download_parse_adv(self.URL_NYMEX_COMEX_ADV, outpath=path_advs, sheetname=self.NYMEX)
-
-        adv_dict = {self.CME: df_cme, self.CBOT: df_cbot, self.NYMEX: df_nymex}
-        return df_prods, adv_dict
-
-    def __get_output_headers(self, pdf_headers, pattern=None):
-        pattern = '(\S+( \S+)*)+' if pattern is None else pattern
-        heading_cols = self.STATIC_OUTCOLS_ADV[0:1]
-        tailing_cols = self.STATIC_OUTCOLS_ADV[1:3]
-        to_cord = lambda mobj: (mobj.start(), mobj.end())
-        to_group = lambda mobj: mobj.group()
-        headers = [to_dict(re.finditer(pattern, string), to_cord, to_group) for string in pdf_headers]
-        alignment = 'right'
-        h1 = headers[0]
-        for h2 in headers[1:]:
-            h1 = TxtHelper.merge_2rows(h1, h2, alignment, 2, self.__merge_headers)
-        return heading_cols + h1 + tailing_cols
-
-    def __merge_headers(self, *headers):
-        headers = [h.lstrip() for h in headers]
-        headers = [h.rstrip() for h in headers]
-        return ' '.join(headers)
-
-    def __parse_line(self, line, **kwargs):
-        kw_pattern = 'pattern'
-        kw_extras = 'extras'
-        pattern = kwargs[kw_pattern] if kw_pattern in kwargs else '(\S+( \S+)*)+'
-        values = [v[0] for v in re.findall(pattern, line)]
-        values = self.__text_to_num(values)
-        return values if kw_extras not in kwargs else values + list(kwargs[kw_extras])
-
-    def __append_to_df(self, df, line, *args):
-        line_parsed = self.__parse_line(line, extras=list(args))
-        df = df.append(pd.Series(line_parsed, index=df.columns), ignore_index=True)
-        return df
-
-    def __text_to_num(self, values):
-        pattern = '^-?[\d\.,]+%?$'
-        for i, value in enumerate(values):
-            if re.match(pattern, value):
-                value = value.replace('%', '')
-                value = value.replace(',', '')
-                values[i] = float(value) if '.' in value else int(value)
-        return values
 
 
 class OSEScraper(object):
@@ -368,7 +259,7 @@ class OSEScraper(object):
             while line is not None:
                 ln_convt = jaconv.z2h(line, kana=False, digit=True, ascii=True)
                 data_piece = OSEScraper.get_ascii_words(ln_convt)
-                aligned_cols = TxtHelper.align_by_mse(header_mtchobjs, data_piece, alignment)
+                aligned_cols = TxtFormatter.align_by_mse(header_mtchobjs, data_piece, alignment)
                 if aligned_cols and any(c in data_row for c in aligned_cols):
                     results = results.append(pd.DataFrame([data_row], columns=headers))
                     data_row = aligned_cols
