@@ -53,7 +53,7 @@ class CMEGScraper(object):
     URL_CBOT_ADV = 'http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_ADV_Report_CBOT.pdf'
     URL_NYMEX_COMEX_ADV = 'http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_ADV_Report_NYMEX_COMEX.pdf'
     URL_PRODSLATE = 'http://www.cmegroup.com/CmeWS/mvc/ProductSlate/V1/Download.xls'
-    ALIGNMENT_ADV = 'right'
+    ALIGNMENT_ADV = TxtFormatter.RIGHT
 
     def default_adv_basenames(self):
         basename_cme = rreplace(os.path.basename(self.URL_CME_ADV), PDF_SUFFIX, '', 1)
@@ -68,49 +68,77 @@ class CMEGScraper(object):
         adv_xlsx_nymex = basename_nymex + XLSX_SUFFIX
         return adv_xlsx_cme, adv_xlsx_cbot, adv_xlsx_nymex
 
-    # returns a dictionary with key: full group name, and value: (asset, instrument)
-    def get_pdf_product_groups(self, sections):
-        prev_level = sections[0][0]
-        asset = sections[0][1]
-        result = dict()
-        for level, title in sections[1:]:
-            if level < prev_level:
-                asset = title
-            else:
-                instrument = title
-                result[('{} {}'.format(asset, instrument))] = (asset, instrument)
-            prev_level = level
-        return result
+    # def get_pdf_product_groups(self, sections):
+    #     prev_level = sections[0][0]
+    #     asset = sections[0][1]
+    #     result = dict()
+    #     for level, title in sections[1:]:
+    #         if level < prev_level:
+    #             asset = title
+    #         else:
+    #             instrument = title
+    #             result[('{} {}'.format(asset, instrument))] = (asset, instrument)
+    #         prev_level = level
+    #     return result
 
-    def read_pdf_metadata(self, fh):
+    # returns a dictionary with key: full group name, and value: (asset, instrument)
+    def get_prod_groups_from_pdf(self, fh):
         fr = PdfFileReader(fh)
         outlines = fr.getOutlines()
         flat_outlines = flatten_iter(outlines, True, (str, Destination))
-        return self.get_pdf_product_groups([(l, o.title) for l, o in flat_outlines[2:]])
+        sections = [(l, o.title) for l, o in flat_outlines[2:]]
 
-    def parse_from_txt(self, pdf, lines):
-        product_groups = self.read_pdf_metadata(pdf)
-        pattern_data = '^ ?((\S+ )+ {2,}){2,}.*$'
-        pattern_headers = '^ {10,}((\S+ )+ {2,}){2,}.*$'
-        if lines:
-            header_line = find_first_n(lines, lambda x: re.match(pattern_headers, x) is not None, 2)
-            df = pd.DataFrame(columns=self.get_adv_headers(header_line))
-            group, clearing = None, None
-            for line in lines:
-                if 'total' in line.lower():
-                    break
-                line = line.rstrip()
-                if line.lstrip() in product_groups:
-                    group, clearing = product_groups[line.lstrip()]
-                elif re.match(pattern_data, line) is not None:
-                    df = self.__append_to_df(df, line, group, clearing)
-            return df
-        else:
-            return None
+        def parse_flatten_sections():
+            prev_level = sections[0][0]
+            asset = sections[0][1]
+            result = dict()
+            for level, title in sections[1:]:
+                if level < prev_level:
+                    asset = title
+                else:
+                    instrument = title
+                    result[('{} {}'.format(asset, instrument))] = (asset, instrument)
+                prev_level = level
+            return result
+        return parse_flatten_sections()
+
+
+    def parse_from_txt(self, exch, pdf, lines):
+        product_groups = self.get_prod_groups_from_pdf(pdf)
+        # pattern_data = '^ ?((\S+ )+ {2,}){2,}.*$'
+        lines_iter = iter(lines)
+        adv_headers, advhdr_mtobjs = self.__parse_adv_headers(lines_iter)
+        cols_benchmark = [mtobjs[0] for mtobjs in advhdr_mtobjs]
+        outcols = ADV_COLS[exch] + adv_headers
+        group, clearedas = None, None
+        for line in lines_iter:
+            if self.__to_adv_headers(line):
+                continue
+            matches = match_tabular_line(line, min_splits=len(adv_headers))
+            if matches:
+                must_data = {PRODUCT_NAME: matches[0], PRODUCT_GROUP: group, CLEARED_AS: clearedas}
+                must_data = [must_data[name] for name in ADV_COLS[exch]]
+
+                adv_data = TxtFormatter.align_by_min_tot_offset(cols_benchmark, )
+
+
+            if 'total' in line.lower():
+                break
+            if match_tabular_line(line):
+                continue
+            line = line.rstrip()
+            line = line.rstrip()
+
+            if line in product_groups:
+                group, clearedas = product_groups[line]
+            elif re.match(pattern_data, line) is not None:
+                df = self.__append_to_df(df, line, group, clearedas)
+        df = pd.DataFrame(columns=outcols)
+        return df
 
     def download_parse_prods(self, outpath=None):
         with tempfile.NamedTemporaryFile() as prods_file:
-            xls = pd.ExcelFile(download(self.URL_PRODSLATE, prods_file), on_demand=True)
+            xls = pd.ExcelFile(download(self.URL_PRODSLATE, prods_file).name, on_demand=True)
             df_prods = pd.read_excel(xls)
             nonna_subset = [PRODUCT_NAME, PRODUCT_GROUP, CLEARED_AS]
             df_clean = clean_df(set_df_col(df_prods), nonna_subset)
@@ -119,35 +147,38 @@ class CMEGScraper(object):
                 return XlsxWriter.save_sheets(outpath, {sheetname: df_clean})
             return df_clean
 
-    def download_parse_adv(self, url, outpath=None, sheetname=None):
+    def download_parse_adv(self, exch, url, outpath=None):
         f_pdf = download(url, tempfile.NamedTemporaryFile())
         txt = run_pdftotext(f_pdf.name)
-        table = self.parse_from_txt(f_pdf, txt)
+        table = self.parse_from_txt(exch, f_pdf, txt)
         f_pdf.close()
         if outpath is not None:
-            sheetname = 'Sheet1' if sheetname is None else sheetname
-            return XlsxWriter.save_sheets(outpath, {sheetname: table})
+            exch = 'Sheet1' if exch is None else exch
+            return XlsxWriter.save_sheets(outpath, {exch: table})
         return table
 
     def run_scraper(self, path_prods=None, path_advs=None, years=None):
         df_prods = self.download_parse_prods(path_prods)
-        df_cme = self.download_parse_adv(self.URL_CME_ADV, outpath=path_advs, sheetname=CME)
-        df_cbot = self.download_parse_adv(self.URL_CBOT_ADV, outpath=path_advs, sheetname=CBOT)
-        df_nymex = self.download_parse_adv(self.URL_NYMEX_COMEX_ADV, outpath=path_advs, sheetname=NYMEX)
+        df_cme = self.download_parse_adv(CME, self.URL_CME_ADV, outpath=path_advs)
+        df_cbot = self.download_parse_adv(CBOT, self.URL_CBOT_ADV, outpath=path_advs)
+        df_nymex = self.download_parse_adv(NYMEX, self.URL_NYMEX_COMEX_ADV, outpath=path_advs)
 
         adv_dict = {CME: df_cme, CBOT: df_cbot, NYMEX: df_nymex}
         out_cols = get_filtered_adv_cols(adv_dict, years)
         fltred_advs = {exch: df_adv[out_cols[exch]] for exch, df_adv in adv_dict.items()}
         return df_prods, fltred_advs
 
-    def get_adv_headers(self, lines, pattern_headers ='^ {10,}((\S+ )+ {2,}){2,}.*$',
-                        pattern_colname='(\S+( \S+)*)+'):
-        for line in lines:
-            if re.match(pattern_headers, line):
-                hs = list(re.finditer(pattern_colname, line))
-                hl = list(re.finditer(pattern_colname, next(lines)))
-                headers = TxtFormatter.merge_2rows(hl, hs, self.__merge_headers, self.ALIGNMENT_ADV)
-                return [PRODUCT_NAME] + headers + [PRODUCT_GROUP, CLEARED_AS]
+    def __to_adv_headers(self, line, p_separator=' {2,}', min_splits=3, colname_func=lambda x: re.search('[A-Za-z]+', x)):
+        return match_tabular_line(line, p_separator, min_splits, colname_func)
+
+    def __parse_adv_headers(self, lines, p_separator=' {2,}', min_splits=3, colname_func=lambda x: re.search('[A-Za-z]+', x)):
+            for line in lines:
+                matches = match_tabular_line(line, p_separator, min_splits, colname_func)
+                if matches:
+                    hs = matches
+                    hl = match_tabular_line(next(lines, ''), p_separator, min_splits, colname_func)
+                    return TxtFormatter.merge_2rows(hl, hs, self.__merge_headers, self.ALIGNMENT_ADV)
+            return []
 
     def __merge_headers(self, hl, hs):
         headers = list()

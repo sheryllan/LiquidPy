@@ -1,10 +1,10 @@
 import unittest as ut
-from datascraper import OSEScraper
-from datascraper import TxtFormatter
+
+from datascraper import *
 import re
 
 
-class OSEScraperTests(ut.TestCase):
+class MainTests(ut.TestCase):
     def test_get_col_header(self):
         lines = ['                                 取 引 高 報 告              2017年',
                  '                                  Yearly Trading Volume 2017',
@@ -19,6 +19,22 @@ class OSEScraperTests(ut.TestCase):
         actual = [m.group() for m in OSEScraper.get_col_header(lines)]
 
         self.assertListEqual(expected, actual)
+
+
+    def test_match_header_line(self):
+        line1 = '                                                      FEB 2018             FEB 2017            % CHG' \
+                '               JAN 2018            % CHG              Y.T.D 2018          Y.T.D 2017            % CHG'
+        line2 = 'JPX-Nikkei Index 400 Futures                 7,669,469         11,167,497,625,807                    140,190'
+
+        results1 = match_tabular_line(line1)
+        results2 = match_tabular_line(line2)
+
+        expected1 = ['FEB 2018', 'FEB 2017', '% CHG', 'JAN 2018', '% CHG', 'Y.T.D 2018', 'Y.T.D 2017', '% CHG']
+        expected2 = []
+
+        self.assertListEqual(expected1, results1)
+        self.assertListEqual(expected2, results2)
+
 
 
 class TxtFormatterTests(ut.TestCase):
@@ -40,7 +56,6 @@ class TxtFormatterTests(ut.TestCase):
         rshorter = list(re.finditer(pattern, line_shorter))
         return rlonger, rshorter
 
-
     def test_align_by_min_tot_diff_rightaligned(self):
         expected = [('FEB 2018', 'ADV'),
                     ('FEB 2017', 'ADV'),
@@ -50,17 +65,18 @@ class TxtFormatterTests(ut.TestCase):
                     ('Y.T.D 2018', 'ADV'),
                     ('Y.T.D 2017', 'ADV'),
                     ('% CHG', None)]
-        actual = TxtFormatter.align_by_min_tot_offset(*self.testcase1(), 'right')
+
+        actual = list(map_recursive(lambda x: x.group() if x else None,
+                                    TxtFormatter.align_by_min_tot_offset(*self.testcase1(), 'right')))
         self.assertListEqual(expected, actual)
 
     def test_align_by_min_tot_diff_combined(self):
-
-
         expected = [('Type', '31,050'),
                     ('Trading Volume(units)', '45,212,540,995'),
                     ('Trading Value(yen)', '-'),
                     ('Open Interest(units)', None)]
-        actual = TxtFormatter.align_by_min_tot_offset(*self.testcase2())
+        actual = list(map_recursive(lambda x: x.group() if x else None,
+                                    TxtFormatter.align_by_min_tot_offset(*self.testcase2())))
         self.assertListEqual(expected, actual)
 
     def test_merge_2rows(self):
@@ -85,5 +101,9 @@ class TxtFormatterTests(ut.TestCase):
                     'ADV Y.T.D 2017',
                     '% CHG']
 
-        actual = TxtFormatter.merge_2rows(*self.testcase1(), merge_headers, 'right')
-        self.assertListEqual(expected, actual)
+        merged, aligned_mtobjs = TxtFormatter.merge_2rows(*self.testcase1(), merge_headers, 'right')
+        self.assertListEqual(expected, merged)
+
+
+if __name__ == "__main__":
+    ut.main()

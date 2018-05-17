@@ -1,4 +1,5 @@
 from collections import Iterable
+import types
 
 
 def nontypes_iterable(arg, excl_types=(str,)):
@@ -21,6 +22,17 @@ def flatten_iter(items, incl_level=False, types=(str,)):
 
     level = -1 if incl_level else None
     return flattern_iter_rcrs(items, list(), level)
+
+
+def map_recursive(f, items):
+    if not nontypes_iterable(items):
+        return f(items)
+
+    subitems = (map_recursive(f, item) for item in items)
+    if isinstance(items, types.GeneratorType):
+        return subitems
+    maps = type(items)
+    return maps(subitems)
 
 
 def to_list(x):

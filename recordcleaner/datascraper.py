@@ -21,7 +21,7 @@ def last_year():
 
 
 def first_nonna_index(df):
-    return pd.isnull(df).any(0).nonzero()[0][0]
+    return pd.notna(df).all(1).nonzero()[0][0]
 
 
 def filter_df(df, filterfunc):
@@ -59,21 +59,29 @@ def run_pdftotext(pdf, txt=None, encoding='utf-8', **kwargs):
 
 
 class TxtFormatter(object):
-    alignment_metric = {'left': lambda x: x[0],
-                        'right': lambda x: x[1],
-                        'centre': lambda x: (x[0] + x[1]) / 2}
+    LEFT = 'left'
+    RIGHT = 'right'
+    CENTRE = 'centre'
 
-    alignment_func = {'left': lambda cord1, cord2: abs(cord1[0] - cord2[0]),
-                      'right': lambda cord1, cord2: abs(cord1[1] - cord2[1]),
-                      'centre': lambda cord1, cord2: abs((cord1[0] + cord1[1]) / 2 - (cord2[0] + cord2[1]) / 2)}
+    alignment_metric = {LEFT: lambda x: x[0],
+                        RIGHT: lambda x: x[1],
+                        CENTRE: lambda x: (x[0] + x[1]) / 2}
+
+    alignment_func = {LEFT: lambda cord1, cord2: abs(cord1[0] - cord2[0]),
+                      RIGHT: lambda cord1, cord2: abs(cord1[1] - cord2[1]),
+                      CENTRE: lambda cord1, cord2: abs((cord1[0] + cord1[1]) / 2 - (cord2[0] + cord2[1]) / 2)}
 
     @classmethod
     def which_alignment(cls, cord1, cord2):
         left = abs(cord1[0] - cord2[0])
         right = abs(cord1[1] - cord2[1])
         centre = abs((cord1[0] + cord1[1]) / 2 - (cord2[0] + cord2[1]) / 2)
-        offsets = {left: 'left', right: 'right', centre: 'centre'}
+        offsets = {left: TxtFormatter.LEFT, right: TxtFormatter.RIGHT, centre: TxtFormatter.CENTRE}
         return offsets[min(offsets)]
+
+    @classmethod
+    def mtobjs_to_cords(cls, mtobjs):
+        return [mtobj.span() for mtobj in mtobjs]
 
     @classmethod
     def sort_robjs(cls, robjs):
@@ -110,10 +118,35 @@ class TxtFormatter(object):
     #             i += 1
     #     return [v for k, v in sorted(merged.items(), key=lambda x: func(x[0]))]
 
+
     @classmethod
     def merge_2rows(cls, rlonger, rshorter, mergfunc, alignment='centre'):
-        aligned_cols = TxtFormatter.align_by_min_tot_offset(rlonger, rshorter, alignment)
-        return [mergfunc(l, s) for l, s in aligned_cols]
+        # def left_aligned(mtobjs, str_merged):
+        #     cords = TxtFormatter.mtobjs_to_cords(mtobjs)
+        #     start = cords[benchmark][0]
+        #     end = start + len(str_merged)
+        #     return start, end
+        #
+        # def right_aligned(mtobjs, str_merged):
+        #     cords = TxtFormatter.mtobjs_to_cords(mtobjs)
+        #     end = cords[benchmark][1]
+        #     start = end - len(str_merged)
+        #     return start, end
+        #
+        # def centr_aligned(mtobjs, str_merged):
+        #     cords = TxtFormatter.mtobjs_to_cords(mtobjs)
+        #     centre = sum(cords[benchmark]) / 2
+        #     start = centre - len(str_merged) / 2
+        #     end = centre + len(str_merged) / 2
+        #     return start, end
+        #
+        # cords_conversion = {TxtFormatter.LEFT: left_aligned,
+        #                     TxtFormatter.RIGHT: right_aligned,
+        #                     TxtFormatter.CENTRE: centr_aligned}
+
+        aligned_cols = list(TxtFormatter.align_by_min_tot_offset(rlonger, rshorter, alignment))
+        return [mergfunc(lobj.group() if lobj else lobj, sobj.group() if sobj else sobj)
+                for lobj, sobj in aligned_cols], aligned_cols
 
 
     @classmethod
@@ -171,12 +204,12 @@ class TxtFormatter(object):
 
     @classmethod
     def align_by_min_tot_offset(cls, rlonger, rshorter, alignment='centre'):
+        rlonger = list(TxtFormatter.sort_robjs(rlonger))
+        rshorter = list(TxtFormatter.sort_robjs(rshorter))
         if len(rlonger) < len(rshorter):
             rlonger, rshorter = swap(rlonger, rshorter)
-        rlonger = TxtFormatter.sort_robjs(rlonger)
-        rshorter = TxtFormatter.sort_robjs(rshorter)
-        cords_longer = [(r.start(), r.end()) for r in rlonger]
-        cords_shorter = [(r.start(), r.end()) for r in rshorter]
+        cords_longer = TxtFormatter.mtobjs_to_cords(rlonger)
+        cords_shorter = TxtFormatter.mtobjs_to_cords(rshorter)
         func = TxtFormatter.alignment_func[alignment]
         num_remaining = len(cords_shorter)
         aligned_idxes = list()
@@ -187,10 +220,30 @@ class TxtFormatter(object):
             aligned_idxes, il_turning = TxtFormatter.__rearrange_prev_idxes(aligned_idxes, il_turning)
             aligned_idxes.append(il_turning)
 
-        return [(rlonger[i].group(), rshorter[aligned_idxes.index(i)].group() if i in aligned_idxes else None)
-                for i in range(0, len(rlonger))]
+        return ((rlonger[i], rshorter[aligned_idxes.index(i)] if i in aligned_idxes else None)
+                for i in range(0, len(rlonger)))
 
 
+ASCII_PATTERN = '([A-Za-z0-9/\(\)\.%&$,-]|(?<! ) (?! ))+'
+
+
+def get_safe_phrase_pattern(pattern):
+    pattern_phrase = '(^|(?<=((?<!\S) ))){}($|(?=( (?!\S))))'
+    return pattern_phrase.format(pattern)
+
+
+def get_char_phrases(string, p_separator=' {2,}', p_chars=ASCII_PATTERN):
+    return [match for match in re.split(p_separator, string) if re.match(p_chars, match)]
+
+
+def min_split(line, p_separator=' {2,}', min_splits=3):
+    splits = list(filter(None, re.split(p_separator, line)))
+    return splits if len(splits) >= min_splits else []
+
+
+def match_tabular_line(line, p_separator=' {2,}', min_splits=3, colname_func=lambda x: re.match(ASCII_PATTERN, x)):
+    splits = min_split(line, p_separator, min_splits)
+    return splits if all(colname_func(split) for split in splits) else []
 
 
 class OSEScraper(object):
