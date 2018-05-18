@@ -84,7 +84,7 @@ class TxtFormatter(object):
         return [mtobj.span() for mtobj in mtobjs]
 
     @classmethod
-    def sort_robjs(cls, robjs):
+    def sort_mtobjs(cls, robjs):
         return sorted(robjs, key=lambda x: x.start())
 
     # r1, r2 are dictionaries with (x0, x1) as keys
@@ -120,33 +120,10 @@ class TxtFormatter(object):
 
 
     @classmethod
-    def merge_2rows(cls, rlonger, rshorter, mergfunc, alignment='centre'):
-        # def left_aligned(mtobjs, str_merged):
-        #     cords = TxtFormatter.mtobjs_to_cords(mtobjs)
-        #     start = cords[benchmark][0]
-        #     end = start + len(str_merged)
-        #     return start, end
-        #
-        # def right_aligned(mtobjs, str_merged):
-        #     cords = TxtFormatter.mtobjs_to_cords(mtobjs)
-        #     end = cords[benchmark][1]
-        #     start = end - len(str_merged)
-        #     return start, end
-        #
-        # def centr_aligned(mtobjs, str_merged):
-        #     cords = TxtFormatter.mtobjs_to_cords(mtobjs)
-        #     centre = sum(cords[benchmark]) / 2
-        #     start = centre - len(str_merged) / 2
-        #     end = centre + len(str_merged) / 2
-        #     return start, end
-        #
-        # cords_conversion = {TxtFormatter.LEFT: left_aligned,
-        #                     TxtFormatter.RIGHT: right_aligned,
-        #                     TxtFormatter.CENTRE: centr_aligned}
-
-        aligned_cols = list(TxtFormatter.align_by_min_tot_offset(rlonger, rshorter, alignment))
-        return [mergfunc(lobj.group() if lobj else lobj, sobj.group() if sobj else sobj)
-                for lobj, sobj in aligned_cols], aligned_cols
+    def merge_2rows(cls, row_longer, row_shorter, cords_longer, cords_shorter, mergfunc, alignment='centre'):
+        aligned_cords = list(TxtFormatter.align_by_min_tot_offset(cords_longer, cords_shorter, alignment))
+        return [mergfunc( if cl is not None else cl, cs.group() if cs else cs)
+                for cl, cs in aligned_cords], aligned_cords
 
 
     @classmethod
@@ -203,13 +180,11 @@ class TxtFormatter(object):
 
 
     @classmethod
-    def align_by_min_tot_offset(cls, rlonger, rshorter, alignment='centre'):
-        rlonger = list(TxtFormatter.sort_robjs(rlonger))
-        rshorter = list(TxtFormatter.sort_robjs(rshorter))
-        if len(rlonger) < len(rshorter):
-            rlonger, rshorter = swap(rlonger, rshorter)
-        cords_longer = TxtFormatter.mtobjs_to_cords(rlonger)
-        cords_shorter = TxtFormatter.mtobjs_to_cords(rshorter)
+    def align_by_min_tot_offset(cls, cords1, cords2, alignment='centre'):
+        cords1, cords2 = list(sorted(cords1)), list(sorted(cords2))
+        cords_longer, cords_shorter = swap(cords1, cords2) if len(cords2) > len(cords1) else (cords1, cords2)
+        cords_order = [cords1, cords2]
+
         func = TxtFormatter.alignment_func[alignment]
         num_remaining = len(cords_shorter)
         aligned_idxes = list()
@@ -220,8 +195,12 @@ class TxtFormatter(object):
             aligned_idxes, il_turning = TxtFormatter.__rearrange_prev_idxes(aligned_idxes, il_turning)
             aligned_idxes.append(il_turning)
 
-        return ((rlonger[i], rshorter[aligned_idxes.index(i)] if i in aligned_idxes else None)
-                for i in range(0, len(rlonger)))
+        idx_funcs = {'longer': lambda x: x,
+                     'shorter': lambda x: cords_shorter[aligned_idxes.index(x)] if x in aligned_idxes else None}
+
+
+        return ((cords_longer[i], cords_shorter[aligned_idxes.index(i)] if i in aligned_idxes else None)
+                for i in range(0, len(cords_longer)))
 
 
 ASCII_PATTERN = '([A-Za-z0-9/\(\)\.%&$,-]|(?<! ) (?! ))+'
@@ -232,18 +211,23 @@ def get_safe_phrase_pattern(pattern):
     return pattern_phrase.format(pattern)
 
 
-def get_char_phrases(string, p_separator=' {2,}', p_chars=ASCII_PATTERN):
+def get_char_phrases(string, p_separator=' {2,}|^ | $', p_chars=ASCII_PATTERN):
     return [match for match in re.split(p_separator, string) if re.match(p_chars, match)]
 
 
-def min_split(line, p_separator=' {2,}', min_splits=3):
-    splits = list(filter(None, re.split(p_separator, line)))
-    return splits if len(splits) >= min_splits else []
+def match_min_split(line, p_separator='^ +| {2,}| +$', min_splits=3):
+    sep_cords = (match.span() for match in re.finditer(p_separator, line))
+    match_indices = list(flatten_iter(sep_cords))
+    match_indices = match_indices[1:] if match_indices[0] == 0 else [0] + match_indices
+    match_indices = match_indices[:-1] if match_indices[-1] == len(line) else match_indices + [len(line)]
+    match_cords = [cord for cord in group_every_n(match_indices, 2, tuple) if len(cord) == 2]
+    match_strings = [line[cord[0]: cord[1]] for cord in match_cords]
+    return (match_strings, match_cords) if len(match_strings) >= min_splits else None
 
 
-def match_tabular_line(line, p_separator=' {2,}', min_splits=3, colname_func=lambda x: re.match(ASCII_PATTERN, x)):
-    splits = min_split(line, p_separator, min_splits)
-    return splits if all(colname_func(split) for split in splits) else []
+def match_tabular_line(line, p_separator='^ +| {2,}| +$', min_splits=3, colname_func=lambda x: re.match(ASCII_PATTERN, x)):
+    match_strings, match_cords = match_min_split(line, p_separator, min_splits)
+    return (match_strings, match_cords) if all(colname_func(s) for s in match_strings) else None
 
 
 class OSEScraper(object):

@@ -20,21 +20,38 @@ class MainTests(ut.TestCase):
 
         self.assertListEqual(expected, actual)
 
+    def test_match_min_split(self):
+        line1 = '                                                                                           February 2018' \
+                '                                                                                      Page 7 of 17'
+        line2 = '                                                      FEB 2018             FEB 2017            % CHG' \
+                '               JAN 2018            % CHG              Y.T.D 2018          Y.T.D 2017            % CHG'
 
-    def test_match_header_line(self):
+        actual1 = match_min_split(line1)
+        actual2 = match_min_split(line2)
+
+        expected1 = None
+        expected_str2 = ['FEB 2018', 'FEB 2017', '% CHG', 'JAN 2018', '% CHG', 'Y.T.D 2018', 'Y.T.D 2017', '% CHG']
+        expected_cords2 = [(54, 62), (75, 83), (95, 100), (115, 123), (135, 140), (154, 164), (174, 184), (196, 201)]
+        self.assertEqual(expected1, actual1)
+        self.assertListEqual(expected_str2, actual2[0])
+        self.assertListEqual(expected_cords2, actual2[1])
+
+    def test_match_tabular_line(self):
         line1 = '                                                      FEB 2018             FEB 2017            % CHG' \
                 '               JAN 2018            % CHG              Y.T.D 2018          Y.T.D 2017            % CHG'
         line2 = 'JPX-Nikkei Index 400 Futures                 7,669,469         11,167,497,625,807                    140,190'
 
-        results1 = match_tabular_line(line1)
-        results2 = match_tabular_line(line2)
+        colname_func = lambda x: re.search('[A-Za-z]+', x)
+        actual1 = match_tabular_line(line1, colname_func=colname_func)
+        actual2 = match_tabular_line(line2, colname_func=colname_func)
 
-        expected1 = ['FEB 2018', 'FEB 2017', '% CHG', 'JAN 2018', '% CHG', 'Y.T.D 2018', 'Y.T.D 2017', '% CHG']
-        expected2 = []
+        expected_str1 = ['FEB 2018', 'FEB 2017', '% CHG', 'JAN 2018', '% CHG', 'Y.T.D 2018', 'Y.T.D 2017', '% CHG']
+        expected_cords1 = [(54, 62), (75, 83), (95, 100), (115, 123), (135, 140), (154, 164), (174, 184), (196, 201)]
+        expected2 = None
 
-        self.assertListEqual(expected1, results1)
-        self.assertListEqual(expected2, results2)
-
+        self.assertListEqual(expected_str1, actual1[0])
+        self.assertListEqual(expected_cords1, actual1[1])
+        self.assertEqual(expected2, actual2)
 
 
 class TxtFormatterTests(ut.TestCase):

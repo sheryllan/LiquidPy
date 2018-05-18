@@ -28,3 +28,9 @@ class PublicFuncTests(ut.TestCase):
 
         self.assertListEqual(expected, actual)
 
+    def test_flatten_iter(self):
+        iter1 = [(1, ('abf', 0)), 4, (8, ('bey', 9))]
+        actual1 = list(flatten_iter(iter1, 0))
+        expected1 = [(1, 1), (2, 'abf'), (2, 0), (0, 4), (1, 8), (2, 'bey'), (2, 9)]
+        self.assertListEqual(expected1, actual1)
+

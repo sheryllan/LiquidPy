@@ -6,22 +6,14 @@ def nontypes_iterable(arg, excl_types=(str,)):
     return isinstance(arg, Iterable) and not isinstance(arg, excl_types)
 
 
-def flatten_iter(items, incl_level=False, types=(str,)):
-    def flattern_iter_rcrs(items, flat_list, level):
-        if not items:
-            return flat_list
-
-        if nontypes_iterable(items, types):
-            level = None if level is None else level + 1
-            for sublist in items:
-                flat_list = flattern_iter_rcrs(sublist, flat_list, level)
-        else:
-            level_item = items if level is None else (level, items)
-            flat_list.append(level_item)
-        return flat_list
-
-    level = -1 if incl_level else None
-    return flattern_iter_rcrs(items, list(), level)
+def flatten_iter(items, level=None, types=(str,)):
+    if nontypes_iterable(items, types):
+        level = None if level is None else level + 1
+        for sublist in items:
+            yield from flatten_iter(sublist, level, types)
+    else:
+        level_item = items if level is None else (level - 1, items)
+        yield level_item
 
 
 def map_recursive(f, items):
@@ -31,8 +23,11 @@ def map_recursive(f, items):
     subitems = (map_recursive(f, item) for item in items)
     if isinstance(items, types.GeneratorType):
         return subitems
-    maps = type(items)
-    return maps(subitems)
+    return type(items)(subitems)
+
+
+def group_every_n(items, n, gtype=list):
+    return (gtype(items[i: i + n]) for i in range(0, len(items), n))
 
 
 def to_list(x):

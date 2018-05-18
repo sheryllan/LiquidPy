@@ -110,7 +110,7 @@ params_dict = {'and': {FIELDNAME, SCHEMA, QSTRING, BOOST, TERMCLASS},
                'orofand': {FIELDNAME, SCHEMA, ANDLIST, BOOST, TERMCLASS},
                'every': {FIELDNAME}}
 
-reserved_params = set([QUERY] + flatten_iter(params_dict.values()))
+reserved_params = set([QUERY] + list(flatten_iter(params_dict.values())))
 
 
 def get_query_params(query, **kwargs):

@@ -85,8 +85,8 @@ class CMEGScraper(object):
     def get_prod_groups_from_pdf(self, fh):
         fr = PdfFileReader(fh)
         outlines = fr.getOutlines()
-        flat_outlines = flatten_iter(outlines, True, (str, Destination))
-        sections = [(l, o.title) for l, o in flat_outlines[2:]]
+        flat_outlines = flatten_iter(outlines, 0, (str, Destination))
+        sections = [(l, o.title) for l, o in flat_outlines if l > 1]
 
         def parse_flatten_sections():
             prev_level = sections[0][0]
@@ -179,6 +179,9 @@ class CMEGScraper(object):
                     hl = match_tabular_line(next(lines, ''), p_separator, min_splits, colname_func)
                     return TxtFormatter.merge_2rows(hl, hs, self.__merge_headers, self.ALIGNMENT_ADV)
             return []
+
+
+
 
     def __merge_headers(self, hl, hs):
         headers = list()
