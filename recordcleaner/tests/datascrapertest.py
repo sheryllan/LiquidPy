@@ -67,7 +67,7 @@ class TxtFormatterTests(ut.TestCase):
 
     def testcase2(self):
         line_longer = '           Type                Trading Volume(units)         Trading Value(yen)      Open Interest(units)'
-        line_shorter = '                      31,050              45,212,540,995            -'
+        line_shorter = '                        31,050            45,212,540,995            -'
         pattern = '(\S+( \S+)*)+'
         rlonger = list(re.finditer(pattern, line_longer))
         rshorter = list(re.finditer(pattern, line_shorter))

@@ -61,16 +61,24 @@ def rreplace(s, old, new, occurrence):
     return new.join(li)
 
 
-def last_indexof(items, target):
-    j = None
+def last_indexof(items, matchfunc):
     for i in range(len(items) - 1, -1, -1):
-        if items[i] == target:
-            j = i
-            break
-    return j
+        if matchfunc(items[i]):
+            return i
+    return None
 
 
 def get_indexes(arry, condition):
     return [i for i, a in enumerate(arry) if condition(a)]
 
 
+def index_culmulative(items, func):
+    idx, _ = func(enumerate(items), key=lambda x: x[1])
+    return idx
+
+
+def verify_non_decreasing(array):
+    for i, _ in enumerate(array[1:]):
+        if array[i - 1] > array[i]:
+            return False
+    return True

@@ -153,12 +153,12 @@ class TxtFormatter(object):
         return aligned_cols
 
     @classmethod
-    def __find_turning_idx(cls, cs, cords_longer, dist_func, start=0, end=None):
-        end = len(cords_longer) if end is None else end
+    def __get_turning_idx(cls, point_ref, points, dist_func, start=0, end=None):
+        end = len(points) if end is None else end
         min_dist = math.inf
         i = start
         for i in range(start, end):
-            distance = abs(dist_func(cs, cords_longer[i]))
+            distance = abs(dist_func(point_ref, points[i]))
             if distance >= min_dist:
                 return i - 1
             else:
@@ -166,41 +166,132 @@ class TxtFormatter(object):
         return i
 
     @classmethod
+    def __distances_to_point(cls, cord_point, cords, dist_func, start=0, end=None):
+        end = len(cords) if end is None else end
+        for i in range(start, end):
+            yield abs(dist_func(cord_point, cords[i]))
+
+
+    # take as many indexes as possible in prev_idxes until i_turning
+    @classmethod
     def __rearrange_prev_idxes(cls, prev_idxes, i_turning):
         if not prev_idxes:
             return prev_idxes, i_turning
         il_curr, is_curr = i_turning, len(prev_idxes)
-        if i_turning > prev_idxes[is_curr - 1]:
-            return prev_idxes, i_turning
-        while i_turning <= is_curr:
-            i_turning += 1
+        if il_curr > prev_idxes[is_curr - 1]:
+            return prev_idxes, il_curr
+        il_curr = il_curr if il_curr >= is_curr else is_curr
 
-        new_idxes = [idx if idx < i_turning else i_turning - is_curr + i for i, idx in enumerate(prev_idxes)]
-        return new_idxes, i_turning
+        new_idxes = [idx if idx <= il_curr else il_curr- is_curr + i for i, idx in enumerate(prev_idxes)]
+        return new_idxes, il_curr
+
+
+
 
 
     @classmethod
     def align_by_min_tot_offset(cls, cords1, cords2, alignment='centre'):
         cords1, cords2 = list(sorted(cords1)), list(sorted(cords2))
-        cords_longer, cords_shorter = swap(cords1, cords2) if len(cords2) > len(cords1) else (cords1, cords2)
-        cords_order = [cords1, cords2]
+        cords_longer, cords_shorter, swapped = (swap(cords1, cords2), True) \
+            if len(cords2) > len(cords1) else (cords1, cords2, False)
 
-        func = TxtFormatter.alignment_func[alignment]
-        num_remaining = len(cords_shorter)
-        aligned_idxes = list()
-        for is_curr, cs in enumerate(cords_shorter):
-            num_remaining -= 1
-            il_end = len(cords_longer) - num_remaining
-            il_turning = TxtFormatter.__find_turning_idx(cs, cords_longer, func, end=il_end)
-            aligned_idxes, il_turning = TxtFormatter.__rearrange_prev_idxes(aligned_idxes, il_turning)
-            aligned_idxes.append(il_turning)
+        def get_dist_matrix(points_shorter, points_longer, alignment):
+            func = TxtFormatter.alignment_func[alignment]
+            end = len(points_longer) - len(points_shorter)
+            for ps in points_shorter:
+                end += 1
+                yield list(TxtFormatter.__distances_to_point(ps, points_longer, func, end=end))
 
-        idx_funcs = {'longer': lambda x: x,
-                     'shorter': lambda x: cords_shorter[aligned_idxes.index(x)] if x in aligned_idxes else None}
+        def get_discontinuous_idx(arr, from_idx, stop_idx, step, decreasing=True):
+            for i in range(from_idx, stop_idx, step):
+                if not (arr[i] - arr[i - 1] == 1 if decreasing else arr[i - 1] - arr[i] == 1):
+                    return i
+            return None
 
 
-        return ((cords_longer[i], cords_shorter[aligned_idxes.index(i)] if i in aligned_idxes else None)
-                for i in range(0, len(cords_longer)))
+
+        dist_matrix, aligned_idexes = list(), list()
+        for distances in get_dist_matrix(cords_shorter, cords_longer, alignment):
+            dist_matrix.append(distances)
+            aligned_idexes.append(index_culmulative(distances, min))
+        if not verify_non_decreasing(aligned_idexes):
+            raise ValueError('Error with mapping of the sorted coordinates: mapped indexes should be non-decreasing')
+
+        for is_curr, il_curr in enumerate(aligned_idexes[1:]):
+            is_prev = is_curr - 1
+            il_prev = aligned_idexes[is_prev]
+            if il_curr != il_prev:
+                continue
+
+            il_left, is_left = il_prev - 1, is_prev - 1
+            diff_left = dist_matrix[is_curr][il_curr] + dist_matrix[is_prev][il_prev] - dist_matrix[is_prev][il_left]
+            while 0 < is_left <= il_left == aligned_idexes[is_left]:
+                diff_left += dist_matrix[is_left][il_left] - dist_matrix[is_left][il_left - 1]
+                il_left -= 1
+                is_left -= 1
+
+            il_right, is_right = il_curr + 1, is_curr + 1
+            diff_right = dist_matrix[is_prev][il_prev] + dist_matrix[is_curr][il_curr] - dist_matrix[is_curr][il_right]
+            while len(aligned_idexes) > is_right and il_right >= is_right and il_right == aligned_idexes[is_right]:
+                diff_right += dist_matrix[is_right][il_right] - dist_matrix[is_right][il_right + 1]
+
+
+
+        # func = TxtFormatter.alignment_func[alignment]
+        # num_remaining = len(cords_shorter)
+        # aligned_idxes = list()
+        # for is_curr, cs in enumerate(cords_shorter):
+        #     num_remaining -= 1
+        #     il_end = len(cords_longer) - num_remaining
+        #     il_turning = TxtFormatter.__find_turning_idx(cs, cords_longer, func, end=il_end)
+        #     aligned_idxes, il_turning = TxtFormatter.__rearrange_prev_idxes(aligned_idxes, il_turning)
+        #     aligned_idxes.append(il_turning)
+        #
+        # return ((cords_longer[i], cords_shorter[aligned_idxes.index(i)] if i in aligned_idxes else None)
+        #         for i in range(0, len(cords_longer)))
+
+
+
+        # By sorting both coordinates, it can be inferred that if j = min_index(dist_matrix[i]),
+        # then min_index(dist_matrix[i - 1]) <= j
+
+
+
+
+        # il_end = len(cords_longer) - len(cords_shorter)
+        # dist_matrix = list()
+        # for cs in cords_shorter:
+        #     il_end += 1
+        #     dist_matrix.append(list(TxtFormatter.__distances_to_point(cs, cords_longer, func, end=il_end)))
+        # By sorting both coordinates, it can be inferred that if j = min_index(dist_matrix[i]),
+        # then min_index(dist_matrix[i - 1]) <= j
+
+
+        # # Find the last cross-aligned index in cords_longer and cords_shorter by the min of dist_matrix
+        # il_turning, is_turning = len(cords_longer) - 1, len(cords_shorter) - 1
+        # aligned_idxes = [index_culmulative(distances, min) for distances in dist_matrix]
+        # for i, j in enumerate(aligned_idxes[::-1]):
+        #     if j < il_turning:
+        #         il_turning = j
+        #     else:
+        #         is_turning = len(cords_shorter) - i
+        #         il_turning = aligned_idxes[is_turning]
+        #         break
+        #
+        # def is_idx_fit(ishorter, ilonger):
+        #     return il_turning > ilonger and is_turning - ishorter <= il_turning - ilonger
+        #
+        # if il_turning < is_turning:
+        #     il_turning = is_turning
+        #
+        # aligned_reidxes = range(il_turning - is_turning, il_turning)
+        # for is_curr, il_curr in enumerate(range(il_turning - is_turning, il_turning)):
+        #     if aligned_idxes[is_curr] >= il_curr + 1:
+        #         break
+
+
+
+
 
 
 ASCII_PATTERN = '([A-Za-z0-9/\(\)\.%&$,-]|(?<! ) (?! ))+'
