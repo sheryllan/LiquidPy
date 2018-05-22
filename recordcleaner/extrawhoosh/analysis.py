@@ -275,7 +275,7 @@ class SpecialWordFilter(Filter):
     def __prev_tokens(self, prev_kws, treedict):
         if not prev_kws:
             return prev_kws
-        last_idx = last_indexof(prev_kws, None)
+        last_idx = last_indexof(prev_kws, lambda x: x is None)
         trans_tokens = prev_kws
         if last_idx is not None:
             longest_kwtokens = self.__longest_kwtokens(prev_kws[0: last_idx], treedict, True)
