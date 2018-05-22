@@ -202,13 +202,6 @@ class TxtFormatter(object):
                 end += 1
                 yield list(TxtFormatter.__distances_to_point(ps, points_longer, func, end=end))
 
-        def get_discontinuous_idx(arr, from_idx, stop_idx, step, decreasing=True):
-            for i in range(from_idx, stop_idx, step):
-                if not (arr[i] - arr[i - 1] == 1 if decreasing else arr[i - 1] - arr[i] == 1):
-                    return i
-            return None
-
-
 
         dist_matrix, aligned_idexes = list(), list()
         for distances in get_dist_matrix(cords_shorter, cords_longer, alignment):
@@ -225,15 +218,19 @@ class TxtFormatter(object):
 
             il_left, is_left = il_prev - 1, is_prev - 1
             diff_left = dist_matrix[is_curr][il_curr] + dist_matrix[is_prev][il_prev] - dist_matrix[is_prev][il_left]
-            while 0 < is_left <= il_left == aligned_idexes[is_left]:
+            while 0 <= is_left < il_left == aligned_idexes[is_left]:
                 diff_left += dist_matrix[is_left][il_left] - dist_matrix[is_left][il_left - 1]
                 il_left -= 1
                 is_left -= 1
 
             il_right, is_right = il_curr + 1, is_curr + 1
             diff_right = dist_matrix[is_prev][il_prev] + dist_matrix[is_curr][il_curr] - dist_matrix[is_curr][il_right]
-            while len(aligned_idexes) > is_right and il_right >= is_right and il_right == aligned_idexes[is_right]:
+            while 0 < len(aligned_idexes) - is_right < len(cords_longer) - il_right and il_right == aligned_idexes[is_right]:
                 diff_right += dist_matrix[is_right][il_right] - dist_matrix[is_right][il_right + 1]
+                il_right += 1
+                is_right += 1
+
+            
 
 
 
