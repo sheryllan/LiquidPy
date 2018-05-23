@@ -67,33 +67,42 @@ class TxtFormatterTests(ut.TestCase):
 
     def testcase2(self):
         line_longer = '           Type                Trading Volume(units)         Trading Value(yen)      Open Interest(units)'
-        line_shorter = '                        31,050            45,212,540,995            -'
+        line_shorter = '                            31,050       45,212,540,995            -'
         pattern = '(\S+( \S+)*)+'
         rlonger = list(re.finditer(pattern, line_longer))
         rshorter = list(re.finditer(pattern, line_shorter))
         return rlonger, rshorter
 
-    def test_align_by_min_tot_diff_rightaligned(self):
-        expected = [('FEB 2018', 'ADV'),
-                    ('FEB 2017', 'ADV'),
-                    ('% CHG', None),
-                    ('JAN 2018', 'ADV'),
-                    ('% CHG', None),
-                    ('Y.T.D 2018', 'ADV'),
-                    ('Y.T.D 2017', 'ADV'),
-                    ('% CHG', None)]
+    def to_cords(self, testcase):
+        longer, shorter = testcase
+        cords_longer = [l.span() for l in longer]
+        cords_shorter = [s.span() for s in shorter]
+        return cords_longer, cords_shorter
 
-        actual = list(map_recursive(lambda x: x.group() if x else None,
-                                    TxtFormatter.align_by_min_tot_offset(*self.testcase1(), 'right')))
+    def test_align_by_min_tot_diff_rightaligned(self):
+        # expected = [('FEB 2018', 'ADV'),
+        #             ('FEB 2017', 'ADV'),
+        #             ('% CHG', None),
+        #             ('JAN 2018', 'ADV'),
+        #             ('% CHG', None),
+        #             ('Y.T.D 2018', 'ADV'),
+        #             ('Y.T.D 2017', 'ADV'),
+        #             ('% CHG', None)]
+        expected = [0, 1, 3, 5, 6]
+
+        cords_longer, cords_shorter = self.to_cords(self.testcase1())
+        actual = TxtFormatter.align_by_min_tot_offset(cords_longer, cords_shorter, 'right')
         self.assertListEqual(expected, actual)
 
     def test_align_by_min_tot_diff_combined(self):
-        expected = [('Type', '31,050'),
-                    ('Trading Volume(units)', '45,212,540,995'),
-                    ('Trading Value(yen)', '-'),
-                    ('Open Interest(units)', None)]
-        actual = list(map_recursive(lambda x: x.group() if x else None,
-                                    TxtFormatter.align_by_min_tot_offset(*self.testcase2())))
+        # expected = [('Type', '31,050'),
+        #             ('Trading Volume(units)', '45,212,540,995'),
+        #             ('Trading Value(yen)', '-'),
+        #             ('Open Interest(units)', None)]
+
+        expected = [0, 1, 2]
+        cords_longer, cords_shorter = self.to_cords(self.testcase2())
+        actual = TxtFormatter.align_by_min_tot_offset(cords_longer, cords_shorter)
         self.assertListEqual(expected, actual)
 
     def test_merge_2rows(self):
