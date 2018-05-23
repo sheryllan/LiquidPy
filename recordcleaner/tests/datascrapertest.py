@@ -91,7 +91,7 @@ class TxtFormatterTests(ut.TestCase):
         expected = [0, 1, 3, 5, 6]
 
         cords_longer, cords_shorter = self.to_cords(self.testcase1())
-        actual = TxtFormatter.align_by_min_tot_offset(cords_longer, cords_shorter, 'right')
+        actual = TxtFormatter.align_by_min_tot_offset(cords_longer, cords_shorter, TxtFormatter.RIGHT)
         self.assertListEqual(expected, actual)
 
     def test_align_by_min_tot_diff_combined(self):
@@ -104,6 +104,14 @@ class TxtFormatterTests(ut.TestCase):
         cords_longer, cords_shorter = self.to_cords(self.testcase2())
         actual = TxtFormatter.align_by_min_tot_offset(cords_longer, cords_shorter)
         self.assertListEqual(expected, actual)
+
+    def test_align_by_min_tot_diff_multi_cross(self):
+        cords_longer = [(0, 3), (10, 19), (30, 32), (36, 39), (52, 53), (54, 57), (66, 70)]
+        cords_shorter = [(8, 10), (12, 15), (17, 22), (40, 41), (60, 64), (69, 72)]
+        actual = TxtFormatter.align_by_min_tot_offset(cords_longer, cords_shorter, TxtFormatter.LEFT)
+        expected = [0, 1, 2, 3, 5, 6]
+        self.assertListEqual(expected, actual)
+
 
     def test_merge_2rows(self):
         def merge_headers(hl, hs):

@@ -2,7 +2,11 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="b667f01e-19f6-4de8-b17b-85ece66739ef" name="Default" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" afterPath="$PROJECT_DIR$/.idea/misc.xml" />
+      <change beforePath="$PROJECT_DIR$/.idea/recordcleaner.iml" afterPath="$PROJECT_DIR$/.idea/recordcleaner.iml" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
       <change beforePath="$PROJECT_DIR$/datascraper.py" afterPath="$PROJECT_DIR$/datascraper.py" />
+      <change beforePath="$PROJECT_DIR$/tests/datascrapertest.py" afterPath="$PROJECT_DIR$/tests/datascrapertest.py" />
     </list>
     <ignored path="$PROJECT_DIR$/.idea/shelf/" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -32,7 +36,7 @@
             <file leaf-file-name="productchecker.py" pinned="false" current-in-tab="false">
               <entry file="file://$PROJECT_DIR$/productchecker.py">
                 <provider selected="true" editor-type-id="text-editor">
-                  <state relative-caret-position="300">
+                  <state relative-caret-position="414">
                     <caret line="31" column="0" lean-forward="false" selection-start-line="31" selection-start-column="0" selection-end-line="31" selection-end-column="0" />
                     <folding>
                       <element signature="e#0#19#0" expanded="true" />
@@ -44,8 +48,8 @@
             <file leaf-file-name="datascraper.py" pinned="false" current-in-tab="true">
               <entry file="file://$PROJECT_DIR$/datascraper.py">
                 <provider selected="true" editor-type-id="text-editor">
-                  <state relative-caret-position="836">
-                    <caret line="232" column="12" lean-forward="false" selection-start-line="232" selection-start-column="12" selection-end-line="232" selection-end-column="12" />
+                  <state relative-caret-position="925">
+                    <caret line="228" column="0" lean-forward="false" selection-start-line="228" selection-start-column="0" selection-end-line="228" selection-end-column="0" />
                     <folding>
                       <element signature="e#0#11#0" expanded="true" />
                     </folding>
@@ -56,7 +60,7 @@
             <file leaf-file-name="re.py" pinned="false" current-in-tab="false">
               <entry file="file://$APPLICATION_HOME_DIR$/helpers/python-skeletons/re.py">
                 <provider selected="true" editor-type-id="text-editor">
-                  <state relative-caret-position="4365">
+                  <state relative-caret-position="5238">
                     <caret line="291" column="8" lean-forward="false" selection-start-line="291" selection-start-column="8" selection-end-line="291" selection-end-column="8" />
                     <folding />
                   </state>
@@ -73,7 +77,7 @@
       <file leaf-file-name="configparser.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/configparser.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1134">
+            <state relative-caret-position="0">
               <caret line="66" column="0" lean-forward="false" selection-start-line="66" selection-start-column="0" selection-end-line="66" selection-end-column="0" />
               <folding>
                 <element signature="e#0#19#0" expanded="true" />
@@ -102,11 +106,11 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="datascrapertest.py" pinned="false" current-in-tab="false">
+      <file leaf-file-name="datascrapertest.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/tests/datascrapertest.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="281">
-              <caret line="69" column="63" lean-forward="false" selection-start-line="69" selection-start-column="63" selection-end-line="69" selection-end-column="63" />
+            <state relative-caret-position="425">
+              <caret line="107" column="53" lean-forward="true" selection-start-line="107" selection-start-column="53" selection-end-line="107" selection-end-column="53" />
               <folding>
                 <element signature="e#0#21#0" expanded="true" />
               </folding>
@@ -114,10 +118,10 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="commonfuncs.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="commonfuncs.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/commonlib/commonfuncs.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="767">
+            <state relative-caret-position="749">
               <caret line="79" column="4" lean-forward="false" selection-start-line="79" selection-start-column="4" selection-end-line="79" selection-end-column="4" />
               <folding>
                 <element signature="e#0#32#0" expanded="true" />
@@ -149,7 +153,7 @@
       <file leaf-file-name="whooshexttest.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/tests/whooshexttest.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1215">
+            <state relative-caret-position="1746">
               <caret line="97" column="36" lean-forward="false" selection-start-line="97" selection-start-column="36" selection-end-line="97" selection-end-column="36" />
               <folding>
                 <element signature="e#0#9#0" expanded="true" />
@@ -161,7 +165,7 @@
       <file leaf-file-name="commonfuncstest.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/tests/commonfuncstest.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="510">
+            <state relative-caret-position="612">
               <caret line="34" column="0" lean-forward="false" selection-start-line="34" selection-start-column="0" selection-end-line="34" selection-end-column="0" />
               <folding>
                 <element signature="e#0#21#0" expanded="true" />
@@ -173,7 +177,7 @@
       <file leaf-file-name="checkscripts.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/checkscripts.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="90">
+            <state relative-caret-position="108">
               <caret line="6" column="0" lean-forward="false" selection-start-line="6" selection-start-column="0" selection-end-line="6" selection-end-column="0" />
               <folding>
                 <element signature="e#0#23#0" expanded="true" />
@@ -193,7 +197,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>pd</find>
       <find>dtsp</find>
       <find>itertools</find>
       <find>warnings</find>
@@ -223,7 +226,11 @@
       <find>matchobj</find>
       <find>.start()</find>
       <find>df.app</find>
+      <find>TxtFormatter</find>
     </findStrings>
+    <replaceStrings>
+      <replace>cls</replace>
+    </replaceStrings>
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
@@ -280,6 +287,7 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
+      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -306,7 +314,6 @@
           <select />
         </subPane>
       </pane>
-      <pane id="Scope" />
       <pane id="Scratches" />
     </panes>
   </component>
@@ -326,7 +333,7 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Python tests.Unittests for datascrapertest.MainTests.test_match_tabular_line">
+  <component name="RunManager" selected="Python tests.Unittests for datascrapertest.TxtFormatterTests.test_align_by_min_tot_diff_multi_cross">
     <configuration name="query" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -344,34 +351,6 @@
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />
-    </configuration>
-    <configuration name="Unittests for commonfuncstest.PublicFuncTests.test_flatten_iter" type="tests" factoryName="Unittests" temporary="true" nameIsGenerated="true">
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs />
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/tests" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <module name="recordcleaner" />
-      <option name="_new_additionalArguments" value="&quot;&quot;" />
-      <option name="_new_target" value="&quot;commonfuncstest.PublicFuncTests.test_flatten_iter&quot;" />
-      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
-    </configuration>
-    <configuration name="Unittests for commonfuncstest.PublicFuncTests.test_map_recursive" type="tests" factoryName="Unittests" temporary="true" nameIsGenerated="true">
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs />
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/tests" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <module name="recordcleaner" />
-      <option name="_new_additionalArguments" value="&quot;&quot;" />
-      <option name="_new_target" value="&quot;commonfuncstest.PublicFuncTests.test_map_recursive&quot;" />
-      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
     </configuration>
     <configuration name="Unittests for datascrapertest.MainTests.test_match_min_split" type="tests" factoryName="Unittests" temporary="true" nameIsGenerated="true">
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -401,20 +380,48 @@
       <option name="_new_target" value="&quot;datascrapertest.MainTests.test_match_tabular_line&quot;" />
       <option name="_new_targetType" value="&quot;PYTHON&quot;" />
     </configuration>
+    <configuration name="Unittests for datascrapertest.TxtFormatterTests.test_align_by_min_tot_diff_combined" type="tests" factoryName="Unittests" temporary="true" nameIsGenerated="true">
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs />
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/tests" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <module name="recordcleaner" />
+      <option name="_new_additionalArguments" value="&quot;&quot;" />
+      <option name="_new_target" value="&quot;datascrapertest.TxtFormatterTests.test_align_by_min_tot_diff_combined&quot;" />
+      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
+    </configuration>
+    <configuration name="Unittests for datascrapertest.TxtFormatterTests.test_align_by_min_tot_diff_multi_cross" type="tests" factoryName="Unittests" temporary="true" nameIsGenerated="true">
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs />
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/tests" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <module name="recordcleaner" />
+      <option name="_new_additionalArguments" value="&quot;&quot;" />
+      <option name="_new_target" value="&quot;datascrapertest.TxtFormatterTests.test_align_by_min_tot_diff_multi_cross&quot;" />
+      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
+    </configuration>
     <list size="5">
-      <item index="0" class="java.lang.String" itemvalue="Python tests.Unittests for commonfuncstest.PublicFuncTests.test_map_recursive" />
-      <item index="1" class="java.lang.String" itemvalue="Python tests.Unittests for commonfuncstest.PublicFuncTests.test_flatten_iter" />
-      <item index="2" class="java.lang.String" itemvalue="Python.query" />
-      <item index="3" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.MainTests.test_match_min_split" />
-      <item index="4" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.MainTests.test_match_tabular_line" />
+      <item index="0" class="java.lang.String" itemvalue="Python.query" />
+      <item index="1" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.MainTests.test_match_min_split" />
+      <item index="2" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.MainTests.test_match_tabular_line" />
+      <item index="3" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.TxtFormatterTests.test_align_by_min_tot_diff_combined" />
+      <item index="4" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.TxtFormatterTests.test_align_by_min_tot_diff_multi_cross" />
     </list>
     <recent_temporary>
       <list size="5">
-        <item index="0" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.MainTests.test_match_tabular_line" />
-        <item index="1" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.MainTests.test_match_min_split" />
-        <item index="2" class="java.lang.String" itemvalue="Python.query" />
-        <item index="3" class="java.lang.String" itemvalue="Python tests.Unittests for commonfuncstest.PublicFuncTests.test_flatten_iter" />
-        <item index="4" class="java.lang.String" itemvalue="Python tests.Unittests for commonfuncstest.PublicFuncTests.test_map_recursive" />
+        <item index="0" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.TxtFormatterTests.test_align_by_min_tot_diff_multi_cross" />
+        <item index="1" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.TxtFormatterTests.test_align_by_min_tot_diff_combined" />
+        <item index="2" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.MainTests.test_match_tabular_line" />
+        <item index="3" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.MainTests.test_match_min_split" />
+        <item index="4" class="java.lang.String" itemvalue="Python.query" />
       </list>
     </recent_temporary>
   </component>
@@ -435,21 +442,6 @@
     <servers />
   </component>
   <component name="TestHistory">
-    <history-entry file="Unittests_for_datascrapertest_MainTests_test_match_min_split - 2018.05.18 at 14h 11m 40s.xml">
-      <configuration name="Unittests for datascrapertest.MainTests.test_match_min_split" configurationId="tests" />
-    </history-entry>
-    <history-entry file="Unittests_for_datascrapertest_MainTests_test_match_min_split - 2018.05.18 at 14h 13m 30s.xml">
-      <configuration name="Unittests for datascrapertest.MainTests.test_match_min_split" configurationId="tests" />
-    </history-entry>
-    <history-entry file="Unittests_for_datascrapertest_MainTests_test_match_min_split - 2018.05.18 at 14h 15m 48s.xml">
-      <configuration name="Unittests for datascrapertest.MainTests.test_match_min_split" configurationId="tests" />
-    </history-entry>
-    <history-entry file="Unittests_for_datascrapertest_MainTests_test_match_min_split - 2018.05.18 at 14h 17m 38s.xml">
-      <configuration name="Unittests for datascrapertest.MainTests.test_match_min_split" configurationId="tests" />
-    </history-entry>
-    <history-entry file="Unittests_for_datascrapertest_MainTests_test_match_min_split - 2018.05.18 at 14h 20m 16s.xml">
-      <configuration name="Unittests for datascrapertest.MainTests.test_match_min_split" configurationId="tests" />
-    </history-entry>
     <history-entry file="Unittests_for_datascrapertest_MainTests_test_match_min_split - 2018.05.18 at 14h 22m 09s.xml">
       <configuration name="Unittests for datascrapertest.MainTests.test_match_min_split" configurationId="tests" />
     </history-entry>
@@ -465,32 +457,45 @@
     <history-entry file="Unittests_for_datascrapertest_MainTests_test_match_tabular_line - 2018.05.18 at 14h 30m 25s.xml">
       <configuration name="Unittests for datascrapertest.MainTests.test_match_tabular_line" configurationId="tests" />
     </history-entry>
+    <history-entry file="Unittests_for_datascrapertest_TxtFormatterTests_test_align_by_min_tot_diff_combined - 2018.05.23 at 11h 11m 55s.xml">
+      <configuration name="Unittests for datascrapertest.TxtFormatterTests.test_align_by_min_tot_diff_combined" configurationId="tests" />
+    </history-entry>
+    <history-entry file="Unittests_for_datascrapertest_TxtFormatterTests_test_align_by_min_tot_diff_combined - 2018.05.23 at 11h 27m 29s.xml">
+      <configuration name="Unittests for datascrapertest.TxtFormatterTests.test_align_by_min_tot_diff_combined" configurationId="tests" />
+    </history-entry>
+    <history-entry file="Unittests_for_datascrapertest_TxtFormatterTests_test_align_by_min_tot_diff_multi_cross - 2018.05.23 at 11h 43m 24s.xml">
+      <configuration name="Unittests for datascrapertest.TxtFormatterTests.test_align_by_min_tot_diff_multi_cross" configurationId="tests" />
+    </history-entry>
+    <history-entry file="Unittests_for_datascrapertest_TxtFormatterTests_test_align_by_min_tot_diff_multi_cross - 2018.05.23 at 11h 47m 50s.xml">
+      <configuration name="Unittests for datascrapertest.TxtFormatterTests.test_align_by_min_tot_diff_multi_cross" configurationId="tests" />
+    </history-entry>
+    <history-entry file="Unittests_for_datascrapertest_TxtFormatterTests_test_align_by_min_tot_diff_multi_cross - 2018.05.23 at 11h 54m 44s.xml">
+      <configuration name="Unittests for datascrapertest.TxtFormatterTests.test_align_by_min_tot_diff_multi_cross" configurationId="tests" />
+    </history-entry>
   </component>
   <component name="ToolWindowManager">
     <frame x="77" y="1328" width="1600" height="1173" extended-state="6" />
+    <editor active="true" />
     <layout>
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3291262" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
       <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32003987" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32924527" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Python Console" active="true" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.33100697" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
+      <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33200398" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32901296" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.17847939" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
+      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.18105671" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="R Packages" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="R Graphics" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3298969" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32801595" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
-      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.31904286" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
+      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.31904286" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
+      <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
       <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
-      <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Message" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
-      <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3291262" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
       <window_info id="Inspection" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
-      <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32901296" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Hierarchy" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="2" side_tool="false" content_ui="combo" />
       <window_info id="Ant Build" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
-      <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
     </layout>
     <layout-to-restore>
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
@@ -522,12 +527,12 @@
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/datascraper.py</url>
-          <line>435</line>
+          <line>415</line>
           <option name="timeStamp" value="15" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/datascraper.py</url>
-          <line>321</line>
+          <line>301</line>
           <option name="timeStamp" value="68" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
@@ -542,7 +547,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/tests/datascrapertest.py</url>
-          <line>121</line>
+          <line>129</line>
           <option name="timeStamp" value="102" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
@@ -555,42 +560,22 @@
           <line>112</line>
           <option name="timeStamp" value="111" />
         </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/datascraper.py</url>
+          <line>194</line>
+          <option name="timeStamp" value="127" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/datascraper.py</url>
+          <line>225</line>
+          <option name="timeStamp" value="128" />
+        </line-breakpoint>
       </breakpoints>
-      <option name="time" value="121" />
+      <option name="time" value="129" />
     </breakpoint-manager>
     <watches-manager />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/configparser.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="0">
-          <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding>
-            <element signature="e#0#19#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/configparser.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="0">
-          <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding>
-            <element signature="e#0#19#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/configparser.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="0">
-          <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding>
-            <element signature="e#0#19#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/configparser.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
@@ -828,7 +813,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/configparser.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1134">
+        <state relative-caret-position="0">
           <caret line="66" column="0" lean-forward="false" selection-start-line="66" selection-start-column="0" selection-end-line="66" selection-end-column="0" />
           <folding>
             <element signature="e#0#19#0" expanded="true" />
@@ -844,16 +829,6 @@
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/venv/lib/python3.6/re.py" />
-    <entry file="file://$PROJECT_DIR$/tests/commonfuncstest.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="612">
-          <caret line="34" column="0" lean-forward="false" selection-start-line="34" selection-start-column="0" selection-end-line="34" selection-end-column="0" />
-          <folding>
-            <element signature="e#0#21#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/venv/lib/python3.6/codecs.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="5544">
@@ -864,7 +839,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/tests/whooshexttest.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1458">
+        <state relative-caret-position="1746">
           <caret line="97" column="36" lean-forward="false" selection-start-line="97" selection-start-column="36" selection-end-line="97" selection-end-column="36" />
           <folding>
             <element signature="e#0#9#0" expanded="true" />
@@ -887,13 +862,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file:///usr/lib/python3.6/unittest/case.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="218">
-          <caret line="604" column="0" lean-forward="false" selection-start-line="604" selection-start-column="0" selection-end-line="604" selection-end-column="0" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/cmegcheck.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="3294">
@@ -912,6 +880,16 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/datascraper.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="836">
+          <caret line="232" column="12" lean-forward="false" selection-start-line="232" selection-start-column="12" selection-end-line="232" selection-end-column="12" />
+          <folding>
+            <element signature="e#0#11#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/productmatcher.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="1584">
@@ -924,8 +902,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/productchecker.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="396">
-          <caret line="30" column="80" lean-forward="false" selection-start-line="30" selection-start-column="80" selection-end-line="30" selection-end-column="80" />
+        <state relative-caret-position="414">
+          <caret line="31" column="0" lean-forward="false" selection-start-line="31" selection-start-column="0" selection-end-line="31" selection-end-column="0" />
           <folding>
             <element signature="e#0#19#0" expanded="true" />
           </folding>
@@ -940,10 +918,10 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/tests/datascrapertest.py">
+    <entry file="file://$PROJECT_DIR$/tests/commonfuncstest.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="281">
-          <caret line="69" column="63" lean-forward="false" selection-start-line="69" selection-start-column="63" selection-end-line="69" selection-end-column="63" />
+        <state relative-caret-position="612">
+          <caret line="34" column="0" lean-forward="false" selection-start-line="34" selection-start-column="0" selection-end-line="34" selection-end-column="0" />
           <folding>
             <element signature="e#0#21#0" expanded="true" />
           </folding>
@@ -952,7 +930,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/commonlib/commonfuncs.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="767">
+        <state relative-caret-position="749">
           <caret line="79" column="4" lean-forward="false" selection-start-line="79" selection-start-column="4" selection-end-line="79" selection-end-column="4" />
           <folding>
             <element signature="e#0#32#0" expanded="true" />
@@ -960,25 +938,31 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/datascraper.py">
+    <entry file="file:///usr/lib/python3.6/unittest/case.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="836">
+        <state relative-caret-position="218">
+          <caret line="604" column="0" lean-forward="false" selection-start-line="604" selection-start-column="0" selection-end-line="604" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/tests/datascrapertest.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="425">
+          <caret line="107" column="53" lean-forward="true" selection-start-line="107" selection-start-column="53" selection-end-line="107" selection-end-column="53" />
+          <folding>
+            <element signature="e#0#21#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/datascraper.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="836">
-          <caret line="232" column="12" lean-forward="false" selection-start-line="232" selection-start-column="12" selection-end-line="232" selection-end-column="12" />
+        <state relative-caret-position="925">
+          <caret line="228" column="0" lean-forward="false" selection-start-line="228" selection-start-column="0" selection-end-line="228" selection-end-column="0" />
           <folding>
             <element signature="e#0#11#0" expanded="true" />
           </folding>
-        </state>
-      </provider>
-    </entry>
-  </component>
-</project>
         </state>
       </provider>
     </entry>

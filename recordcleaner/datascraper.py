@@ -76,7 +76,7 @@ class TxtFormatter(object):
         left = abs(cord1[0] - cord2[0])
         right = abs(cord1[1] - cord2[1])
         centre = abs((cord1[0] + cord1[1]) / 2 - (cord2[0] + cord2[1]) / 2)
-        offsets = {left: TxtFormatter.LEFT, right: TxtFormatter.RIGHT, centre: TxtFormatter.CENTRE}
+        offsets = {left: cls.LEFT, right: cls.RIGHT, centre: cls.CENTRE}
         return offsets[min(offsets)]
 
     @classmethod
@@ -122,7 +122,7 @@ class TxtFormatter(object):
     @classmethod
     def merge_2rows(cls, row_longer, row_shorter, cords_longer, cords_shorter, mergfunc, alignment='centre'):
         pass
-        # aligned_cords = list(TxtFormatter.align_by_min_tot_offset(cords_longer, cords_shorter, alignment))
+        # aligned_cords = list(cls.align_by_min_tot_offset(cords_longer, cords_shorter, alignment))
         # return [mergfunc( if cl is not None else cl, cs.group() if cs else cs)
         #         for cl, cs in aligned_cords], aligned_cords
 
@@ -130,7 +130,7 @@ class TxtFormatter(object):
 
     @classmethod
     def sqr_offset(cls, cols1, cols2, alignment='centre'):
-        func = TxtFormatter.alignment_func[alignment]
+        func = cls.alignment_func[alignment]
         result = 0
         for c1, c2 in zip(cols1, cols2):
             result += func(c1, c2)**2
@@ -155,58 +155,53 @@ class TxtFormatter(object):
         return aligned_cols
 
     @classmethod
-    def __get_turning_idx(cls, point_ref, points, dist_func, start=0, end=None):
-        end = len(points) if end is None else end
-        min_dist = math.inf
-        i = start
-        for i in range(start, end):
-            distance = abs(dist_func(point_ref, points[i]))
-            if distance >= min_dist:
-                return i - 1
-            else:
-                min_dist = distance
-        return i
-
-    @classmethod
-    def __distances_to_point(cls, cord_point, cords, dist_func, start=0, end=None):
+    def distances_to_point(cls, cord_point, cords, dist_func, start=0, end=None):
         end = len(cords) if end is None else end
         for i in range(start, end):
             yield abs(dist_func(cord_point, cords[i]))
 
-
-    # take as many indexes as possible in prev_idxes until i_turning
     @classmethod
-    def __rearrange_prev_idxes(cls, prev_idxes, i_turning):
-        if not prev_idxes:
-            return prev_idxes, i_turning
-        il_curr, is_curr = i_turning, len(prev_idxes)
-        if il_curr > prev_idxes[is_curr - 1]:
-            return prev_idxes, il_curr
-        il_curr = il_curr if il_curr >= is_curr else is_curr
-
-        new_idxes = [idx if idx <= il_curr else il_curr- is_curr + i for i, idx in enumerate(prev_idxes)]
-        return new_idxes, il_curr
-
+    def __get_dist_matrix(cls, points_shorter, points_longer, alignment):
+        func = cls.alignment_func[alignment]
+        end = len(points_longer) - len(points_shorter)
+        for ps in points_shorter:
+            end += 1
+            yield list(cls.distances_to_point(ps, points_longer, func, end=end))
 
     @classmethod
-    def __remapp_idexes(cls, diff_init, i_left, i_right, aligned_idexes, dist_matrix):
+    def __move_adj_idxes(cls, i_left, i_right, aligned_idexes, dist_matrix):
         il_left, is_left = i_left
         il_right, is_right = i_right
-        reidx, diff = dict(), diff_init
+        reidx, dist = dict(), 0
 
-        while 0 <= is_left < il_left == aligned_idexes[is_left]:
+        while 0 <= is_left < il_left <= aligned_idexes[is_left]:
                 reidx.update({is_left: il_left - 1})
-                diff += dist_matrix[is_left][il_left] - dist_matrix[is_left][il_left - 1]
+                dist += dist_matrix[is_left][il_left - 1]
                 il_left, is_left = il_left - 1, is_left - 1
 
-        len_l, len_s = len(dist_matrix[is_right]), len(aligned_idexes)
-        while 0 < len_s - is_right < len_l - il_right and il_right == aligned_idexes[is_right]:
+        len_l, len_s = len(dist_matrix[-1]), len(aligned_idexes)
+        while 0 < len_s - is_right < len_l - il_right and il_right >= aligned_idexes[is_right]:
                 reidx.update({is_right: il_right + 1})
-                diff += dist_matrix[is_right][il_right] - dist_matrix[is_right][il_right + 1]
+                dist += dist_matrix[is_right][il_right + 1]
                 il_right, is_right = il_right + 1, is_right + 1
 
-        return diff, reidx
+        return dist if reidx else math.inf, reidx
 
+    @classmethod
+    def __remap_idxes(cls, i_curr, i_prev, dist_matrix, aligned_idxes):
+        il_curr, is_curr = i_curr
+        il_prev, is_prev = i_prev
+
+        dist_left, reidx_left = cls.__move_adj_idxes((il_prev, is_prev), (il_curr, is_curr + 1), aligned_idxes, dist_matrix)
+        dist_right, reidx_right = cls.__move_adj_idxes((il_prev, is_prev - 1), (il_curr, is_curr), aligned_idxes, dist_matrix)
+
+        if not (reidx_left or reidx_right):
+            raise ValueError('Invalid indexes for remapping: cannot move a position on either side of the points')
+
+        is_set = set().union(reidx_left.keys(), reidx_right.keys())
+        dist_left = dist_left + sum(dist_matrix[i][aligned_idxes[i]] for i in is_set if i not in reidx_left)
+        dist_right = dist_right + sum(dist_matrix[i][aligned_idxes[i]] for i in is_set if i not in reidx_right)
+        return reidx_left if dist_left <= dist_right else reidx_right
 
     @classmethod
     def align_by_min_tot_offset(cls, cords1, cords2, alignment='centre'):
@@ -214,39 +209,24 @@ class TxtFormatter(object):
         cords_longer, cords_shorter, swapped = (swap(cords1, cords2), True) \
             if len(cords2) > len(cords1) else (cords1, cords2, False)
 
-        def get_dist_matrix(points_shorter, points_longer, alignment):
-            func = TxtFormatter.alignment_func[alignment]
-            end = len(points_longer) - len(points_shorter)
-            for ps in points_shorter:
-                end += 1
-                yield list(TxtFormatter.__distances_to_point(ps, points_longer, func, end=end))
-
-        dist_matrix, aligned_idexes = list(), list()
-        for distances in get_dist_matrix(cords_shorter, cords_longer, alignment):
+        dist_matrix, aligned_idxes = list(), list()
+        for distances in cls.__get_dist_matrix(cords_shorter, cords_longer, alignment):
             dist_matrix.append(distances)
-            aligned_idexes.append(index_culmulative(distances, min))
-        if not verify_non_decreasing(aligned_idexes):
+            aligned_idxes.append(index_culmulative(distances, min))
+        if not verify_non_decreasing(aligned_idxes):
             raise ValueError('Error with mapping of the sorted coordinates: mapped indexes should be non-decreasing')
 
-        for is_curr in range(1, len(aligned_idexes)):
-            il_curr = aligned_idexes[is_curr]
+        for is_curr in range(1, len(aligned_idxes)):
+            il_curr = aligned_idxes[is_curr]
             is_prev = is_curr - 1
-            il_prev = aligned_idexes[is_prev]
+            il_prev = aligned_idxes[is_prev]
             if il_curr != il_prev:
                 continue
 
-            diff_left, diff_right = dist_matrix[is_curr][il_curr], dist_matrix[is_prev][il_prev]
-            result_left = TxtFormatter.__remapp_idexes(diff_left, (il_prev, is_prev), (il_curr, is_curr + 1),
-                                                       aligned_idexes, dist_matrix)
-            result_right = TxtFormatter.__remapp_idexes(diff_right, (il_prev, is_prev - 1), (il_curr, is_curr),
-                                                        aligned_idexes, dist_matrix)
-            diff, reidx = min(result_left, result_right, key=lambda x: x[0])
+            reidx = cls.__remap_idxes((il_curr, is_curr), (il_prev, is_prev), dist_matrix, aligned_idxes)
             for is_new, il_new in reidx.items():
-                aligned_idexes[is_new] = il_new
-        return aligned_idexes
-
-
-
+                aligned_idxes[is_new] = il_new
+        return aligned_idxes
 
 
 
