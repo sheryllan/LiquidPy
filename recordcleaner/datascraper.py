@@ -121,9 +121,11 @@ class TxtFormatter(object):
 
     @classmethod
     def merge_2rows(cls, row_longer, row_shorter, cords_longer, cords_shorter, mergfunc, alignment='centre'):
-        aligned_cords = list(TxtFormatter.align_by_min_tot_offset(cords_longer, cords_shorter, alignment))
-        return [mergfunc( if cl is not None else cl, cs.group() if cs else cs)
-                for cl, cs in aligned_cords], aligned_cords
+        pass
+        # aligned_cords = list(TxtFormatter.align_by_min_tot_offset(cords_longer, cords_shorter, alignment))
+        # return [mergfunc( if cl is not None else cl, cs.group() if cs else cs)
+        #         for cl, cs in aligned_cords], aligned_cords
+
 
 
     @classmethod
@@ -186,7 +188,24 @@ class TxtFormatter(object):
         return new_idxes, il_curr
 
 
+    @classmethod
+    def __remapp_idexes(cls, diff_init, i_left, i_right, aligned_idexes, dist_matrix):
+        il_left, is_left = i_left
+        il_right, is_right = i_right
+        reidx, diff = dict(), diff_init
 
+        while 0 <= is_left < il_left == aligned_idexes[is_left]:
+                reidx.update({is_left: il_left - 1})
+                diff += dist_matrix[is_left][il_left] - dist_matrix[is_left][il_left - 1]
+                il_left, is_left = il_left - 1, is_left - 1
+
+        len_l, len_s = len(dist_matrix[is_right]), len(aligned_idexes)
+        while 0 < len_s - is_right < len_l - il_right and il_right == aligned_idexes[is_right]:
+                reidx.update({is_right: il_right + 1})
+                diff += dist_matrix[is_right][il_right] - dist_matrix[is_right][il_right + 1]
+                il_right, is_right = il_right + 1, is_right + 1
+
+        return diff, reidx
 
 
     @classmethod
@@ -202,7 +221,6 @@ class TxtFormatter(object):
                 end += 1
                 yield list(TxtFormatter.__distances_to_point(ps, points_longer, func, end=end))
 
-
         dist_matrix, aligned_idexes = list(), list()
         for distances in get_dist_matrix(cords_shorter, cords_longer, alignment):
             dist_matrix.append(distances)
@@ -210,27 +228,25 @@ class TxtFormatter(object):
         if not verify_non_decreasing(aligned_idexes):
             raise ValueError('Error with mapping of the sorted coordinates: mapped indexes should be non-decreasing')
 
-        for is_curr, il_curr in enumerate(aligned_idexes[1:]):
+        for is_curr in range(1, len(aligned_idexes)):
+            il_curr = aligned_idexes[is_curr]
             is_prev = is_curr - 1
             il_prev = aligned_idexes[is_prev]
             if il_curr != il_prev:
                 continue
 
-            il_left, is_left = il_prev - 1, is_prev - 1
-            diff_left = dist_matrix[is_curr][il_curr] + dist_matrix[is_prev][il_prev] - dist_matrix[is_prev][il_left]
-            while 0 <= is_left < il_left == aligned_idexes[is_left]:
-                diff_left += dist_matrix[is_left][il_left] - dist_matrix[is_left][il_left - 1]
-                il_left -= 1
-                is_left -= 1
+            diff_left, diff_right = dist_matrix[is_curr][il_curr], dist_matrix[is_prev][il_prev]
+            result_left = TxtFormatter.__remapp_idexes(diff_left, (il_prev, is_prev), (il_curr, is_curr + 1),
+                                                       aligned_idexes, dist_matrix)
+            result_right = TxtFormatter.__remapp_idexes(diff_right, (il_prev, is_prev - 1), (il_curr, is_curr),
+                                                        aligned_idexes, dist_matrix)
+            diff, reidx = min(result_left, result_right, key=lambda x: x[0])
+            for is_new, il_new in reidx.items():
+                aligned_idexes[is_new] = il_new
+        return aligned_idexes
 
-            il_right, is_right = il_curr + 1, is_curr + 1
-            diff_right = dist_matrix[is_prev][il_prev] + dist_matrix[is_curr][il_curr] - dist_matrix[is_curr][il_right]
-            while 0 < len(aligned_idexes) - is_right < len(cords_longer) - il_right and il_right == aligned_idexes[is_right]:
-                diff_right += dist_matrix[is_right][il_right] - dist_matrix[is_right][il_right + 1]
-                il_right += 1
-                is_right += 1
 
-            
+
 
 
 
