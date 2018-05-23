@@ -63,6 +63,6 @@ def run_all_configs_parse(dest_files=None, sheetname=None):
     return results
 
 
-run_all_configs_parse(get_default_destfiles())
+# run_all_configs_parse(get_default_destfiles())
 
 # get_raw_file('asx.xml')
