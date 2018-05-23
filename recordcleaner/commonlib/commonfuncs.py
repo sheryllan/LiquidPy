@@ -78,7 +78,7 @@ def index_culmulative(items, func):
 
 
 def verify_non_decreasing(array):
-    for i, _ in enumerate(array[1:]):
+    for i in range(1, len(array)):
         if array[i - 1] > array[i]:
             return False
     return True
