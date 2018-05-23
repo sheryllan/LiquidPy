@@ -38,14 +38,13 @@ def validate_df(dfs_dict, cols_dict):
 
 def get_ytd_header(df, year=None):
     year = last_year() if not year else year
-    headers = list(df.columns.values)
-    return find_first_n(headers, lambda x: PATTERN_ADV_YTD in x and str(year) in x)
+    header = list(df.columns.values)
+    return find_first_n(header, lambda x: PATTERN_ADV_YTD in x and str(year) in x)
 
 
 def get_filtered_adv_cols(dfs, years=None):
     return {list(df.columns) if years is not None else exch: ADV_COLS[exch] + [get_ytd_header(df, y) for y in years]
             for exch, df in dfs.items()}
-
 
 
 class CMEGScraper(object):
@@ -100,41 +99,34 @@ class CMEGScraper(object):
                     result[('{} {}'.format(asset, instrument))] = (asset, instrument)
                 prev_level = level
             return result
+
         return parse_flatten_sections()
 
-
-    def parse_from_txt(self, exch, pdf, lines):
+    def parse_table_from_txt(self, exch, pdf, lines):
         product_groups = self.get_prod_groups_from_pdf(pdf)
-        # pattern_data = '^ ?((\S+ )+ {2,}){2,}.*$'
-        lines_iter = iter(lines)
-        adv_headers, advhdr_mtobjs = self.__parse_adv_headers(lines_iter)
-        cols_benchmark = [mtobjs[0] for mtobjs in advhdr_mtobjs]
-        outcols = ADV_COLS[exch] + adv_headers
         group, clearedas = None, None
-        for line in lines_iter:
-            if self.__to_adv_headers(line):
-                continue
-            matches = match_tabular_line(line, min_splits=len(adv_headers))
-            if matches:
-                must_data = {PRODUCT_NAME: matches[0], PRODUCT_GROUP: group, CLEARED_AS: clearedas}
-                must_data = [must_data[name] for name in ADV_COLS[exch]]
+        lines = iter(lines)
+        header_dict = self.__parse_adv_header(lines)
+        if not header_dict:
+            return None
+        cols_benchmark, adv_header = list(header_dict.keys()), list(header_dict.values())
 
-                adv_data = TxtFormatter.align_by_min_tot_offset(cols_benchmark, )
-
-
-            if 'total' in line.lower():
+        tbl_rows = list()
+        for line in lines:
+            if match_tabular_header(line) or 'total' in line.lower():
                 break
-            if match_tabular_line(line):
-                continue
-            line = line.rstrip()
-            line = line.rstrip()
-
-            if line in product_groups:
+            line = line.strip()
+            matches = match_tabular_line(line, min_splits=len(header_dict))
+            if matches:
+                prod_data = [matches[0], group, clearedas]
+                match_dict = {m[0]: m[1] for m in matches}
+                aligned = TxtFormatter.align_by_min_tot_offset(match_dict.keys(), cols_benchmark, CMEGScraper.ALIGNMENT_ADV)
+                adv_data = [match_dict[cords[0]] for cords in aligned]
+                tbl_rows.append(prod_data + adv_data)
+            elif line in product_groups:
                 group, clearedas = product_groups[line]
-            elif re.match(pattern_data, line) is not None:
-                df = self.__append_to_df(df, line, group, clearedas)
-        df = pd.DataFrame(columns=outcols)
-        return df
+
+        return pd.DataFrame.from_records(tbl_rows, columns=ADV_COLS[exch] + adv_header)
 
     def download_parse_prods(self, outpath=None):
         with tempfile.NamedTemporaryFile() as prods_file:
@@ -149,8 +141,8 @@ class CMEGScraper(object):
 
     def download_parse_adv(self, exch, url, outpath=None):
         f_pdf = download(url, tempfile.NamedTemporaryFile())
-        txt = run_pdftotext(f_pdf.name)
-        table = self.parse_from_txt(exch, f_pdf, txt)
+        num_pages = get_pdf_num_pages(f_pdf)
+        table = pdftotext_parse_by_pages(f_pdf.name, lambda x: self.parse_table_from_txt(exch, f_pdf, x), num_pages)
         f_pdf.close()
         if outpath is not None:
             exch = 'Sheet1' if exch is None else exch
@@ -168,32 +160,24 @@ class CMEGScraper(object):
         fltred_advs = {exch: df_adv[out_cols[exch]] for exch, df_adv in adv_dict.items()}
         return df_prods, fltred_advs
 
-    def __to_adv_headers(self, line, p_separator=' {2,}', min_splits=3, colname_func=lambda x: re.search('[A-Za-z]+', x)):
-        return match_tabular_line(line, p_separator, min_splits, colname_func)
+    def __parse_adv_header(self, lines, p_separator=None, min_splits=None):
+        lines = iter(lines)
+        for line in lines:
+            matches = match_tabular_header(line, p_separator, min_splits)
+            if matches is not None:
+                line1, line2 = next(lines, ''), line
+                cords1 = [m[0] for m in matches]
+                cords2 = [m[0] for m in match_tabular_header(line2, p_separator, min_splits)]
 
-    def __parse_adv_headers(self, lines, p_separator=' {2,}', min_splits=3, colname_func=lambda x: re.search('[A-Za-z]+', x)):
-            for line in lines:
-                matches = match_tabular_line(line, p_separator, min_splits, colname_func)
-                if matches:
-                    hs = matches
-                    hl = match_tabular_line(next(lines, ''), p_separator, min_splits, colname_func)
-                    return TxtFormatter.merge_2rows(hl, hs, self.__merge_headers, self.ALIGNMENT_ADV)
-            return []
+                c_selector = 0 if len(cords1) >= len(cords2) else 1
+                merged = TxtFormatter.merge_2rows(line1, line2, cords1, cords2, self.__merge_headers, self.ALIGNMENT_ADV)
+                return {m[0][c_selector]: m[1] for m in merged}
+        return None
 
-
-
-
-    def __merge_headers(self, hl, hs):
-        headers = list()
-        if hs:
-            hs = hs.rstrip()
-            hs = hs.lstrip()
-            headers.append(hs)
-        if hl:
-            hl = hl.rstrip()
-            hl = hl.lstrip()
-            headers.append(hl)
-        return ' '.join(headers)
+    def __merge_headers(self, h1, h2):
+        h1 = h1.strip()
+        h2 = h2.strip()
+        return ' '.join(filter(None, [h1, h2]))
 
     def __parse_line(self, line, **kwargs):
         kw_pattern = 'pattern'
@@ -234,7 +218,6 @@ class CMEGMatcher(object):
                  GLOBEX: F_GLOBEX,
                  SUB_GROUP: F_SUB_GROUP,
                  EXCHANGE: F_EXCHANGE}
-
 
     # region CME specific
     CME_EXACT_MAPPING = {
@@ -560,7 +543,7 @@ class CMEGMatcher(object):
         lwc_flt = LowercaseFilter()
         splt_mrg_flt = SplitMergeFilter(mergewords=True, mergenums=True, ignore_mrg=True)
 
-        stp_flt =StopFilter(stoplist=CMEGMatcher.STOP_LIST + CMEGMatcher.CME_COMMON_WORDS, minsize=1)
+        stp_flt = StopFilter(stoplist=CMEGMatcher.STOP_LIST + CMEGMatcher.CME_COMMON_WORDS, minsize=1)
         sp_flt = SpecialWordFilter(CMEGMatcher.CME_KEYWORD_MAPPING)
         vw_flt = VowelFilter(CMEGMatcher.CME_KYWRD_EXCLU, lift_ignore=False)
         multi_flt = MultiFilterFixed(index=vw_flt)

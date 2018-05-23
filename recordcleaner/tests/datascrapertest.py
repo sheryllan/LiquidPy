@@ -27,14 +27,19 @@ class MainTests(ut.TestCase):
                 '               JAN 2018            % CHG              Y.T.D 2018          Y.T.D 2017            % CHG'
 
         actual1 = match_min_split(line1)
-        actual2 = match_min_split(line2)
+        actual2 = list(match_min_split(line2))
 
         expected1 = None
-        expected_str2 = ['FEB 2018', 'FEB 2017', '% CHG', 'JAN 2018', '% CHG', 'Y.T.D 2018', 'Y.T.D 2017', '% CHG']
-        expected_cords2 = [(54, 62), (75, 83), (95, 100), (115, 123), (135, 140), (154, 164), (174, 184), (196, 201)]
+        expected2 = [((54, 62), 'FEB 2018'),
+                     ((75, 83), 'FEB 2017'),
+                     ((95, 100), '% CHG'),
+                     ((115, 123), 'JAN 2018'),
+                     ((135, 140), '% CHG'),
+                     ((154, 164), 'Y.T.D 2018'),
+                     ((174, 184), 'Y.T.D 2017'),
+                     ((196, 201), '% CHG')]
         self.assertEqual(expected1, actual1)
-        self.assertListEqual(expected_str2, actual2[0])
-        self.assertListEqual(expected_cords2, actual2[1])
+        self.assertListEqual(expected2, actual2)
 
     def test_match_tabular_line(self):
         line1 = '                                                      FEB 2018             FEB 2017            % CHG' \
@@ -45,12 +50,17 @@ class MainTests(ut.TestCase):
         actual1 = match_tabular_line(line1, colname_func=colname_func)
         actual2 = match_tabular_line(line2, colname_func=colname_func)
 
-        expected_str1 = ['FEB 2018', 'FEB 2017', '% CHG', 'JAN 2018', '% CHG', 'Y.T.D 2018', 'Y.T.D 2017', '% CHG']
-        expected_cords1 = [(54, 62), (75, 83), (95, 100), (115, 123), (135, 140), (154, 164), (174, 184), (196, 201)]
+        expected1 = [((54, 62), 'FEB 2018'),
+                     ((75, 83), 'FEB 2017'),
+                     ((95, 100), '% CHG'),
+                     ((115, 123), 'JAN 2018'),
+                     ((135, 140), '% CHG'),
+                     ((154, 164), 'Y.T.D 2018'),
+                     ((174, 184), 'Y.T.D 2017'),
+                     ((196, 201), '% CHG')]
         expected2 = None
 
-        self.assertListEqual(expected_str1, actual1[0])
-        self.assertListEqual(expected_cords1, actual1[1])
+        self.assertListEqual(expected1, actual1)
         self.assertEqual(expected2, actual2)
 
 
@@ -88,10 +98,14 @@ class TxtFormatterTests(ut.TestCase):
         #             ('Y.T.D 2018', 'ADV'),
         #             ('Y.T.D 2017', 'ADV'),
         #             ('% CHG', None)]
-        expected = [0, 1, 3, 5, 6]
 
+        aligned_idxes = [0, 1, 3, 5, 6]
         cords_longer, cords_shorter = self.to_cords(self.testcase1())
-        actual = TxtFormatter.align_by_min_tot_offset(cords_longer, cords_shorter, TxtFormatter.RIGHT)
+        expected = [(cs, None) for cs in cords_longer]
+        for i, il in enumerate(aligned_idxes):
+            expected[il] = (cords_longer[il], cords_shorter[i])
+
+        actual = list(TxtFormatter.align_by_min_tot_offset(cords_longer, cords_shorter, TxtFormatter.RIGHT))
         self.assertListEqual(expected, actual)
 
     def test_align_by_min_tot_diff_combined(self):
@@ -100,43 +114,49 @@ class TxtFormatterTests(ut.TestCase):
         #             ('Trading Value(yen)', '-'),
         #             ('Open Interest(units)', None)]
 
-        expected = [0, 1, 2]
+        aligned_idxes = [0, 1, 2]
         cords_longer, cords_shorter = self.to_cords(self.testcase2())
-        actual = TxtFormatter.align_by_min_tot_offset(cords_longer, cords_shorter)
+        expected = [(cs, None) for cs in cords_longer]
+        for i, il in enumerate(aligned_idxes):
+            expected[il] = (cords_longer[il], cords_shorter[i])
+
+        actual = list(TxtFormatter.align_by_min_tot_offset(cords_longer, cords_shorter))
         self.assertListEqual(expected, actual)
 
     def test_align_by_min_tot_diff_multi_cross(self):
         cords_longer = [(0, 3), (10, 19), (30, 32), (36, 39), (52, 53), (54, 57), (66, 70)]
         cords_shorter = [(8, 10), (12, 15), (17, 22), (40, 41), (60, 64), (69, 72)]
-        actual = TxtFormatter.align_by_min_tot_offset(cords_longer, cords_shorter, TxtFormatter.LEFT)
-        expected = [0, 1, 2, 3, 5, 6]
+        actual = list(TxtFormatter.align_by_min_tot_offset(cords_longer, cords_shorter, TxtFormatter.LEFT))
+
+        aligned_idxes = [0, 1, 2, 3, 5, 6]
+        expected = [(cs, None) for cs in cords_longer]
+        for i, il in enumerate(aligned_idxes):
+            expected[il] = (cords_longer[il], cords_shorter[i])
+
         self.assertListEqual(expected, actual)
 
-
     def test_merge_2rows(self):
-        def merge_headers(hl, hs):
-            headers = list()
-            if hs:
-                hs = hs.rstrip()
-                hs = hs.lstrip()
-                headers.append(hs)
-            if hl:
-                hl = hl.rstrip()
-                hl = hl.lstrip()
-                headers.append(hl)
-            return ' '.join(headers)
+        def merge_headers(h1, h2):
+            h1 = h1.strip()
+            h2 = h2.strip()
+            return ' '.join(filter(None, [h1, h2]))
 
-        expected = ['ADV FEB 2018',
-                    'ADV FEB 2017',
-                    '% CHG',
-                    'ADV JAN 2018',
-                    '% CHG',
-                    'ADV Y.T.D 2018',
-                    'ADV Y.T.D 2017',
-                    '% CHG']
+        expected = [(((58, 61), (54, 62)), 'ADV FEB 2018'),
+                    (((79, 82), (75, 83)), 'ADV FEB 2017'),
+                    ((None, (112, 117)), '% CHG'),
+                    (((136, 139), (132, 140)), 'ADV JAN 2018'),
+                    ((None, (152, 157)), '% CHG'),
+                    (((177, 180), (171, 181)), 'ADV Y.T.D 2018'),
+                    (((197, 200), (191, 201)), 'ADV Y.T.D 2017'),
+                    ((None, (213, 218)), '% CHG')]
 
-        merged, aligned_mtobjs = TxtFormatter.merge_2rows(*self.testcase1(), merge_headers, 'right')
-        self.assertListEqual(expected, merged)
+        rlonger, rshorter = self.testcase1()
+        str_longer, str_shorter = rlonger[0].string, rshorter[0].string
+        cords_longer, cords_shorter = [m.span() for m in rlonger], [m.span() for m in rshorter]
+        actual = list(TxtFormatter.merge_2rows(str_shorter, str_longer, cords_shorter, cords_longer,
+                                               merge_headers, TxtFormatter.RIGHT))
+
+        self.assertListEqual(expected, actual)
 
 
 if __name__ == "__main__":

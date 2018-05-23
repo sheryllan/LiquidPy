@@ -87,46 +87,10 @@ class TxtFormatter(object):
     def sort_mtobjs(cls, robjs):
         return sorted(robjs, key=lambda x: x.start())
 
-    # r1, r2 are dictionaries with (x0, x1) as keys
-    # @classmethod
-    # def merge_2rows(cls, rlonger, rshorter, alignment, atol, merge):
-    #     if len(rlonger) < len(rshorter):
-    #         rlonger, rshorter = swap(rlonger, rshorter)
-    #     func = cls.alignment_metric[alignment]
-    #     rlonger = list(sorted(rlonger.items(), key=lambda x: func(x[0])))
-    #     rshorter = list(sorted(rshorter.items(), key=lambda x: func(x[0])))
-    #     merged = dict()
-    #     i, j = 0, 0
-    #     while i < len(rlonger):
-    #         clonger, vlonger = rlonger[i]
-    #         if j < len(rshorter):
-    #             cshorter, vshorter = rshorter[j]
-    #             while abs(func(clonger) - func(cshorter)) > atol:
-    #                 if func(clonger) < func(cshorter):
-    #                     merged[clonger] = vlonger
-    #                     i += 1
-    #                     clonger, vlonger = rlonger[i]
-    #                 else:
-    #                     merged[cshorter] = vshorter
-    #                     j += 1
-    #                     cshorter, vshorter = rshorter[j]
-    #             merged[clonger] = merge(vshorter, vlonger)
-    #             i += 1
-    #             j += 1
-    #         else:
-    #             merged[clonger] = vlonger
-    #             i += 1
-    #     return [v for k, v in sorted(merged.items(), key=lambda x: func(x[0]))]
-
-
     @classmethod
-    def merge_2rows(cls, row_longer, row_shorter, cords_longer, cords_shorter, mergfunc, alignment='centre'):
-        pass
-        # aligned_cords = list(cls.align_by_min_tot_offset(cords_longer, cords_shorter, alignment))
-        # return [mergfunc( if cl is not None else cl, cs.group() if cs else cs)
-        #         for cl, cs in aligned_cords], aligned_cords
-
-
+    def merge_2rows(cls, row1, row2, cords1, cords2, mergfunc, alignment='centre'):
+        aligned_cords = cls.align_by_min_tot_offset(cords1, cords2, alignment)
+        return (((c1, c2), mergfunc(slice_str(row1, c1), slice_str(row2, c2))) for c1, c2 in aligned_cords)
 
     @classmethod
     def sqr_offset(cls, cols1, cols2, alignment='centre'):
@@ -135,7 +99,6 @@ class TxtFormatter(object):
         for c1, c2 in zip(cols1, cols2):
             result += func(c1, c2)**2
         return result
-
 
     @classmethod
     def align_by_mse(cls, robjs_baseline, robjs_instance, alignment='centre'):
@@ -204,9 +167,25 @@ class TxtFormatter(object):
         return reidx_left if dist_left <= dist_right else reidx_right
 
     @classmethod
+    def __aligned_idxes_to_cords(cls, aligned_idxes, cords_longer, cords_shorter):
+        iter_il = iter(range(len(cords_longer)))
+
+        def gen_misaligned_cords():
+            for il in iter_il:
+                if il == aligned_il:
+                    break
+                yield (cords_longer[il], None)
+
+        for i, aligned_il in enumerate(aligned_idxes):
+            yield from gen_misaligned_cords()
+            yield (cords_longer[aligned_il], cords_shorter[i])
+
+        yield from gen_misaligned_cords()
+
+    @classmethod
     def align_by_min_tot_offset(cls, cords1, cords2, alignment='centre'):
         cords1, cords2 = list(sorted(cords1)), list(sorted(cords2))
-        cords_longer, cords_shorter, swapped = (swap(cords1, cords2), True) \
+        cords_longer, cords_shorter, swapped = (*swap(cords1, cords2), True) \
             if len(cords2) > len(cords1) else (cords1, cords2, False)
 
         dist_matrix, aligned_idxes = list(), list()
@@ -226,68 +205,15 @@ class TxtFormatter(object):
             reidx = cls.__remap_idxes((il_curr, is_curr), (il_prev, is_prev), dist_matrix, aligned_idxes)
             for is_new, il_new in reidx.items():
                 aligned_idxes[is_new] = il_new
-        return aligned_idxes
 
-
-
-        # func = TxtFormatter.alignment_func[alignment]
-        # num_remaining = len(cords_shorter)
-        # aligned_idxes = list()
-        # for is_curr, cs in enumerate(cords_shorter):
-        #     num_remaining -= 1
-        #     il_end = len(cords_longer) - num_remaining
-        #     il_turning = TxtFormatter.__find_turning_idx(cs, cords_longer, func, end=il_end)
-        #     aligned_idxes, il_turning = TxtFormatter.__rearrange_prev_idxes(aligned_idxes, il_turning)
-        #     aligned_idxes.append(il_turning)
-        #
-        # return ((cords_longer[i], cords_shorter[aligned_idxes.index(i)] if i in aligned_idxes else None)
-        #         for i in range(0, len(cords_longer)))
-
-
-
-        # By sorting both coordinates, it can be inferred that if j = min_index(dist_matrix[i]),
-        # then min_index(dist_matrix[i - 1]) <= j
-
-
-
-
-        # il_end = len(cords_longer) - len(cords_shorter)
-        # dist_matrix = list()
-        # for cs in cords_shorter:
-        #     il_end += 1
-        #     dist_matrix.append(list(TxtFormatter.__distances_to_point(cs, cords_longer, func, end=il_end)))
-        # By sorting both coordinates, it can be inferred that if j = min_index(dist_matrix[i]),
-        # then min_index(dist_matrix[i - 1]) <= j
-
-
-        # # Find the last cross-aligned index in cords_longer and cords_shorter by the min of dist_matrix
-        # il_turning, is_turning = len(cords_longer) - 1, len(cords_shorter) - 1
-        # aligned_idxes = [index_culmulative(distances, min) for distances in dist_matrix]
-        # for i, j in enumerate(aligned_idxes[::-1]):
-        #     if j < il_turning:
-        #         il_turning = j
-        #     else:
-        #         is_turning = len(cords_shorter) - i
-        #         il_turning = aligned_idxes[is_turning]
-        #         break
-        #
-        # def is_idx_fit(ishorter, ilonger):
-        #     return il_turning > ilonger and is_turning - ishorter <= il_turning - ilonger
-        #
-        # if il_turning < is_turning:
-        #     il_turning = is_turning
-        #
-        # aligned_reidxes = range(il_turning - is_turning, il_turning)
-        # for is_curr, il_curr in enumerate(range(il_turning - is_turning, il_turning)):
-        #     if aligned_idxes[is_curr] >= il_curr + 1:
-        #         break
-
-
-
-
+        for cords in cls.__aligned_idxes_to_cords(aligned_idxes, cords_longer, cords_shorter):
+            if swapped:
+                cords = swap(*cords)
+            yield cords
 
 
 ASCII_PATTERN = '([A-Za-z0-9/\(\)\.%&$,-]|(?<! ) (?! ))+'
+LETTER_PATTERN = '[A-Za-z]+'
 
 
 def get_safe_phrase_pattern(pattern):
@@ -299,19 +225,45 @@ def get_char_phrases(string, p_separator=' {2,}|^ | $', p_chars=ASCII_PATTERN):
     return [match for match in re.split(p_separator, string) if re.match(p_chars, match)]
 
 
+def slice_str(string, span):
+    if not string or not span:
+        return ''
+    return string[span[0]: span[1]]
+
+
 def match_min_split(line, p_separator='^ +| {2,}| +$', min_splits=3):
     sep_cords = (match.span() for match in re.finditer(p_separator, line))
     match_indices = list(flatten_iter(sep_cords))
     match_indices = match_indices[1:] if match_indices[0] == 0 else [0] + match_indices
     match_indices = match_indices[:-1] if match_indices[-1] == len(line) else match_indices + [len(line)]
     match_cords = [cord for cord in group_every_n(match_indices, 2, tuple) if len(cord) == 2]
-    match_strings = [line[cord[0]: cord[1]] for cord in match_cords]
-    return (match_strings, match_cords) if len(match_strings) >= min_splits else None
+    if len(match_cords) < min_splits:
+        return None
+    return ((cord, slice_str(line, cord)) for cord in match_cords)
 
 
 def match_tabular_line(line, p_separator='^ +| {2,}| +$', min_splits=3, colname_func=lambda x: re.match(ASCII_PATTERN, x)):
-    match_strings, match_cords = match_min_split(line, p_separator, min_splits)
-    return (match_strings, match_cords) if all(colname_func(s) for s in match_strings) else None
+    matches = list(match_min_split(line, p_separator, min_splits))
+    return matches if all(colname_func(s) for s in map(lambda x: x[1], matches)) else None
+
+
+def match_tabular_header(line, p_separator=None, min_splits=None):
+    p_separator = '^ +| {2,}| +$' if p_separator is None else p_separator
+    min_splits = 3 if min_splits is None else min_splits
+    return match_tabular_line(line, p_separator, min_splits, colname_func=lambda x: re.search(LETTER_PATTERN, x))
+
+
+def pdftotext_parse_by_pages(pdf_name, parse_func, end_page, start_page=1):
+    tables = list()
+    for page in range(start_page, end_page + 1):
+        txt = run_pdftotext(pdf_name, f=page, l=page)
+        df = parse_func(txt)
+        tables.append(df)
+    return pd.concat(tables)
+
+
+def get_pdf_num_pages(f_pdf):
+    return PdfFileReader(f_pdf).getNumPages()
 
 
 class OSEScraper(object):
