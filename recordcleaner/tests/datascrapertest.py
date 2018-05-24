@@ -26,8 +26,8 @@ class MainTests(ut.TestCase):
         line2 = '                                                      FEB 2018             FEB 2017            % CHG' \
                 '               JAN 2018            % CHG              Y.T.D 2018          Y.T.D 2017            % CHG'
 
-        actual1 = match_min_split(line1)
-        actual2 = list(match_min_split(line2))
+        actual1 = TabularTxtParser.match_min_split(line1)
+        actual2 = list(TabularTxtParser.match_min_split(line2))
 
         expected1 = None
         expected2 = [((54, 62), 'FEB 2018'),
@@ -47,8 +47,8 @@ class MainTests(ut.TestCase):
         line2 = 'JPX-Nikkei Index 400 Futures                 7,669,469         11,167,497,625,807                    140,190'
 
         colname_func = lambda x: re.search('[A-Za-z]+', x)
-        actual1 = match_tabular_line(line1, colname_func=colname_func)
-        actual2 = match_tabular_line(line2, colname_func=colname_func)
+        actual1 = TabularTxtParser.match_tabular_line(line1, colname_func=colname_func)
+        actual2 = TabularTxtParser.match_tabular_line(line2, colname_func=colname_func)
 
         expected1 = [((54, 62), 'FEB 2018'),
                      ((75, 83), 'FEB 2017'),
@@ -105,7 +105,7 @@ class TxtFormatterTests(ut.TestCase):
         for i, il in enumerate(aligned_idxes):
             expected[il] = (cords_longer[il], cords_shorter[i])
 
-        actual = list(TxtFormatter.align_by_min_tot_offset(cords_longer, cords_shorter, TxtFormatter.RIGHT))
+        actual = list(TabularTxtParser.align_by_min_tot_offset(cords_longer, cords_shorter, TabularTxtParser.RIGHT))
         self.assertListEqual(expected, actual)
 
     def test_align_by_min_tot_diff_combined(self):
@@ -120,13 +120,13 @@ class TxtFormatterTests(ut.TestCase):
         for i, il in enumerate(aligned_idxes):
             expected[il] = (cords_longer[il], cords_shorter[i])
 
-        actual = list(TxtFormatter.align_by_min_tot_offset(cords_longer, cords_shorter))
+        actual = list(TabularTxtParser.align_by_min_tot_offset(cords_longer, cords_shorter))
         self.assertListEqual(expected, actual)
 
     def test_align_by_min_tot_diff_multi_cross(self):
         cords_longer = [(0, 3), (10, 19), (30, 32), (36, 39), (52, 53), (54, 57), (66, 70)]
         cords_shorter = [(8, 10), (12, 15), (17, 22), (40, 41), (60, 64), (69, 72)]
-        actual = list(TxtFormatter.align_by_min_tot_offset(cords_longer, cords_shorter, TxtFormatter.LEFT))
+        actual = list(TabularTxtParser.align_by_min_tot_offset(cords_longer, cords_shorter, TabularTxtParser.LEFT))
 
         aligned_idxes = [0, 1, 2, 3, 5, 6]
         expected = [(cs, None) for cs in cords_longer]
@@ -153,8 +153,8 @@ class TxtFormatterTests(ut.TestCase):
         rlonger, rshorter = self.testcase1()
         str_longer, str_shorter = rlonger[0].string, rshorter[0].string
         cords_longer, cords_shorter = [m.span() for m in rlonger], [m.span() for m in rshorter]
-        actual = list(TxtFormatter.merge_2rows(str_shorter, str_longer, cords_shorter, cords_longer,
-                                               merge_headers, TxtFormatter.RIGHT))
+        actual = list(TabularTxtParser.merge_2rows(str_shorter, str_longer, cords_shorter, cords_longer,
+                                                   merge_headers, TabularTxtParser.RIGHT))
 
         self.assertListEqual(expected, actual)
 

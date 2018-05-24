@@ -4,9 +4,9 @@ from tempfile import TemporaryDirectory
 
 def cmeg_check(outpath=None):
     scraper = CMEGScraper()
-    prods_file, dfs_adv = scraper.run_scraper(years=[last_year()])
-    df_prods = pd.read_excel(prods_file)
-
+    df_prods, dfs_adv = scraper.run_scraper()
+    df_prods = df_prods[PRODS_COLS]
+    dfs_adv = filter_adv_dfs(dfs_adv, get_ytd_header)
     matcher = CMEGMatcher()
     with TemporaryDirectory() as ixfolder_cme, TemporaryDirectory() as ixfolder_cbot:
         dfs_matched = matcher.run_pd_mtch(dfs_adv, df_prods, (ixfolder_cme, ixfolder_cbot), True)

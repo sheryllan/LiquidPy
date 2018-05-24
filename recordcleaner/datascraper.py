@@ -43,6 +43,25 @@ def clean_df(df, nonna_subset):
     return df
 
 
+ASCII_PATTERN = '([A-Za-z0-9/\(\)\.%&$,-]|(?<! ) (?! ))+'
+LETTER_PATTERN = '[A-Za-z]+'
+
+
+def get_safe_phrase_pattern(pattern):
+    pattern_phrase = '(^|(?<=((?<!\S) ))){}($|(?=( (?!\S))))'
+    return pattern_phrase.format(pattern)
+
+
+def get_char_phrases(string, p_separator='^ +| {2,}| +$', p_chars=ASCII_PATTERN):
+    return [match for match in re.split(p_separator, string) if re.match(p_chars, match)]
+
+
+def slice_str(string, span):
+    if not string or not span:
+        return ''
+    return string[span[0]: span[1]]
+
+
 def run_pdftotext(pdf, txt=None, encoding='utf-8', **kwargs):
     # txt = re.sub('\.pdf$', pdf, '.txt') if txt is None else txt
     txt = '-' if txt is None else txt
@@ -58,7 +77,30 @@ def run_pdftotext(pdf, txt=None, encoding='utf-8', **kwargs):
     return out if txt == '-' else txt
 
 
-class TxtFormatter(object):
+def pdftotext_parse_by_pages(pdf_name, parse_func, end_page, start_page=1):
+    tables = list()
+    for page in range(start_page, end_page + 1):
+        txt = run_pdftotext(pdf_name, f=page, l=page)
+        df = parse_func(txt)
+        tables.append(df)
+    return pd.concat(tables, ignore_index=True)
+
+
+def get_pdf_num_pages(f_pdf):
+    return PdfFileReader(f_pdf).getNumPages()
+
+
+def text_to_num(values):
+    pattern = '^-?[\d\.,]+%?$'
+    for i, value in enumerate(values):
+        result = value.strip()
+        if re.match(pattern, result):
+            result = result.replace('%', '').replace(',', '')
+            result = float(result) if '.' in result else int(result)
+        yield result
+
+
+class TabularTxtParser(object):
     LEFT = 'left'
     RIGHT = 'right'
     CENTRE = 'centre'
@@ -91,31 +133,6 @@ class TxtFormatter(object):
     def merge_2rows(cls, row1, row2, cords1, cords2, mergfunc, alignment='centre'):
         aligned_cords = cls.align_by_min_tot_offset(cords1, cords2, alignment)
         return (((c1, c2), mergfunc(slice_str(row1, c1), slice_str(row2, c2))) for c1, c2 in aligned_cords)
-
-    @classmethod
-    def sqr_offset(cls, cols1, cols2, alignment='centre'):
-        func = cls.alignment_func[alignment]
-        result = 0
-        for c1, c2 in zip(cols1, cols2):
-            result += func(c1, c2)**2
-        return result
-
-    @classmethod
-    def align_by_mse(cls, robjs_baseline, robjs_instance, alignment='centre'):
-        if not robjs_baseline or not robjs_instance:
-            return None
-        min_offset = math.inf
-        aligned_cols = None
-        col_num = len(robjs_instance)
-        for i in range(0, len(robjs_baseline) - col_num + 1):
-            cords_cols = [(h.start(), h.end()) for h in robjs_baseline[i: i + col_num]]
-            cords_instance = [(d.start(), d.end()) for d in robjs_instance]
-            offset = cls.sqr_offset(cords_cols, cords_instance, alignment)
-            if offset < min_offset:
-                min_offset = offset
-                aligned_cols = {obj_base.group(): obj_inst.group()
-                                for obj_base, obj_inst in zip(robjs_baseline[i: i + col_num], robjs_instance)}
-        return aligned_cols
 
     @classmethod
     def distances_to_point(cls, cord_point, cords, dist_func, start=0, end=None):
@@ -211,59 +228,61 @@ class TxtFormatter(object):
                 cords = swap(*cords)
             yield cords
 
+    @classmethod
+    def match_min_split(cls, line, p_separator='^ +| {2,}| +$', min_splits=3):
+        sep_cords = (match.span() for match in re.finditer(p_separator, line))
+        match_indices = list(flatten_iter(sep_cords))
+        if len(match_indices) < 2 * (min_splits - 1):
+            return None
+        match_indices = match_indices[1:] if match_indices[0] == 0 else [0] + match_indices
+        match_indices = match_indices[:-1] if match_indices[-1] == len(line) else match_indices + [len(line)]
+        match_cords = [cord for cord in group_every_n(match_indices, 2, tuple) if len(cord) == 2]
+        if len(match_cords) < min_splits:
+            return None
+        return ((cord, slice_str(line, cord)) for cord in match_cords)
 
-ASCII_PATTERN = '([A-Za-z0-9/\(\)\.%&$,-]|(?<! ) (?! ))+'
-LETTER_PATTERN = '[A-Za-z]+'
+    @classmethod
+    def match_tabular_line(cls, line, p_separator='^ +| {2,}| +$', min_splits=3,
+                           colname_func=lambda x: re.match(ASCII_PATTERN, x)):
+        matches = cls.match_min_split(line, p_separator, min_splits)
+        if matches is None:
+            return None
+        matches = list(matches)
+        return matches if matches and all(colname_func(s) for s in map(lambda x: x[1], matches)) else None
 
-
-def get_safe_phrase_pattern(pattern):
-    pattern_phrase = '(^|(?<=((?<!\S) ))){}($|(?=( (?!\S))))'
-    return pattern_phrase.format(pattern)
-
-
-def get_char_phrases(string, p_separator=' {2,}|^ | $', p_chars=ASCII_PATTERN):
-    return [match for match in re.split(p_separator, string) if re.match(p_chars, match)]
-
-
-def slice_str(string, span):
-    if not string or not span:
-        return ''
-    return string[span[0]: span[1]]
-
-
-def match_min_split(line, p_separator='^ +| {2,}| +$', min_splits=3):
-    sep_cords = (match.span() for match in re.finditer(p_separator, line))
-    match_indices = list(flatten_iter(sep_cords))
-    match_indices = match_indices[1:] if match_indices[0] == 0 else [0] + match_indices
-    match_indices = match_indices[:-1] if match_indices[-1] == len(line) else match_indices + [len(line)]
-    match_cords = [cord for cord in group_every_n(match_indices, 2, tuple) if len(cord) == 2]
-    if len(match_cords) < min_splits:
-        return None
-    return ((cord, slice_str(line, cord)) for cord in match_cords)
+    @classmethod
+    def match_tabular_header(cls, line, p_separator=None, min_splits=None):
+        p_separator = '^ +| {2,}| +$' if p_separator is None else p_separator
+        min_splits = 3 if min_splits is None else min_splits
+        return TabularTxtParser.match_tabular_line(line, p_separator, min_splits, colname_func=lambda x: re.search(LETTER_PATTERN, x))
 
 
-def match_tabular_line(line, p_separator='^ +| {2,}| +$', min_splits=3, colname_func=lambda x: re.match(ASCII_PATTERN, x)):
-    matches = list(match_min_split(line, p_separator, min_splits))
-    return matches if all(colname_func(s) for s in map(lambda x: x[1], matches)) else None
 
 
-def match_tabular_header(line, p_separator=None, min_splits=None):
-    p_separator = '^ +| {2,}| +$' if p_separator is None else p_separator
-    min_splits = 3 if min_splits is None else min_splits
-    return match_tabular_line(line, p_separator, min_splits, colname_func=lambda x: re.search(LETTER_PATTERN, x))
+    @classmethod
+    def sqr_offset(cls, cols1, cols2, alignment='centre'):
+        func = cls.alignment_func[alignment]
+        result = 0
+        for c1, c2 in zip(cols1, cols2):
+            result += func(c1, c2) ** 2
+        return result
 
-
-def pdftotext_parse_by_pages(pdf_name, parse_func, end_page, start_page=1):
-    tables = list()
-    for page in range(start_page, end_page + 1):
-        txt = run_pdftotext(pdf_name, f=page, l=page)
-        df = parse_func(txt)
-        tables.append(df)
-    return pd.concat(tables)
-
-
-def get_pdf_num_pages(f_pdf):
-    return PdfFileReader(f_pdf).getNumPages()
+    @classmethod
+    def align_by_mse(cls, robjs_baseline, robjs_instance, alignment='centre'):
+        if not robjs_baseline or not robjs_instance:
+            return None
+        min_offset = math.inf
+        aligned_cols = None
+        col_num = len(robjs_instance)
+        for i in range(0, len(robjs_baseline) - col_num + 1):
+            cords_cols = [(h.start(), h.end()) for h in robjs_baseline[i: i + col_num]]
+            cords_instance = [(d.start(), d.end()) for d in robjs_instance]
+            offset = cls.sqr_offset(cords_cols, cords_instance, alignment)
+            if offset < min_offset:
+                min_offset = offset
+                aligned_cols = {obj_base.group(): obj_inst.group()
+                                for obj_base, obj_inst in zip(robjs_baseline[i: i + col_num], robjs_instance)}
+        return aligned_cols
 
 
 class OSEScraper(object):
@@ -332,7 +351,7 @@ class OSEScraper(object):
             while line is not None:
                 ln_convt = jaconv.z2h(line, kana=False, digit=True, ascii=True)
                 data_piece = OSEScraper.get_ascii_words(ln_convt)
-                aligned_cols = TxtFormatter.align_by_mse(header_mtchobjs, data_piece, alignment)
+                aligned_cols = TabularTxtParser.align_by_mse(header_mtchobjs, data_piece, alignment)
                 if aligned_cols and any(c in data_row for c in aligned_cols):
                     results = results.append(pd.DataFrame([data_row], columns=headers))
                     data_row = aligned_cols

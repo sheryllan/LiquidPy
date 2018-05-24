@@ -24,16 +24,10 @@ CBOT = 'CBOT'
 NYMEX = 'NYMEX'
 COMEX = 'COMEX'
 
-ADV_COLS = {CME: [PRODUCT_NAME, PRODUCT_GROUP, CLEARED_AS],
-            CBOT: [PRODUCT_NAME, PRODUCT_GROUP, CLEARED_AS],
-            NYMEX: [PRODUCT_NAME, PRODUCT_GROUP, CLEARED_AS, COMMODITY]}
+
+MUST_COLS = [PRODUCT_NAME, PRODUCT_GROUP, CLEARED_AS]
+ADV_COLS = {CME: MUST_COLS, CBOT: MUST_COLS, NYMEX: MUST_COLS + [COMMODITY]}
 PRODS_COLS = [PRODUCT_NAME, PRODUCT_GROUP, CLEARED_AS, CLEARING, GLOBEX, SUB_GROUP, EXCHANGE]
-
-
-def validate_df(dfs_dict, cols_dict):
-    for key, df in dfs_dict.items():
-        if not all(c in cols_dict[key] for c in df.columns):
-            raise ValueError('Input {} dataframe is missing necessary columns'.format(key))
 
 
 def get_ytd_header(df, year=None):
@@ -42,9 +36,11 @@ def get_ytd_header(df, year=None):
     return find_first_n(header, lambda x: PATTERN_ADV_YTD in x and str(year) in x)
 
 
-def get_filtered_adv_cols(dfs, years=None):
-    return {list(df.columns) if years is not None else exch: ADV_COLS[exch] + [get_ytd_header(df, y) for y in years]
-            for exch, df in dfs.items()}
+def filter_adv_dfs(dfs, filter_func):
+    def get_interested_adv_cols(df, exch):
+        return ADV_COLS[exch] + to_list(filter_func(df))
+
+    return {exch: df[get_interested_adv_cols(df, exch)] for exch, df in dfs.items()}
 
 
 class CMEGScraper(object):
@@ -52,7 +48,7 @@ class CMEGScraper(object):
     URL_CBOT_ADV = 'http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_ADV_Report_CBOT.pdf'
     URL_NYMEX_COMEX_ADV = 'http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_ADV_Report_NYMEX_COMEX.pdf'
     URL_PRODSLATE = 'http://www.cmegroup.com/CmeWS/mvc/ProductSlate/V1/Download.xls'
-    ALIGNMENT_ADV = TxtFormatter.RIGHT
+    ALIGNMENT_ADV = TabularTxtParser.RIGHT
 
     def default_adv_basenames(self):
         basename_cme = rreplace(os.path.basename(self.URL_CME_ADV), PDF_SUFFIX, '', 1)
@@ -66,19 +62,6 @@ class CMEGScraper(object):
         adv_xlsx_cbot = basename_cbot + XLSX_SUFFIX
         adv_xlsx_nymex = basename_nymex + XLSX_SUFFIX
         return adv_xlsx_cme, adv_xlsx_cbot, adv_xlsx_nymex
-
-    # def get_pdf_product_groups(self, sections):
-    #     prev_level = sections[0][0]
-    #     asset = sections[0][1]
-    #     result = dict()
-    #     for level, title in sections[1:]:
-    #         if level < prev_level:
-    #             asset = title
-    #         else:
-    #             instrument = title
-    #             result[('{} {}'.format(asset, instrument))] = (asset, instrument)
-    #         prev_level = level
-    #     return result
 
     # returns a dictionary with key: full group name, and value: (asset, instrument)
     def get_prod_groups_from_pdf(self, fh):
@@ -102,31 +85,52 @@ class CMEGScraper(object):
 
         return parse_flatten_sections()
 
-    def parse_table_from_txt(self, exch, pdf, lines):
+    def parse_adv_header(self, lines, p_separator=None, min_splits=None):
+        def merge_headers(h1, h2):
+            h1 = h1.strip()
+            h2 = h2.strip()
+            return ' '.join(filter(None, [h1, h2]))
+
+        lines = iter(lines)
+        for line in lines:
+            matches = TabularTxtParser.match_tabular_header(line, p_separator, min_splits)
+            if matches is not None:
+                line1, line2 = line, next(lines, '')
+                cords1 = [m[0] for m in matches]
+                cords2 = [m[0] for m in TabularTxtParser.match_tabular_header(line2, p_separator, min_splits)]
+
+                c_selector = 0 if len(cords1) >= len(cords2) else 1
+                merged = TabularTxtParser.merge_2rows(line1, line2, cords1, cords2, merge_headers, self.ALIGNMENT_ADV)
+                return {m[0][c_selector]: m[1] for m in merged}
+        return None
+
+    def parse_table_from_txt(self, pdf, lines):
         product_groups = self.get_prod_groups_from_pdf(pdf)
         group, clearedas = None, None
         lines = iter(lines)
-        header_dict = self.__parse_adv_header(lines)
+        header_dict = self.parse_adv_header(lines)
         if not header_dict:
             return None
         cols_benchmark, adv_header = list(header_dict.keys()), list(header_dict.values())
 
         tbl_rows = list()
         for line in lines:
-            if match_tabular_header(line) or 'total' in line.lower():
+            if not line:
+                continue
+            if TabularTxtParser.match_tabular_header(line) or 'total' in line.lower():
                 break
             line = line.strip()
-            matches = match_tabular_line(line, min_splits=len(header_dict))
+            matches = TabularTxtParser.match_tabular_line(line, min_splits=len(header_dict))
             if matches:
-                prod_data = [matches[0], group, clearedas]
-                match_dict = {m[0]: m[1] for m in matches}
-                aligned = TxtFormatter.align_by_min_tot_offset(match_dict.keys(), cols_benchmark, CMEGScraper.ALIGNMENT_ADV)
-                adv_data = [match_dict[cords[0]] for cords in aligned]
+                prod_data = [matches[0][1], group, clearedas]
+                match_dict = {m[0]: m[1] for m in matches[1:]}
+                aligned = TabularTxtParser.align_by_min_tot_offset(match_dict.keys(), cols_benchmark, CMEGScraper.ALIGNMENT_ADV)
+                adv_data = list(text_to_num(match_dict[cords[0]] for cords in aligned))
                 tbl_rows.append(prod_data + adv_data)
             elif line in product_groups:
                 group, clearedas = product_groups[line]
 
-        return pd.DataFrame.from_records(tbl_rows, columns=ADV_COLS[exch] + adv_header)
+        return pd.DataFrame.from_records(tbl_rows, columns=MUST_COLS + adv_header)
 
     def download_parse_prods(self, outpath=None):
         with tempfile.NamedTemporaryFile() as prods_file:
@@ -139,67 +143,38 @@ class CMEGScraper(object):
                 return XlsxWriter.save_sheets(outpath, {sheetname: df_clean})
             return df_clean
 
-    def download_parse_adv(self, exch, url, outpath=None):
+    def download_parse_adv(self, url, outpath=None, sheetname=None):
         f_pdf = download(url, tempfile.NamedTemporaryFile())
         num_pages = get_pdf_num_pages(f_pdf)
-        table = pdftotext_parse_by_pages(f_pdf.name, lambda x: self.parse_table_from_txt(exch, f_pdf, x), num_pages)
+        table = pdftotext_parse_by_pages(f_pdf.name, lambda x: self.parse_table_from_txt(f_pdf, x), num_pages)
         f_pdf.close()
         if outpath is not None:
-            exch = 'Sheet1' if exch is None else exch
-            return XlsxWriter.save_sheets(outpath, {exch: table})
+            sheetname = 'Sheet1' if sheetname is None else sheetname
+            return XlsxWriter.save_sheets(outpath, {sheetname: table})
         return table
 
-    def run_scraper(self, path_prods=None, path_advs=None, years=None):
+    def run_scraper(self, path_prods=None, path_advs=None):
         df_prods = self.download_parse_prods(path_prods)
-        df_cme = self.download_parse_adv(CME, self.URL_CME_ADV, outpath=path_advs)
-        df_cbot = self.download_parse_adv(CBOT, self.URL_CBOT_ADV, outpath=path_advs)
-        df_nymex = self.download_parse_adv(NYMEX, self.URL_NYMEX_COMEX_ADV, outpath=path_advs)
+        df_cme = self.download_parse_adv(self.URL_CME_ADV, outpath=path_advs, sheetname=CME)
+        df_cbot = self.download_parse_adv(self.URL_CBOT_ADV, outpath=path_advs, sheetname=CBOT)
+        df_nymex = self.download_parse_adv(self.URL_NYMEX_COMEX_ADV, outpath=path_advs, sheetname=NYMEX)
 
         adv_dict = {CME: df_cme, CBOT: df_cbot, NYMEX: df_nymex}
-        out_cols = get_filtered_adv_cols(adv_dict, years)
-        fltred_advs = {exch: df_adv[out_cols[exch]] for exch, df_adv in adv_dict.items()}
-        return df_prods, fltred_advs
+        return df_prods, adv_dict
 
-    def __parse_adv_header(self, lines, p_separator=None, min_splits=None):
-        lines = iter(lines)
-        for line in lines:
-            matches = match_tabular_header(line, p_separator, min_splits)
-            if matches is not None:
-                line1, line2 = next(lines, ''), line
-                cords1 = [m[0] for m in matches]
-                cords2 = [m[0] for m in match_tabular_header(line2, p_separator, min_splits)]
 
-                c_selector = 0 if len(cords1) >= len(cords2) else 1
-                merged = TxtFormatter.merge_2rows(line1, line2, cords1, cords2, self.__merge_headers, self.ALIGNMENT_ADV)
-                return {m[0][c_selector]: m[1] for m in merged}
-        return None
-
-    def __merge_headers(self, h1, h2):
-        h1 = h1.strip()
-        h2 = h2.strip()
-        return ' '.join(filter(None, [h1, h2]))
-
-    def __parse_line(self, line, **kwargs):
-        kw_pattern = 'pattern'
-        kw_extras = 'extras'
-        pattern = kwargs[kw_pattern] if kw_pattern in kwargs else '(\S+( \S+)*)+'
-        values = [v[0] for v in re.findall(pattern, line)]
-        values = self.__text_to_num(values)
-        return values if kw_extras not in kwargs else values + list(kwargs[kw_extras])
-
-    def __append_to_df(self, df, line, *args):
-        line_parsed = self.__parse_line(line, extras=list(args))
-        df = df.append(pd.Series(line_parsed, index=df.columns), ignore_index=True)
-        return df
-
-    def __text_to_num(self, values):
-        pattern = '^-?[\d\.,]+%?$'
-        for i, value in enumerate(values):
-            if re.match(pattern, value):
-                value = value.replace('%', '')
-                value = value.replace(',', '')
-                values[i] = float(value) if '.' in value else int(value)
-        return values
+    # def __parse_line(self, line, **kwargs):
+    #     kw_pattern = 'pattern'
+    #     kw_extras = 'extras'
+    #     pattern = kwargs[kw_pattern] if kw_pattern in kwargs else '(\S+( \S+)*)+'
+    #     values = [v[0] for v in re.findall(pattern, line)]
+    #     values = self.__text_to_num(values)
+    #     return values if kw_extras not in kwargs else values + list(kwargs[kw_extras])
+    #
+    # def __append_to_df(self, df, line, *args):
+    #     line_parsed = self.__parse_line(line, extras=list(args))
+    #     df = df.append(pd.Series(line_parsed, index=df.columns), ignore_index=True)
+    #     return df
 
 
 class CMEGMatcher(object):
@@ -509,13 +484,24 @@ class CMEGMatcher(object):
         return joined_dicts
 
     def __match_prods_by_commodity(self, df_prods, df_adv):
+        # df_prods_tomap = df_prods[[c for c in df_prods.columns if c not in [GLOBEX, CLEARING]]]
+        # df_prods_tomap[COMMODITY] = list(map(str, (globex if not pd.isnull(globex) else clearing for globex, clearing
+        #                                            in filter(any, zip(df_prods[GLOBEX], df_prods[CLEARING])))))
+        #
+        #
+        # df_adv[COMMODITY] = df_adv[COMMODITY].map(str)
+        # df_matched = df_adv.merge(df_prods_tomap, on=COMMODITY)
+
+        df_matched = pd.concat([df_adv.merge(df_prods, left_on=COMMODITY, right_on=GLOBEX),
+                                df_adv.merge(df_prods, left_on=COMMODITY, right_on=CLEARING)], ignore_index=True)
+
         prod_dict = {str(row[GLOBEX]): row for _, row in df_prods.iterrows()}
         prod_dict.update({str(row[CLEARING]): row for _, row in df_prods.iterrows()})
         matched_rows = [{**row, **prod_dict[str(row[COMMODITY])]} for _, row in df_adv.iterrows()
                         if str(row[COMMODITY]) in prod_dict]
         cols = list(df_adv.columns) + list(df_prods.columns)
         df = pd.DataFrame(matched_rows, columns=cols)
-        return df
+        return df_matched
 
     def get_cbot_fields(self):
         regtk_exp = '[^\s/\(\)]+'
@@ -559,7 +545,7 @@ class CMEGMatcher(object):
 
     def __prepfor_index(self, df_prods):
         df_ix = df_prods.rename(columns=CMEGMatcher.COL2FIELD)
-        return {exch: df.reset_index(drop=0) for exch, df in df_groupby(df_ix, [EXCHANGE]).items()}
+        return {exch: df.reset_index(drop=True) for exch, df in df_groupby(df_ix, [EXCHANGE]).items()}
 
     def init_ix_cme_cbot(self, gdf_exch, ixname_cme, ixname_cbot, clean=False):
 
@@ -568,16 +554,13 @@ class CMEGMatcher(object):
         return ix_cme, ix_cbot
 
     def match_nymex_comex(self, df_adv, gdf_exch):
-        df_nymex_comex_prods = gdf_exch[NYMEX].append(gdf_exch[COMEX], ignore_index=True)
-        df_nymex_comex_prods.reset_index(drop=True, inplace=True)
-        if 'index' in df_nymex_comex_prods.columns:
-            df_nymex_comex_prods.drop(['index'], axis=1, inplace=True)
+        df_nymex_comex_prods = pd.concat([gdf_exch[NYMEX], gdf_exch[COMEX]], ignore_index=True)
         df_adv = self.__match_prods_by_commodity(df_nymex_comex_prods, df_adv)
         return df_adv
 
     def run_pd_mtch(self, dfs_adv, df_prods, ix_names, clean=False):
-        validate_df({'Products': df_prods}, {'Product': PRODS_COLS})
-        validate_df(dfs_adv, ADV_COLS)
+        validate_dfcols({'Products': df_prods}, {'Products': PRODS_COLS})
+        validate_dfcols(dfs_adv, ADV_COLS)
         gdf_exch = self.__prepfor_index(df_prods)
         ix_cme, ix_cbot = self.init_ix_cme_cbot(gdf_exch, *ix_names, clean)
         mdf_nymex = self.match_nymex_comex(dfs_adv[NYMEX], gdf_exch)

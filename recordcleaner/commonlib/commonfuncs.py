@@ -1,5 +1,6 @@
 from collections import Iterable
 import types
+import re
 
 
 def nontypes_iterable(arg, excl_types=(str,)):
@@ -30,8 +31,8 @@ def group_every_n(items, n, gtype=list):
     return (gtype(items[i: i + n]) for i in range(0, len(items), n))
 
 
-def to_list(x):
-    return [x] if not nontypes_iterable(x) else list(x)
+def to_list(x, excl_types=(str,)):
+    return [x] if not nontypes_iterable(x, excl_types) else list(x)
 
 
 def find_first_n(arry, condition, n=1):
@@ -82,3 +83,9 @@ def verify_non_decreasing(array):
         if array[i - 1] > array[i]:
             return False
     return True
+
+
+def validate_dfcols(dfs_dict, cols_dict):
+    for key, df in dfs_dict.items():
+        if not all(c in df.columns for c in cols_dict[key]):
+            raise ValueError('Input {} dataframe is missing necessary columns'.format(key))
