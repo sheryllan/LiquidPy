@@ -85,7 +85,7 @@ def verify_non_decreasing(array):
     return True
 
 
-def validate_dfcols(dfs_dict, cols_dict):
-    for key, df in dfs_dict.items():
-        if not all(c in df.columns for c in cols_dict[key]):
-            raise ValueError('Input {} dataframe is missing necessary columns'.format(key))
+# def validate_dfcols(dfs_dict, cols_dict):
+#     for key, df in dfs_dict.items():
+#         if not all(c in df.columns for c in cols_dict[key]):
+#             raise ValueError('Input {} dataframe is missing necessary columns'.format(key))

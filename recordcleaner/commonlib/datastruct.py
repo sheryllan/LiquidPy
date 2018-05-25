@@ -59,12 +59,7 @@ class TreeMap(object):
         return node
 
     def get_items(self, head):
-        def get_items_recursive(node, items):
-            if node is None:
-                return items
-            items = get_items_recursive(node.left, items)
-            items.append(node.data)
-            items = get_items_recursive(node.right, items)
-            return items
-
-        return get_items_recursive(head, [])
+        if head is not None:
+            yield from self.get_items(head.left)
+            yield head.data
+            yield from self.get_items(head.right)

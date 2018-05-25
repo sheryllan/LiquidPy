@@ -39,7 +39,7 @@ def set_df_col(df):
 
 def clean_df(df, nonna_subset):
     df.dropna(subset=nonna_subset, how='all', inplace=True)
-    df.reset_index(drop=0, inplace=True)
+    df.reset_index(drop=True, inplace=True)
     return df
 
 

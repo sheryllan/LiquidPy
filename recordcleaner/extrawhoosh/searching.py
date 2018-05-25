@@ -63,4 +63,4 @@ def min_dist_rslt(results, qstring, fieldname, schema, minboost=0):
                     break
 
         head = results_srted.add(((qt_len, rt_len), r), head)
-    return [r for _, r in results_srted.get_items(head)]
+    return (r for _, r in results_srted.get_items(head))
