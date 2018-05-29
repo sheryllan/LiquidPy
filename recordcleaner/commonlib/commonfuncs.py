@@ -57,6 +57,11 @@ def to_dict(items, tkey, tval):
     return {tkey(x): tval(x) for x in items}
 
 
+def dict_updated(dct, values):
+    dct.update(values)
+    return dct
+
+
 def rreplace(s, old, new, occurrence):
     li = s.rsplit(old, occurrence)
     return new.join(li)

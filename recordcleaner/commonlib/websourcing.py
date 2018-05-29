@@ -50,10 +50,9 @@ def make_soup(input):
         return make_soup_from_file(input)
 
 
-def fltr_attrs(tags, attrs=None):
-    if attrs is None:
-        return tags
-    return [{k: v for k, v in list(tag.attrs.items()) if k in attrs} for tag in tags]
+def fltr_attrs(tags, attrs, mapping=None):
+    mapping = {} if mapping is None else mapping
+    return ({mapping.get(k, k): v for k, v in tag.attrs.items() if k in attrs} for tag in tags)
 
 
 def find_link(soupobjs, pattern):

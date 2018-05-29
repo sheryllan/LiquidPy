@@ -2,10 +2,25 @@ import unittest as ut
 import pandas as pd
 
 from productmatcher import MatchHelper
-from productmatcher import CMEGMatcher
+from productchecker import ProductKey
+
 
 import productchecker as pdck
 
+
+A_PRODUCT_NAME = 'Product Name'
+A_PRODUCT_GROUP = 'Product Group'
+A_CLEARED_AS = 'Cleared As'
+A_COMMODITY = 'Commodity'
+PATTERN_ADV_YTD = 'ADV Y.T.D'
+
+F_PRODUCT_NAME = 'P_Product_Name'
+F_PRODUCT_GROUP = 'P_Product_Group'
+F_CLEARED_AS = 'P_Cleared_As'
+F_CLEARING = 'P_Clearing'
+F_GLOBEX = 'P_Globex'
+F_SUB_GROUP = 'P_Sub_Group'
+F_EXCHANGE = 'P_Exchange'
 
 class MatcherTester(ut.TestCase):
     def test_match_in_string(self):
@@ -27,11 +42,11 @@ class MatcherTester(ut.TestCase):
 
     def test_hierarch_groupby(self):
         ytd = 'ADV Y.T.D 2017'
-        cols = [CMEGMatcher.PRODUCT, CMEGMatcher.PRODUCT_GROUP,
-                CMEGMatcher.CLEARED_AS, ytd,
-                CMEGMatcher.F_CLEARED_AS, CMEGMatcher.F_CLEARING,
-                CMEGMatcher.F_GLOBEX, CMEGMatcher.F_PRODUCT_GROUP,
-                CMEGMatcher.F_PRODUCT_NAME, CMEGMatcher.F_SUB_GROUP]
+        cols = [F_PRODUCT_NAME, F_PRODUCT_GROUP,
+                F_CLEARED_AS, ytd,
+                F_CLEARED_AS, F_CLEARING,
+                F_GLOBEX, F_PRODUCT_GROUP,
+                F_PRODUCT_NAME, F_SUB_GROUP]
         row_emin_sp500 = pd.Series(['E-MINI S&P500', 'Equity Index',
                                     'Futures', 1593256, 'Futures',
                                     'ES', 'ES', 'Equities',
@@ -51,7 +66,16 @@ class MatcherTester(ut.TestCase):
                      (0, 'ACD'): row_ad_cd,
                      (0, 'RTO'): row_emin_russell2000}
 
-        keyfuncs = [lambda x: x[ytd], lambda x: (x[CMEGMatcher.PRODUCT], x[CMEGMatcher.CLEARED_AS]),
-                    lambda x: x[CMEGMatcher.F_GLOBEX]]
+        keyfuncs = [lambda x: x[ytd], lambda x: (x[F_PRODUCT_NAME], x[F_CLEARED_AS]),
+                    lambda x: x[F_GLOBEX]]
         out_dict = pdck.hierarch_groupby(test_dict, keyfuncs, True)
         print(out_dict)
+
+
+class MainTests(ut.TestCase):
+    def test_ProductKey(self):
+        # case1 = ProductKey('GC', 'Futures')
+        # print(case1)
+
+        case2 = ProductKey(type='Options')
+        self.assertTrue((None, 'option') == case2)

@@ -11,7 +11,7 @@ A_PRODUCT_NAME = 'Product Name'
 A_PRODUCT_GROUP = 'Product Group'
 A_CLEARED_AS = 'Cleared As'
 A_COMMODITY = 'Commodity'
-PATTERN_ADV_YTD = 'ADV Y.T.D'
+ADV_YTD = 'ADV Y.T.D'
 
 F_PRODUCT_NAME = 'P_Product_Name'
 F_PRODUCT_GROUP = 'P_Product_Group'
@@ -35,7 +35,7 @@ PRODS_COLS = [F_PRODUCT_NAME, F_PRODUCT_GROUP, F_CLEARED_AS, F_CLEARING, F_GLOBE
 def get_ytd_header(df, year=None):
     year = last_year() if not year else year
     header = list(df.columns.values)
-    return find_first_n(header, lambda x: PATTERN_ADV_YTD in x and str(year) in x)
+    return find_first_n(header, lambda x: ADV_YTD in x and str(year) in x)
 
 
 class CMEGScraper(object):
@@ -143,34 +143,27 @@ class CMEGScraper(object):
 
         return pd.DataFrame.from_records(tbl_rows, columns=MUST_COLS + adv_header)
 
-    def download_parse_prods(self, outpath=None):
+    def get_prods_table(self):
         with tempfile.NamedTemporaryFile() as prods_file:
             xls = pd.ExcelFile(download(self.URL_PRODSLATE, prods_file).name, on_demand=True)
             df_prods = pd.read_excel(xls)
             nonna_subset = [A_PRODUCT_NAME, A_PRODUCT_GROUP, A_CLEARED_AS]
-            df_clean = clean_df(set_df_col(df_prods), nonna_subset)
-            if outpath is not None:
-                sheetname = xls.sheet_names[0]
-                return XlsxWriter.save_sheets(outpath, {sheetname: df_clean})
-            return df_clean
+            return clean_df(set_df_col(df_prods), nonna_subset)
 
-    def download_parse_adv(self, url, outpath=None, sheetname=None):
+    def get_adv_table(self, url):
         f_pdf = download(url, tempfile.NamedTemporaryFile())
         num_pages = get_pdf_num_pages(f_pdf)
         table = pdftotext_parse_by_pages(f_pdf.name, lambda x: self.parse_table_from_txt(f_pdf, x), num_pages)
         f_pdf.close()
-        if outpath is not None:
-            sheetname = 'Sheet1' if sheetname is None else sheetname
-            return XlsxWriter.save_sheets(outpath, {sheetname: table})
         return table
 
-    def run_scraper(self, path_prods=None, path_advs=None):
-        df_prods = self.download_parse_prods(path_prods)
+    def run_scraper(self):
+        df_prods = self.get_prods_table()
         df_prods = df_prods.rename(columns=CMEGScraper.COL2FIELD)
 
-        df_cme = self.download_parse_adv(self.URL_CME_ADV, outpath=path_advs, sheetname=CME)
-        df_cbot = self.download_parse_adv(self.URL_CBOT_ADV, outpath=path_advs, sheetname=CBOT)
-        df_nymex = self.download_parse_adv(self.URL_NYMEX_COMEX_ADV, outpath=path_advs, sheetname=NYMEX)
+        df_cme = self.get_adv_table(self.URL_CME_ADV)
+        df_cbot = self.get_adv_table(self.URL_CBOT_ADV)
+        df_nymex = self.get_adv_table(self.URL_NYMEX_COMEX_ADV)
         adv_dict = {CME: df_cme, CBOT: df_cbot, NYMEX: df_nymex}
 
         return df_prods, adv_dict
@@ -447,7 +440,6 @@ class CMEGMatcher(object):
     def filter_adv_dfs(self, dfs, filter_func):
         def get_interested_adv_cols(df, exch):
             return ADV_COLS[exch] + to_list(filter_func(df))
-
         return {exch: df[get_interested_adv_cols(df, exch)] for exch, df in dfs.items()}
 
     def get_cbot_fields(self):
@@ -518,9 +510,9 @@ class CMEGMatcher(object):
             rows_matched = list(match_rows())
         return pd.DataFrame(rows_matched, columns=list(df_adv.columns) + ix.schema.stored_names())
 
-    def run_pd_mtch(self, dfs_adv, df_prods, ix_names, clean=False):
+    def run_pd_mtch(self, dfs_adv, df_prods, ix_names, adv_filter=get_ytd_header, clean=True):
         df_prods_flt = df_prods[PRODS_COLS]
-        dfs_adv_flt = self.filter_adv_dfs(dfs_adv, get_ytd_header)
+        dfs_adv_flt = self.filter_adv_dfs(dfs_adv, adv_filter)
         gdf_exch = {exch: df.reset_index(drop=True) for exch, df in df_groupby(df_prods_flt, [F_EXCHANGE]).items()}
 
         df_nymex_comex_prods = pd.concat([gdf_exch[NYMEX], gdf_exch[COMEX]], ignore_index=True)
@@ -553,24 +545,7 @@ class CMEGChecker(object):
             return ProductKey(pd_code, row[F_CLEARED_AS])
         return None
 
-    def __is_recorded(self, key, config_keys):
-        cf_type = get_cf_type(key[1])
-        new_key = (key[0], cf_type)
-        return new_key in config_keys
-
-    def check_prod_by(self, agg_dict, threshold, rec_condition, config_keys):
-        prods_wanted = list()
-        for k, row in agg_dict.items():
-            if not rec_condition(row, threshold):
-                continue
-            pdnm = row[F_PRODUCT_NAME]
-            recorded = self.__is_recorded(k, config_keys)
-            result = {PRODCODE: k[0], TYPE: k[1], PRODUCT: pdnm, RECORDED: recorded}
-            prods_wanted.append(result)
-            print(result)
-        return prods_wanted
-
-    def check_cme_cbot(self, dfs_dict, config_keys, vol_threshold):
+    def check_cme_cbot(self, dfs_dict, config_dict, vol_threshold):
         df_cme, df_cbot = dfs_dict[CME], dfs_dict[CBOT]
 
         group_key = [[A_PRODUCT_NAME, A_CLEARED_AS]]
@@ -579,13 +554,12 @@ class CMEGChecker(object):
 
         ytd_cme = get_ytd_header(df_cme)
         ytd_cbot = get_ytd_header(df_cbot)
-        _, aggdict_cme = aggregate_todict(df_cme, group_key, ytd_cme, aggr_func, dict_keyfunc)
-        _, aggdict_cbot = aggregate_todict(df_cbot, group_key, ytd_cbot, aggr_func, dict_keyfunc)
+        aggrows_cme = dfgroupby_aggr(df_cme, group_key, ytd_cme, aggr_func)
+        aggrows_cbot = dfgroupby_aggr(df_cbot, group_key, ytd_cbot, aggr_func)
 
-        prods_cme = self.check_prod_by(aggdict_cme, vol_threshold, lambda row, threshold: row[ytd_cme] >= threshold,
-                                       config_keys)
-        prods_cbot = self.check_prod_by(aggdict_cbot, vol_threshold, lambda row, threshold: row[ytd_cbot] >= threshold,
-                                        config_keys)
+        prods_cme = check_prod_by_key(aggrows_cme, self.get_prod_key, config_dict,
+                                           lambda row: row[ytd_cme] >= vol_threshold)
+        prods_cbot = check_prod_by_key(aggrows_cbot, lambda row: row[ytd_cbot] >= vol_threshold, config_dict)
 
         return {CME: prods_cme, CBOT: prods_cbot}
 
@@ -593,17 +567,14 @@ class CMEGChecker(object):
         df_nymex = dfs_dict[NYMEX]
         dict_nymex = df_todict(df_nymex, self.get_prod_key)
         ytd_nymex = get_ytd_header(df_nymex)
-        prods_nymex = self.check_prod_by(dict_nymex, vol_threshold, lambda row, threshold: row[ytd_nymex] >= threshold,
-                                         config_keys)
+        prods_nymex = check_prod_by_key(dict_nymex, lambda row: row[ytd_nymex] >= vol_threshold, config_keys)
         return {NYMEX: prods_nymex}
 
     def run_pd_check(self, dfs_dict, vol_threshold=1000, outpath=None):
-        cme = 'cme'
-        config_props = cp.PROPERTIES[cme]
-        config_keys = get_config_keys(cme, [config_props[1], config_props[0]])
+        config_dict = get_config_dict(cme)
 
-        prods_cme_cbot = self.check_cme_cbot(dfs_dict, config_keys, vol_threshold)
-        prods_nymex = self.check_nymex(dfs_dict, config_keys, vol_threshold)
+        prods_cme_cbot = self.check_cme_cbot(dfs_dict, config_dict, vol_threshold)
+        prods_nymex = self.check_nymex(dfs_dict, config_dict, vol_threshold)
         prods_cmeg = {**prods_cme_cbot, **prods_nymex}
 
         if outpath is not None:

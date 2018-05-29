@@ -2,10 +2,9 @@ import pandas as pd
 from collections import namedtuple
 from sortedcontainers import SortedDict
 
-import configparser as cp
+from configparser import *
 from productmatcher import *
 from commonlib.iohelper import XlsxWriter
-from commonlib.commonfuncs import *
 from commonlib.datastruct import namedtuple_with_defaults
 
 
@@ -28,7 +27,13 @@ RECORDED = 'recorded'
 # endregion
 
 
-ProductKey = namedtuple_with_defaults(namedtuple('ProductKey', [PRODCODE, TYPE]))
+class ProductKey(namedtuple_with_defaults(namedtuple('ProductKey', [PRODCODE, TYPE]))):
+    def __eq__(self, other):
+        this_tuple = tuple(map(str, self))
+        other_tuple = tuple(map(str, other))
+        eq_code = this_tuple[0].lower() == this_tuple[0].lower()
+        eq_type = MatchHelper.match_in_string(this_tuple[1], other_tuple[1], one=False, stemming=True)
+        return eq_code and eq_type
 
 
 def sum_unique(subdf, aggr_col):
@@ -48,23 +53,24 @@ def xl_consolidate(file2sheet, dest):
 def print_duplicate(group, duplicate):
     print()
     print('In group: {}'.format(group))
-    print('duplicate (pd_code, cleared_as): {}'.format(duplicate))
+    print('duplicate: {}'.format(str(duplicate)))
 
 
-def aggregate_todict(df, group_key, aggr_col, aggr_func, dict_keyfunc):
+def dfgroupby_aggr(df, group_key, aggr_col, aggr_func):
     groups = df_groupby(df, group_key)
-    output_dict = dict()
     for group, subdf in groups.items():
         aggr_val = aggr_func(subdf, aggr_col)
         for _, row in subdf.iterrows():
-            dict_key = dict_keyfunc(row)
-            if dict_key is not None:
-                if dict_key in output_dict:
-                    print_duplicate(group, dict_key)
-                else:
-                    row.update(pd.Series([aggr_val], index=[aggr_col]))
-                    output_dict.update({dict_key: row})
-    return groups, output_dict
+            row[aggr_col] = aggr_val
+            yield row
+            # dict_key = dict_keyfunc(row)
+            # if dict_key is not None:
+            #     if dict_key in output_dict:
+            #         print_duplicate(group, dict_key)
+            #     else:
+            #         row.update(pd.Series([aggr_val], index=[aggr_col]))
+            #         output_dict.update({dict_key: row})
+    # return output_dict
 
 
 def df_todict(df, keyfunc):
@@ -97,24 +103,23 @@ def hierarch_groupby(orig_dict, key_funcs, sort=False):
     return output_dict
 
 
-def get_cf_type(rp_type):
-    cf_type = find_first_n(cp.INSTRUMENT_TYPES.keys(),
-                           lambda x: MatchHelper.match_in_string(x, rp_type, one=False, stemming=True))
-    return cf_type if cf_type else None
+def get_config_dict(exch, keycols=(CO_PRODCODE, CO_TYPE), valcols=None):
+    config_data = parse_config(exch, columns=valcols)
+    return {tuple(d[col] for col in keycols): d for d in config_data}
 
 
-def get_config_keys(exch, cols, name='configkey'):
-    config_data = cp.parse_config(exch)[cols]
-    return set(key for key in config_data.itertuples(False, name))
-
-
-
+def check_prod_by_key(data_rows, keyfunc, config_dict, filterfunc=None):
+    for row in data_rows:
+        if filterfunc and not filterfunc(row):
+            continue
+        recorded = keyfunc(row) in config_dict
+        yield {**row, RECORDED: recorded}
 
 
 
 class OSEChecker(object):
     def __init__(self):
-        self.cfg_properties = cp.PROPERTIES['ose']
+        self.cfg_properties = ATTR_NAMES['ose']
 
 
     # def run_pd_check(self, df):
