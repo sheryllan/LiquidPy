@@ -32,7 +32,7 @@ class MatcherTester(ut.TestCase):
 
         # test all
         self.assertTrue(MatchHelper.match_in_string(tc_ref1, tc_sample1, False, True))
-
+        #
         # test any
         self.assertTrue(MatchHelper.match_in_string(tc_ref2, tc_sample2, stemming=True))
         self.assertFalse(MatchHelper.match_in_string(tc_ref2, tc_sample2, False, True))
@@ -78,4 +78,8 @@ class MainTests(ut.TestCase):
         # print(case1)
 
         case2 = ProductKey(type='Options')
-        self.assertTrue((None, 'option') == case2)
+        print(str(case2))
+        is_in_by_eq = case2 in [(None, 'option'), ('san', 'do')]
+        self.assertTrue(is_in_by_eq)
+        is_in_by_hash = case2 in {(None, 'option'): 'k', ('san', 'do'): 'v'}
+        self.assertTrue(is_in_by_hash)

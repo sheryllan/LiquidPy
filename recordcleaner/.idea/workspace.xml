@@ -2,11 +2,10 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="b667f01e-19f6-4de8-b17b-85ece66739ef" name="Default" comment="">
+      <change beforePath="$PROJECT_DIR$/checkscripts.py" afterPath="$PROJECT_DIR$/checkscripts.py" />
       <change beforePath="$PROJECT_DIR$/cmegcheck.py" afterPath="$PROJECT_DIR$/cmegcheck.py" />
-      <change beforePath="$PROJECT_DIR$/commonlib/commonfuncs.py" afterPath="$PROJECT_DIR$/commonlib/commonfuncs.py" />
-      <change beforePath="$PROJECT_DIR$/commonlib/websourcing.py" afterPath="$PROJECT_DIR$/commonlib/websourcing.py" />
-      <change beforePath="$PROJECT_DIR$/configparser.py" afterPath="$PROJECT_DIR$/configparser.py" />
       <change beforePath="$PROJECT_DIR$/productchecker.py" afterPath="$PROJECT_DIR$/productchecker.py" />
+      <change beforePath="$PROJECT_DIR$/productmatcher.py" afterPath="$PROJECT_DIR$/productmatcher.py" />
       <change beforePath="$PROJECT_DIR$/tests/pdmatchertest.py" afterPath="$PROJECT_DIR$/tests/pdmatchertest.py" />
     </list>
     <ignored path="$PROJECT_DIR$/.idea/shelf/" />
@@ -22,11 +21,11 @@
       <content type="file-editors">
         <state>
           <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-            <file leaf-file-name="productmatcher.py" pinned="false" current-in-tab="false">
+            <file leaf-file-name="productmatcher.py" pinned="false" current-in-tab="true">
               <entry file="file://$PROJECT_DIR$/productmatcher.py">
                 <provider selected="true" editor-type-id="text-editor">
-                  <state relative-caret-position="1134">
-                    <caret line="63" column="8" lean-forward="false" selection-start-line="63" selection-start-column="8" selection-end-line="63" selection-end-column="8" />
+                  <state relative-caret-position="910">
+                    <caret line="101" column="25" lean-forward="true" selection-start-line="101" selection-start-column="25" selection-end-line="101" selection-end-column="25" />
                     <folding>
                       <element signature="e#0#14#0" expanded="true" />
                     </folding>
@@ -34,11 +33,11 @@
                 </provider>
               </entry>
             </file>
-            <file leaf-file-name="productchecker.py" pinned="false" current-in-tab="true">
+            <file leaf-file-name="productchecker.py" pinned="false" current-in-tab="false">
               <entry file="file://$PROJECT_DIR$/productchecker.py">
                 <provider selected="true" editor-type-id="text-editor">
-                  <state relative-caret-position="1907">
-                    <caret line="121" column="30" lean-forward="false" selection-start-line="121" selection-start-column="30" selection-end-line="121" selection-end-column="30" />
+                  <state relative-caret-position="-757">
+                    <caret line="11" column="53" lean-forward="true" selection-start-line="11" selection-start-column="53" selection-end-line="11" selection-end-column="53" />
                     <folding>
                       <element signature="e#0#19#0" expanded="true" />
                     </folding>
@@ -61,8 +60,8 @@
             <file leaf-file-name="builtins.py" pinned="false" current-in-tab="false">
               <entry file="file://$USER_HOME$/.PyCharmCE2017.3/system/python_stubs/-1474598009/builtins.py">
                 <provider selected="true" editor-type-id="text-editor">
-                  <state relative-caret-position="361">
-                    <caret line="2992" column="6" lean-forward="false" selection-start-line="2992" selection-start-column="6" selection-end-line="2992" selection-end-column="6" />
+                  <state relative-caret-position="352">
+                    <caret line="5389" column="8" lean-forward="false" selection-start-line="5389" selection-start-column="8" selection-end-line="5389" selection-end-column="8" />
                     <folding />
                   </state>
                 </provider>
@@ -85,7 +84,7 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file leaf-file-name="configparser.py" pinned="false" current-in-tab="false">
+      <file leaf-file-name="configparser.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/configparser.py">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="198">
@@ -93,16 +92,6 @@
               <folding>
                 <element signature="e#0#19#0" expanded="true" />
               </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="element.py" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/venv/lib/python3.6/site-packages/bs4/element.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="220">
-              <caret line="1297" column="8" lean-forward="false" selection-start-line="1297" selection-start-column="8" selection-end-line="1297" selection-end-column="8" />
-              <folding />
             </state>
           </provider>
         </entry>
@@ -132,7 +121,7 @@
       <file leaf-file-name="datascrapertest.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/tests/datascrapertest.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-594">
+            <state relative-caret-position="-885">
               <caret line="66" column="17" lean-forward="false" selection-start-line="66" selection-start-column="17" selection-end-line="66" selection-end-column="17" />
               <folding>
                 <element signature="e#0#21#0" expanded="true" />
@@ -141,22 +130,20 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="cmegcheck.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="cmegcheck.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/cmegcheck.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="560">
-              <caret line="569" column="22" lean-forward="true" selection-start-line="569" selection-start-column="22" selection-end-line="569" selection-end-column="22" />
+            <state relative-caret-position="232">
+              <caret line="348" column="34" lean-forward="false" selection-start-line="348" selection-start-column="34" selection-end-line="348" selection-end-column="34" />
               <folding>
                 <element signature="e#0#38#0" expanded="true" />
-                <element signature="e#6962#7761#0" expanded="false" />
-                <element signature="e#7788#8395#0" expanded="false" />
-                <element signature="e#8419#9085#0" expanded="false" />
-                <element signature="e#9109#11114#0" expanded="false" />
-                <element signature="e#11137#12819#0" expanded="false" />
-                <element signature="e#12847#14062#0" expanded="false" />
-                <element signature="e#14364#14386#0" expanded="false" />
-                <element signature="e#17920#17957#0" expanded="false" />
-                <element signature="e#19388#19431#0" expanded="false" />
+                <element signature="e#6845#7644#0" expanded="false" />
+                <element signature="e#7671#8278#0" expanded="false" />
+                <element signature="e#8302#8968#0" expanded="false" />
+                <element signature="e#8992#10997#0" expanded="false" />
+                <element signature="e#11020#12702#0" expanded="false" />
+                <element signature="e#12730#13945#0" expanded="false" />
+                <element signature="e#14247#14269#0" expanded="false" />
               </folding>
             </state>
           </provider>
@@ -175,22 +162,10 @@
       <file leaf-file-name="pdmatchertest.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/tests/pdmatchertest.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="821">
-              <caret line="80" column="38" lean-forward="false" selection-start-line="80" selection-start-column="38" selection-end-line="80" selection-end-column="38" />
+            <state relative-caret-position="308">
+              <caret line="54" column="57" lean-forward="true" selection-start-line="54" selection-start-column="57" selection-end-line="54" selection-end-column="57" />
               <folding>
                 <element signature="e#0#21#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="analysis.py" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/extrawhoosh/analysis.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="162">
-              <caret line="9" column="31" lean-forward="false" selection-start-line="9" selection-start-column="31" selection-end-line="9" selection-end-column="31" />
-              <folding>
-                <element signature="e#0#11#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -199,8 +174,8 @@
       <file leaf-file-name="checkscripts.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/checkscripts.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="162">
-              <caret line="9" column="35" lean-forward="false" selection-start-line="9" selection-start-column="35" selection-end-line="9" selection-end-column="35" />
+            <state relative-caret-position="198">
+              <caret line="11" column="0" lean-forward="false" selection-start-line="11" selection-start-column="0" selection-end-line="11" selection-end-column="0" />
               <folding>
                 <element signature="e#0#23#0" expanded="true" />
               </folding>
@@ -219,12 +194,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>configparser</find>
-      <find>XlsxWriter</find>
-      <find>PdfFileReader</find>
-      <find>c</find>
-      <find>destination</find>
-      <find>outline</find>
       <find>matcher</find>
       <find>Treemap</find>
       <find>last_indexof</find>
@@ -248,6 +217,12 @@
       <find>rename</find>
       <find>drop=</find>
       <find>find</find>
+      <find>__hash__</find>
+      <find>namedtuple</find>
+      <find>__hash</find>
+      <find>a_adv_ytd</find>
+      <find>plural</find>
+      <find>def plural</find>
       <find>cp</find>
     </findStrings>
     <replaceStrings>
@@ -272,26 +247,26 @@
         <option value="$PROJECT_DIR$/extrawhoosh/__init__.py" />
         <option value="$PROJECT_DIR$/commonlib/__init__.py" />
         <option value="$PROJECT_DIR$/extrawhoosh/analysis.py" />
-        <option value="$PROJECT_DIR$/productmatcher.py" />
         <option value="$PROJECT_DIR$/tests/commonfuncstest.py" />
         <option value="$PROJECT_DIR$/extrawhoosh/query.py" />
         <option value="$PROJECT_DIR$/tests/datascrapertest.py" />
         <option value="$PROJECT_DIR$/extrawhoosh/searching.py" />
-        <option value="$PROJECT_DIR$/checkscripts.py" />
         <option value="$PROJECT_DIR$/datascraper.py" />
         <option value="$PROJECT_DIR$/commonlib/datastruct.py" />
-        <option value="$PROJECT_DIR$/tests/pdmatchertest.py" />
         <option value="$PROJECT_DIR$/commonlib/websourcing.py" />
         <option value="$PROJECT_DIR$/commonlib/commonfuncs.py" />
         <option value="$PROJECT_DIR$/configparser.py" />
-        <option value="$PROJECT_DIR$/productchecker.py" />
+        <option value="$PROJECT_DIR$/checkscripts.py" />
         <option value="$PROJECT_DIR$/cmegcheck.py" />
+        <option value="$PROJECT_DIR$/productmatcher.py" />
+        <option value="$PROJECT_DIR$/productchecker.py" />
+        <option value="$PROJECT_DIR$/tests/pdmatchertest.py" />
       </list>
     </option>
   </component>
   <component name="ProjectFrameBounds" extendedState="6">
-    <option name="x" value="127" />
-    <option name="y" value="1309" />
+    <option name="x" value="1582" />
+    <option name="y" value="131" />
     <option name="width" value="1380" />
     <option name="height" value="1011" />
   </component>
@@ -376,20 +351,6 @@
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />
     </configuration>
-    <configuration name="Unittests for datascrapertest.MainTests.test_match_tabular_line" type="tests" factoryName="Unittests" temporary="true" nameIsGenerated="true">
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs />
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/tests" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <module name="recordcleaner" />
-      <option name="_new_additionalArguments" value="&quot;&quot;" />
-      <option name="_new_target" value="&quot;datascrapertest.MainTests.test_match_tabular_line&quot;" />
-      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
-    </configuration>
     <configuration name="Unittests for datascrapertest.TxtFormatterTests" type="tests" factoryName="Unittests" temporary="true" nameIsGenerated="true">
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -432,20 +393,34 @@
       <option name="_new_target" value="&quot;pdmatchertest.MainTests.test_ProductKey&quot;" />
       <option name="_new_targetType" value="&quot;PYTHON&quot;" />
     </configuration>
+    <configuration name="Unittests for pdmatchertest.MatcherTester.test_match_in_string" type="tests" factoryName="Unittests" temporary="true" nameIsGenerated="true">
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs />
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/tests" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <module name="recordcleaner" />
+      <option name="_new_additionalArguments" value="&quot;&quot;" />
+      <option name="_new_target" value="&quot;pdmatchertest.MatcherTester.test_match_in_string&quot;" />
+      <option name="_new_targetType" value="&quot;PYTHON&quot;" />
+    </configuration>
     <list size="5">
       <item index="0" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.TxtFormatterTests.test_merge_2rows" />
-      <item index="1" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.MainTests.test_match_tabular_line" />
-      <item index="2" class="java.lang.String" itemvalue="Python.checkscripts" />
-      <item index="3" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.TxtFormatterTests" />
-      <item index="4" class="java.lang.String" itemvalue="Python tests.Unittests for pdmatchertest.MainTests.test_ProductKey" />
+      <item index="1" class="java.lang.String" itemvalue="Python.checkscripts" />
+      <item index="2" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.TxtFormatterTests" />
+      <item index="3" class="java.lang.String" itemvalue="Python tests.Unittests for pdmatchertest.MainTests.test_ProductKey" />
+      <item index="4" class="java.lang.String" itemvalue="Python tests.Unittests for pdmatchertest.MatcherTester.test_match_in_string" />
     </list>
     <recent_temporary>
       <list size="5">
         <item index="0" class="java.lang.String" itemvalue="Python tests.Unittests for pdmatchertest.MainTests.test_ProductKey" />
-        <item index="1" class="java.lang.String" itemvalue="Python.checkscripts" />
-        <item index="2" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.TxtFormatterTests" />
-        <item index="3" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.TxtFormatterTests.test_merge_2rows" />
-        <item index="4" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.MainTests.test_match_tabular_line" />
+        <item index="1" class="java.lang.String" itemvalue="Python tests.Unittests for pdmatchertest.MatcherTester.test_match_in_string" />
+        <item index="2" class="java.lang.String" itemvalue="Python.checkscripts" />
+        <item index="3" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.TxtFormatterTests" />
+        <item index="4" class="java.lang.String" itemvalue="Python tests.Unittests for datascrapertest.TxtFormatterTests.test_merge_2rows" />
       </list>
     </recent_temporary>
   </component>
@@ -466,53 +441,53 @@
     <servers />
   </component>
   <component name="TestHistory">
-    <history-entry file="Unittests_for_pdmatchertest_MainTests_test_ProductKey - 2018.05.29 at 14h 21m 12s.xml">
+    <history-entry file="Unittests_for_pdmatchertest_MainTests_test_ProductKey - 2018.05.30 at 17h 17m 39s.xml">
       <configuration name="Unittests for pdmatchertest.MainTests.test_ProductKey" configurationId="tests" />
     </history-entry>
-    <history-entry file="Unittests_for_pdmatchertest_MainTests_test_ProductKey - 2018.05.29 at 14h 23m 16s.xml">
+    <history-entry file="Unittests_for_pdmatchertest_MainTests_test_ProductKey - 2018.05.30 at 17h 20m 15s.xml">
       <configuration name="Unittests for pdmatchertest.MainTests.test_ProductKey" configurationId="tests" />
     </history-entry>
-    <history-entry file="Unittests_for_pdmatchertest_MainTests_test_ProductKey - 2018.05.29 at 14h 24m 08s.xml">
+    <history-entry file="Unittests_for_pdmatchertest_MainTests_test_ProductKey - 2018.05.30 at 17h 21m 54s.xml">
       <configuration name="Unittests for pdmatchertest.MainTests.test_ProductKey" configurationId="tests" />
     </history-entry>
-    <history-entry file="Unittests_for_pdmatchertest_MainTests_test_ProductKey - 2018.05.29 at 14h 25m 58s.xml">
+    <history-entry file="Unittests_for_pdmatchertest_MainTests_test_ProductKey - 2018.05.30 at 17h 22m 55s.xml">
       <configuration name="Unittests for pdmatchertest.MainTests.test_ProductKey" configurationId="tests" />
     </history-entry>
-    <history-entry file="Unittests_for_pdmatchertest_MainTests_test_ProductKey - 2018.05.29 at 14h 26m 15s.xml">
+    <history-entry file="Unittests_for_pdmatchertest_MainTests_test_ProductKey - 2018.05.30 at 17h 25m 00s.xml">
       <configuration name="Unittests for pdmatchertest.MainTests.test_ProductKey" configurationId="tests" />
     </history-entry>
-    <history-entry file="Unittests_for_pdmatchertest_MainTests_test_ProductKey - 2018.05.29 at 14h 26m 43s.xml">
+    <history-entry file="Unittests_for_pdmatchertest_MainTests_test_ProductKey - 2018.05.30 at 17h 26m 46s.xml">
       <configuration name="Unittests for pdmatchertest.MainTests.test_ProductKey" configurationId="tests" />
     </history-entry>
-    <history-entry file="Unittests_for_pdmatchertest_MainTests_test_ProductKey - 2018.05.29 at 14h 26m 58s.xml">
-      <configuration name="Unittests for pdmatchertest.MainTests.test_ProductKey" configurationId="tests" />
+    <history-entry file="Unittests_for_pdmatchertest_MatcherTester_test_match_in_string - 2018.05.30 at 15h 54m 34s.xml">
+      <configuration name="Unittests for pdmatchertest.MatcherTester.test_match_in_string" configurationId="tests" />
     </history-entry>
-    <history-entry file="Unittests_for_pdmatchertest_MainTests_test_ProductKey - 2018.05.29 at 14h 27m 16s.xml">
-      <configuration name="Unittests for pdmatchertest.MainTests.test_ProductKey" configurationId="tests" />
+    <history-entry file="Unittests_for_pdmatchertest_MatcherTester_test_match_in_string - 2018.05.30 at 15h 56m 27s.xml">
+      <configuration name="Unittests for pdmatchertest.MatcherTester.test_match_in_string" configurationId="tests" />
     </history-entry>
-    <history-entry file="Unittests_for_pdmatchertest_MainTests_test_ProductKey - 2018.05.29 at 14h 27m 35s.xml">
-      <configuration name="Unittests for pdmatchertest.MainTests.test_ProductKey" configurationId="tests" />
+    <history-entry file="Unittests_for_pdmatchertest_MatcherTester_test_match_in_string - 2018.05.30 at 16h 28m 18s.xml">
+      <configuration name="Unittests for pdmatchertest.MatcherTester.test_match_in_string" configurationId="tests" />
     </history-entry>
-    <history-entry file="Unittests_for_pdmatchertest_MainTests_test_ProductKey - 2018.05.29 at 14h 28m 35s.xml">
-      <configuration name="Unittests for pdmatchertest.MainTests.test_ProductKey" configurationId="tests" />
+    <history-entry file="Unittests_for_pdmatchertest_MatcherTester_test_match_in_string - 2018.05.30 at 17h 11m 09s.xml">
+      <configuration name="Unittests for pdmatchertest.MatcherTester.test_match_in_string" configurationId="tests" />
     </history-entry>
   </component>
   <component name="ToolWindowManager">
-    <frame x="0" y="1227" width="1600" height="1173" extended-state="6" />
+    <frame x="1600" y="0" width="1600" height="1200" extended-state="6" />
     <editor active="true" />
     <layout>
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3291262" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
-      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32003987" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.31941748" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32924527" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.33200398" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
+      <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33106795" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32901296" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.18105671" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="R Packages" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="R Graphics" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3298969" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
-      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3120638" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
+      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.2368932" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
-      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.31904286" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
+      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3184466" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
       <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="Message" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
@@ -564,6 +539,36 @@
           <line>11</line>
           <option name="timeStamp" value="173" />
         </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/cmegcheck.py</url>
+          <line>562</line>
+          <option name="timeStamp" value="192" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/cmegcheck.py</url>
+          <line>531</line>
+          <option name="timeStamp" value="193" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/cmegcheck.py</url>
+          <line>445</line>
+          <option name="timeStamp" value="197" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/tests/pdmatchertest.py</url>
+          <line>83</line>
+          <option name="timeStamp" value="199" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/productmatcher.py</url>
+          <line>122</line>
+          <option name="timeStamp" value="204" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/tests/pdmatchertest.py</url>
+          <line>37</line>
+          <option name="timeStamp" value="206" />
+        </line-breakpoint>
       </breakpoints>
       <default-breakpoints>
         <breakpoint type="python-exception">
@@ -572,21 +577,11 @@
           </properties>
         </breakpoint>
       </default-breakpoints>
-      <option name="time" value="192" />
+      <option name="time" value="214" />
     </breakpoint-manager>
     <watches-manager />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/configparser.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="0">
-          <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding>
-            <element signature="e#0#19#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/venv/lib/python3.6/site-packages/pandas/io/common.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="-104">
@@ -777,14 +772,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$USER_HOME$/.PyCharmCE2017.3/system/python_stubs/-1474598009/builtins.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="361">
-          <caret line="2992" column="6" lean-forward="false" selection-start-line="2992" selection-start-column="6" selection-end-line="2992" selection-end-column="6" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/extrawhoosh/query.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="591">
@@ -827,60 +814,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/productmatcher.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1134">
-          <caret line="63" column="8" lean-forward="false" selection-start-line="63" selection-start-column="8" selection-end-line="63" selection-end-column="8" />
-          <folding>
-            <element signature="e#0#14#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/tests/datascrapertest.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-594">
-          <caret line="66" column="17" lean-forward="false" selection-start-line="66" selection-start-column="17" selection-end-line="66" selection-end-column="17" />
-          <folding>
-            <element signature="e#0#21#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/commonlib/datastruct.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="180">
-          <caret line="10" column="0" lean-forward="false" selection-start-line="10" selection-start-column="0" selection-end-line="10" selection-end-column="0" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/tests/pdmatchertest.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="821">
-          <caret line="80" column="38" lean-forward="false" selection-start-line="80" selection-start-column="38" selection-end-line="80" selection-end-column="38" />
-          <folding>
-            <element signature="e#0#21#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/venv/lib/python3.6/collections/__init__.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="361">
-          <caret line="356" column="4" lean-forward="false" selection-start-line="356" selection-start-column="4" selection-end-line="356" selection-end-column="4" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file:///usr/lib/python3.6/unittest/case.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="488">
-          <caret line="604" column="0" lean-forward="false" selection-start-line="604" selection-start-column="0" selection-end-line="604" selection-end-column="0" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/venv/lib/python3.6/site-packages/pandas/core/frame.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="328">
@@ -915,26 +848,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/configparser.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="198">
-          <caret line="11" column="0" lean-forward="false" selection-start-line="11" selection-start-column="0" selection-end-line="11" selection-end-column="0" />
-          <folding>
-            <element signature="e#0#19#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/checkscripts.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="162">
-          <caret line="9" column="35" lean-forward="false" selection-start-line="9" selection-start-column="35" selection-end-line="9" selection-end-column="35" />
-          <folding>
-            <element signature="e#0#23#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/commonlib/commonfuncs.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="211">
@@ -945,31 +858,119 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/productchecker.py">
+    <entry file="file://$PROJECT_DIR$/checkscripts.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1907">
-          <caret line="121" column="30" lean-forward="false" selection-start-line="121" selection-start-column="30" selection-end-line="121" selection-end-column="30" />
+        <state relative-caret-position="198">
+          <caret line="11" column="0" lean-forward="false" selection-start-line="11" selection-start-column="0" selection-end-line="11" selection-end-column="0" />
+          <folding>
+            <element signature="e#0#23#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/venv/lib/python3.6/collections/__init__.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1932">
+          <caret line="1113" column="14" lean-forward="false" selection-start-line="1113" selection-start-column="8" selection-end-line="1113" selection-end-column="14" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/cmegcheck.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="232">
+          <caret line="348" column="34" lean-forward="false" selection-start-line="348" selection-start-column="34" selection-end-line="348" selection-end-column="34" />
+          <folding>
+            <element signature="e#0#38#0" expanded="true" />
+            <element signature="e#6845#7644#0" expanded="false" />
+            <element signature="e#7671#8278#0" expanded="false" />
+            <element signature="e#8302#8968#0" expanded="false" />
+            <element signature="e#8992#10997#0" expanded="false" />
+            <element signature="e#11020#12702#0" expanded="false" />
+            <element signature="e#12730#13945#0" expanded="false" />
+            <element signature="e#14247#14269#0" expanded="false" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/venv/lib/python3.6/site-packages/inflect.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="395">
+          <caret line="1583" column="0" lean-forward="true" selection-start-line="1583" selection-start-column="0" selection-end-line="1583" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$USER_HOME$/.PyCharmCE2017.3/system/python_stubs/-1474598009/builtins.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="352">
+          <caret line="5389" column="8" lean-forward="false" selection-start-line="5389" selection-start-column="8" selection-end-line="5389" selection-end-column="8" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/tests/datascrapertest.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-885">
+          <caret line="66" column="17" lean-forward="false" selection-start-line="66" selection-start-column="17" selection-end-line="66" selection-end-column="17" />
+          <folding>
+            <element signature="e#0#21#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file:///usr/lib/python3.6/unittest/case.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="224">
+          <caret line="604" column="0" lean-forward="false" selection-start-line="604" selection-start-column="0" selection-end-line="604" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/tests/pdmatchertest.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="308">
+          <caret line="54" column="57" lean-forward="true" selection-start-line="54" selection-start-column="57" selection-end-line="54" selection-end-column="57" />
+          <folding>
+            <element signature="e#0#21#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/commonlib/datastruct.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="180">
+          <caret line="10" column="0" lean-forward="false" selection-start-line="10" selection-start-column="0" selection-end-line="10" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/configparser.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="198">
+          <caret line="11" column="0" lean-forward="false" selection-start-line="11" selection-start-column="0" selection-end-line="11" selection-end-column="0" />
           <folding>
             <element signature="e#0#19#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/cmegcheck.py">
+    <entry file="file://$PROJECT_DIR$/productchecker.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="560">
-          <caret line="569" column="22" lean-forward="true" selection-start-line="569" selection-start-column="22" selection-end-line="569" selection-end-column="22" />
+        <state relative-caret-position="-757">
+          <caret line="11" column="53" lean-forward="true" selection-start-line="11" selection-start-column="53" selection-end-line="11" selection-end-column="53" />
           <folding>
-            <element signature="e#0#38#0" expanded="true" />
-            <element signature="e#6962#7761#0" expanded="false" />
-            <element signature="e#7788#8395#0" expanded="false" />
-            <element signature="e#8419#9085#0" expanded="false" />
-            <element signature="e#9109#11114#0" expanded="false" />
-            <element signature="e#11137#12819#0" expanded="false" />
-            <element signature="e#12847#14062#0" expanded="false" />
-            <element signature="e#14364#14386#0" expanded="false" />
-            <element signature="e#17920#17957#0" expanded="false" />
-            <element signature="e#19388#19431#0" expanded="false" />
+            <element signature="e#0#19#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/productmatcher.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="910">
+          <caret line="101" column="25" lean-forward="true" selection-start-line="101" selection-start-column="25" selection-end-line="101" selection-end-column="25" />
+          <folding>
+            <element signature="e#0#14#0" expanded="true" />
           </folding>
         </state>
       </provider>

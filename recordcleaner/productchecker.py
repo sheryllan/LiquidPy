@@ -19,8 +19,6 @@ from commonlib.datastruct import namedtuple_with_defaults
 # REPORT_FILES = {e: REPORT_FMTNAME.format(e.upper()) for e in EXCHANGES}
 
 # region output keys
-GROUP = 'group'
-PRODUCT = 'product'
 PRODCODE = 'prod_code'
 TYPE = 'type'
 RECORDED = 'recorded'
@@ -34,6 +32,19 @@ class ProductKey(namedtuple_with_defaults(namedtuple('ProductKey', [PRODCODE, TY
         eq_code = this_tuple[0].lower() == this_tuple[0].lower()
         eq_type = MatchHelper.match_in_string(this_tuple[1], other_tuple[1], one=False, stemming=True)
         return eq_code and eq_type
+
+    def __ne__(self, other):
+        this_tuple = tuple(map(str, self))
+        other_tuple = tuple(map(str, other))
+        eq_code = this_tuple[0].lower() == this_tuple[0].lower()
+        eq_type = MatchHelper.match_in_string(this_tuple[1], other_tuple[1], one=False, stemming=True)
+        return not (eq_code or eq_type)
+
+    def __hash__(self):
+        this_tuple = tuple(map(lambda x: str(x) if x else x, self))
+        t_code = this_tuple[0].lower() if this_tuple[0] else this_tuple[0]
+        t_type = MatchHelper.to_singular_noun(this_tuple[1].lower())
+        return hash(tuple([t_code, t_type]))
 
 
 def sum_unique(subdf, aggr_col):
@@ -108,7 +119,7 @@ def get_config_dict(exch, keycols=(CO_PRODCODE, CO_TYPE), valcols=None):
     return {tuple(d[col] for col in keycols): d for d in config_data}
 
 
-def check_prod_by_key(data_rows, keyfunc, config_dict, filterfunc=None):
+def filter_mark_prods(data_rows, filterfunc, keyfunc, config_dict):
     for row in data_rows:
         if filterfunc and not filterfunc(row):
             continue

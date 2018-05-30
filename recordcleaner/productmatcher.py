@@ -54,11 +54,34 @@ class MatchHelper(object):
         return False
 
     @staticmethod
-    def match_sgl_plrl(s1, s2, casesensitive=False, p=inflect.engine()):
+    def to_singular_noun(string, p=inflect.engine()):
+        n_singluar = p.singular_noun(string)
+        n_plural = p.plural_noun(string)
+        plural = p.plural(string)
+
+        if not n_singluar:
+            return string
+        elif n_singluar == plural:
+            return n_singluar
+        elif plural == n_plural:
+            if n_singluar == plural[:-3]:
+                return string
+            else:
+                return n_singluar
+        else:
+            return n_singluar
+
+    @staticmethod
+    def match_sgl_plrl(s1, s2, casesensitive=False, p=inflect.engine(), operator=lambda x, y: x == y):
         if not casesensitive:
             s1 = s1.lower()
             s2 = s2.lower()
-        return s1 == s2 or p.plural(s1) == s2 or p.singular_noun(s1) == s2
+        if operator(s1, s2):
+            return True
+        if len(s1) < 3:
+            return False
+        return operator(MatchHelper.to_singular_noun(s1, p), s2) or operator(p.plural_noun(s1), s2)
+
 
     @staticmethod
     def match_in_string(s_ref, s_sample, one=True, stemming=False, casesensitive=False, engine=inflect.engine()):
@@ -66,25 +89,45 @@ class MatchHelper(object):
             s_ref = s_ref.lower()
             s_sample = s_sample.lower()
 
-        wds_sample = MatchHelper.get_words(s_sample)
-        wds_ref = MatchHelper.get_words(s_ref)
         if not one:
-            wds_sample = [' '.join(wds_sample)]
-            wds_ref = ' '.join(wds_ref)
+            return MatchHelper.match_sgl_plrl(s_sample, s_ref, True, engine, lambda x, y: x in y)
+        else:
+            wds_sample = MatchHelper.get_words(s_sample)
+            wds_ref = MatchHelper.get_words(s_ref)
 
-        found = False
-        for w in wds_sample:
-            found = w in wds_ref
-            if len(w) < 3:
-                continue
-            if (not found) and stemming:
-                found = (engine.plural(w) in wds_ref)
-                if not found:
-                    sgl = engine.singular_noun(w)
-                    found = sgl in wds_ref if sgl else sgl
-            if found:
-                return found
-        return found
+            found = False
+            for ws in wds_sample:
+                found = any(MatchHelper.match_sgl_plrl(ws, wr, True, engine) for wr in wds_ref) \
+                    if stemming else ws in wds_ref
+                if found:
+                    return found
+            return found
+
+    # @staticmethod
+    # def match_in_string(s_ref, s_sample, one=True, stemming=False, casesensitive=False, engine=inflect.engine()):
+    #     if not casesensitive:
+    #         s_ref = s_ref.lower()
+    #         s_sample = s_sample.lower()
+    #
+    #     wds_sample = MatchHelper.get_words(s_sample)
+    #     wds_ref = MatchHelper.get_words(s_ref)
+    #     if not one:
+    #         wds_sample = [' '.join(wds_sample)]
+    #         wds_ref = ' '.join(wds_ref)
+    #
+    #     found = False
+    #     for ws in wds_sample:
+    #         found = ws in wds_ref
+    #         if len(ws) < 3:
+    #             continue
+    #         if (not found) and stemming:
+    #             found = (engine.plural(ws) in wds_ref)
+    #             if not found:
+    #                 sgl = engine.singular_noun(ws)
+    #                 found = sgl in wds_ref if sgl else sgl
+    #         if found:
+    #             return found
+    #     return found
 
 
 
