@@ -1,5 +1,15 @@
+*.log
+*.pot
+*.pyc
+__pycache__/
+
 # Distribution / packaging
 .Python
+.env
+.venv
+env/
+venv/
+recordcleaner/venv
 **/env/
 **/venv/
 **/build/
