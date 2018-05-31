@@ -1,12 +1,15 @@
-import pandas as pd
 import tempfile
-from commonlib.websourcing import *
-from commonlib.iohelper import XlsxWriter
+import pandas as pd
+import paramiko
+import os
 
+from commonlib.websourcing import *
 
 BASE_PATH = '/home/slan/Documents/config_files/'
 EXCHANGES = ['asx', 'cme', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
 source_files = {e: e + '.xml' for e in EXCHANGES}
+
+XML_SUFFIX = '.xml'
 
 asx = 'asx'
 cme = 'cme'
@@ -64,12 +67,25 @@ INSTRUMENT_TYPES = {'F': 'Futures',
                     'E': 'Equities'}
 
 
+REACTOR_BOX = 'lcmint-core1'
+USERNAME = 'rsprod'
+CONFIG_PATH = '/opt/reactor/base/data/tng-cat/products'
+
+
 def get_default_destfiles():
     return {e: BASE_PATH + e + '.xlsx' for e in EXCHANGES}
 
 
-def get_src_file(exch):
-    return BASE_PATH + source_files[exch]
+def get_src_file(exch, pkey_path='/home/slan/.ssh/id_rsa'):
+    pkey = paramiko.RSAKey.from_private_key_file(pkey_path)
+    with paramiko.SSHClient() as ssh_client:
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh_client.connect(hostname=REACTOR_BOX, username=USERNAME, pkey=pkey)
+        print('Connected to {}@{}'.format(USERNAME, REACTOR_BOX))
+        file_path = os.path.join(CONFIG_PATH, exch + XML_SUFFIX)
+        sftp_client = ssh_client.open_sftp()
+        with sftp_client.open(file_path) as remote_file:
+            return remote_file.read()
 
 
 def get_raw_file(filename):
@@ -78,26 +94,26 @@ def get_raw_file(filename):
     download(full_url, f_temp)
 
 
-def parse_config(exch, tag=TAG_PRODUCT, columns=None, mapping_cols=CF_OUTCOLS_MAPPING, to_df=False):
-    src_path = get_src_file(exch)
-    columns = ATTR_NAMES[exch] if columns is None else columns
-    data_parsed = fltr_attrs(make_soup(src_path).find_all(tag), columns, mapping_cols)
-    config_data = list(dict_updated(d, {CO_TYPE: INSTRUMENT_TYPES.get(d[CO_TYPE], d[CO_TYPE])}) for d in data_parsed)
+def parse_config(exch, tag=TAG_PRODUCT, attrs=None, mapping_cols=CF_OUTCOLS_MAPPING, to_df=False):
+    src = get_src_file(exch)
+    attrs = ATTR_NAMES[exch] if attrs is None else attrs
+    data_parsed = fltr_attrs(make_soup(src).find_all(tag), attrs, mapping_cols)
+    config_data = (dict_updated(d, {CO_TYPE: INSTRUMENT_TYPES.get(d[CO_TYPE], d[CO_TYPE])}) for d in data_parsed)
     if to_df:
-        renamed_cols = (mapping_cols.get(c, c) for c in columns)
-        config_data = pd.DataFrame(config_data, columns=renamed_cols)
+        renamed_cols = (mapping_cols.get(c, c) for c in attrs)
+        config_data = pd.DataFrame(list(config_data), columns=renamed_cols)
     return config_data
 
 
-def run_all_configs_parse(dest_files=None, sheetname=None):
-    results = dict()
-    for exch in EXCHANGES:
-        outpath = dest_files[exch] if dest_files is not None else None
-        df_parsed = parse_config(exch)
-        results.update({exch: df_parsed})
-    return results
+# def run_all_configs_parse(dest_files=None, sheetname=None):
+#     results = dict()
+#     for exch in EXCHANGES:
+#         outpath = dest_files[exch] if dest_files is not None else None
+#         df_parsed = parse_config(exch)
+#         results.update({exch: df_parsed})
+#     return results
 
 
 # run_all_configs_parse(get_default_destfiles())
 
-# get_raw_file('asx.xml')
+# parse_config('cme')

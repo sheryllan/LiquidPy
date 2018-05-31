@@ -44,10 +44,13 @@ def make_soup_from_file(path):
 
 
 def make_soup(input):
-    try:
-        return make_soup_from_url(input)
-    except ValueError:
-        return make_soup_from_file(input)
+    if isinstance(input, str):
+        try:
+            return make_soup_from_url(input)
+        except ValueError:
+            return make_soup_from_file(input)
+    else:
+        return BeautifulSoup(input, 'html.parser')
 
 
 def fltr_attrs(tags, attrs, mapping=None):

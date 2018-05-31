@@ -8,24 +8,13 @@ from commonlib.iohelper import XlsxWriter
 from commonlib.datastruct import namedtuple_with_defaults
 
 
-# reports_path = '/home/slan/Documents/exch_report/'
-# configs_path = '/home/slan/Documents/config_files/'
-# # checked_path = '/home/slan/Documents/checked_report/'
-# checked_path = os.getcwd()
-#
-# EXCHANGES = ['asx', 'bloomberg', 'cme', 'cbot', 'nymex_comex', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
-# REPORT_FMTNAME = 'Web_ADV_Report_{}.xlsx'
-#
-# REPORT_FILES = {e: REPORT_FMTNAME.format(e.upper()) for e in EXCHANGES}
-
-# region output keys
-PRODCODE = 'prod_code'
-TYPE = 'type'
-RECORDED = 'recorded'
-# endregion
+RECORDED = 'Recorded'
 
 
-class ProductKey(namedtuple_with_defaults(namedtuple('ProductKey', [PRODCODE, TYPE]))):
+class ProductKey(namedtuple_with_defaults(namedtuple('ProductKey', [CO_PRODCODE, CO_TYPE]))):
+    FD_PRODCODE = CO_PRODCODE
+    FD_TYPE = CO_TYPE
+
     def __eq__(self, other):
         this_tuple = tuple(map(str, self))
         other_tuple = tuple(map(str, other))
@@ -40,11 +29,14 @@ class ProductKey(namedtuple_with_defaults(namedtuple('ProductKey', [PRODCODE, TY
         eq_type = MatchHelper.match_in_string(this_tuple[1], other_tuple[1], one=False, stemming=True)
         return not (eq_code or eq_type)
 
-    def __hash__(self):
+    def hashing_type(self):
         this_tuple = tuple(map(lambda x: str(x) if x else x, self))
         t_code = this_tuple[0].lower() if this_tuple[0] else this_tuple[0]
         t_type = MatchHelper.to_singular_noun(this_tuple[1].lower())
-        return hash(tuple([t_code, t_type]))
+        return tuple([t_code, t_type])
+
+    def __hash__(self):
+        return hash(self.hashing_type())
 
 
 def sum_unique(subdf, aggr_col):
@@ -74,14 +66,6 @@ def dfgroupby_aggr(df, group_key, aggr_col, aggr_func):
         for _, row in subdf.iterrows():
             row[aggr_col] = aggr_val
             yield row
-            # dict_key = dict_keyfunc(row)
-            # if dict_key is not None:
-            #     if dict_key in output_dict:
-            #         print_duplicate(group, dict_key)
-            #     else:
-            #         row.update(pd.Series([aggr_val], index=[aggr_col]))
-            #         output_dict.update({dict_key: row})
-    # return output_dict
 
 
 def df_todict(df, keyfunc):
@@ -114,9 +98,9 @@ def hierarch_groupby(orig_dict, key_funcs, sort=False):
     return output_dict
 
 
-def get_config_dict(exch, keycols=(CO_PRODCODE, CO_TYPE), valcols=None):
-    config_data = parse_config(exch, columns=valcols)
-    return {tuple(d[col] for col in keycols): d for d in config_data}
+def get_config_dict(exch, keycols=(ProductKey.FD_PRODCODE, ProductKey.FD_TYPE), keygen=ProductKey, valcols=None):
+    config_data = parse_config(exch, attrs=valcols)
+    return {keygen(**select_dict(d, keycols)): d for d in config_data}
 
 
 def filter_mark_prods(data_rows, filterfunc, keyfunc, config_dict):
@@ -125,16 +109,6 @@ def filter_mark_prods(data_rows, filterfunc, keyfunc, config_dict):
             continue
         recorded = keyfunc(row) in config_dict
         yield {**row, RECORDED: recorded}
-
-
-
-class OSEChecker(object):
-    def __init__(self):
-        self.cfg_properties = ATTR_NAMES['ose']
-
-
-    # def run_pd_check(self, df):
-
 
 
 

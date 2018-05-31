@@ -62,6 +62,12 @@ def dict_updated(dct, values):
     return dct
 
 
+def select_dict(dct, keys):
+    if not isinstance(dct, dict):
+        raise ValueError('The first argument should be of dict type')
+    return {k: dct.get(k, None) for k in keys}
+
+
 def rreplace(s, old, new, occurrence):
     li = s.rsplit(old, occurrence)
     return new.join(li)

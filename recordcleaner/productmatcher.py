@@ -103,50 +103,6 @@ class MatchHelper(object):
                     return found
             return found
 
-    # @staticmethod
-    # def match_in_string(s_ref, s_sample, one=True, stemming=False, casesensitive=False, engine=inflect.engine()):
-    #     if not casesensitive:
-    #         s_ref = s_ref.lower()
-    #         s_sample = s_sample.lower()
-    #
-    #     wds_sample = MatchHelper.get_words(s_sample)
-    #     wds_ref = MatchHelper.get_words(s_ref)
-    #     if not one:
-    #         wds_sample = [' '.join(wds_sample)]
-    #         wds_ref = ' '.join(wds_ref)
-    #
-    #     found = False
-    #     for ws in wds_sample:
-    #         found = ws in wds_ref
-    #         if len(ws) < 3:
-    #             continue
-    #         if (not found) and stemming:
-    #             found = (engine.plural(ws) in wds_ref)
-    #             if not found:
-    #                 sgl = engine.singular_noun(ws)
-    #                 found = sgl in wds_ref if sgl else sgl
-    #         if found:
-    #             return found
-    #     return found
-
-
-
-# exchanges = ['asx', 'bloomberg', 'cme', 'cbot', 'nymex_comex', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
-# report_fmtname = 'Web_ADV_Report_{}.xlsx'
-#
-# report_files = {e: report_fmtname.format(e.upper()) for e in exchanges}
-#
-# cmeg_prds_file = 'Product_Slate.xls'
-# cmeg_adv_files = {CMEGMatcher.CME: report_files['cme'],
-#                   CMEGMatcher.CBOT: report_files['cbot'],
-#                   CMEGMatcher.NYMEX: report_files['nymex_comex']}
-#
-# cmeg = CMEGMatcher()
-# dfs_adv = {k: pd.read_excel(v) for k, v in cmeg_adv_files.items()}
-# df_prods = pd.read_excel(cmeg_prds_file)
-# cmeg.run_pd_mtch(dfs_adv, df_prods, ('CME_Product_Index', 'CBOT_Product_Index'), clean=True)
-
-
 
 # region TODO: test
 # def __match_prods_by_commodity(self, df_prods, df_adv):

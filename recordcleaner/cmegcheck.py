@@ -258,6 +258,7 @@ class CMEGMatcher(object):
                       'huf': CRRNCY_TOKENSUB['huf']}
 
     CME_SPECIAL_MAPPING = {'mc': [TokenSub('midcurve', 1, True, True)],
+                           'gi': [TokenSub('growth', 1, True, True)],
                            'pqo': [TokenSub('premium', 1, True, True), TokenSub('quoted', 1, True, True),
                                    TokenSub('european', 1, True, True), TokenSub('style', 1, True, True)],
                            'eow': [TokenSub('weekly', 1, True, True), TokenSub('wk', 1, True, False)],
@@ -563,14 +564,14 @@ class CMEGChecker(object):
         prods_cme = list(filter_mark_prods(aggrows_cme, filterfunc, self.get_prod_key, config_dict))
         prods_cbot = list(filter_mark_prods(aggrows_cbot, filterfunc, self.get_prod_key, config_dict))
 
-        return {CME: pd.DataFrame(prods_cme, columns=df_cme.columns),
-                CBOT: pd.DataFrame(prods_cbot, columns=df_cbot.columns)}
+        return {CME: pd.DataFrame(prods_cme),
+                CBOT: pd.DataFrame(prods_cbot)}
 
     def check_nymex(self, dfs_dict, config_dict, filterfunc):
         df_nymex = dfs_dict[NYMEX]
-        rows_nymex = map(lambda x: x[1], df_nymex.iterrows)
+        rows_nymex = map(lambda x: x[1], df_nymex.iterrows())
         prods_nymex = list(filter_mark_prods(rows_nymex, filterfunc, self.get_prod_key, config_dict))
-        return {NYMEX: pd.DataFrame(prods_nymex, columns=df_nymex.columns)}
+        return {NYMEX: pd.DataFrame(prods_nymex)}
 
     def run_pd_check(self, dfs_dict, vol_threshold=1000, outpath=None, outcols=None):
         config_dict = get_config_dict(cme)
@@ -581,7 +582,10 @@ class CMEGChecker(object):
         prods_cmeg = {**prods_cme_cbot, **prods_nymex}
 
         if outpath is not None:
-            outdf_dict = {exch: pd.DataFrame(prods, columns=outcols if outcols else dfs_dict[exch].columns)
+            outdf_dict = {exch: pd.DataFrame(prods, columns=outcols) if outcols else pd.DataFrame(prods)
                           for exch, prods in prods_cmeg.items()}
             return XlsxWriter.save_sheets(outpath, outdf_dict)
         return prods_cmeg
+
+
+
