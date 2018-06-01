@@ -5,9 +5,8 @@ import os
 
 from commonlib.websourcing import *
 
-BASE_PATH = '/home/slan/Documents/config_files/'
-EXCHANGES = ['asx', 'cme', 'eurex', 'hkfe', 'ice', 'ose', 'sgx']
-source_files = {e: e + '.xml' for e in EXCHANGES}
+# BASE_PATH = '/home/slan/Documents/config_files/'
+# source_files = {e: e + '.xml' for e in EXCHANGES}
 
 XML_SUFFIX = '.xml'
 
@@ -18,6 +17,7 @@ hkfe = 'hkfe'
 ice = 'ice'
 ose = 'ose'
 sgx = 'sgx'
+EXCHANGES = [asx, cme, eurex, hkfe, ice, ose, sgx]
 
 
 CF_TYPE = 'type'
@@ -73,7 +73,7 @@ CONFIG_PATH = '/opt/reactor/base/data/tng-cat/products'
 
 
 def get_default_destfiles():
-    return {e: BASE_PATH + e + '.xlsx' for e in EXCHANGES}
+    return {e: e + '.xlsx' for e in EXCHANGES}
 
 
 def get_src_file(exch, pkey_path='/home/slan/.ssh/id_rsa'):
