@@ -7,6 +7,9 @@ from extrawhoosh.indexing import *
 from extrawhoosh.query import *
 from extrawhoosh.searching import *
 from productchecker import *
+from baseclasses import TaskBase
+from checkconfigs import CMEGConfig
+
 
 A_PRODUCT_NAME = 'Product Name'
 A_PRODUCT_GROUP = 'Product Group'
@@ -574,7 +577,7 @@ class CMEGChecker(object):
         prods_nymex = list(filter_mark_prods(rows_nymex, filterfunc, self.get_prod_key, config_dict))
         return {NYMEX: pd.DataFrame(prods_nymex)}
 
-    def run_pd_check(self, dfs_dict, vol_threshold=1000, outpath=None, outcols=None):
+    def run_pd_check(self, dfs_dict, vol_threshold, outpath=None, outcols=None):
         config_dict = get_config_dict(cme)
         filterfunc = lambda x: x[self.adv_colname] >= vol_threshold
 
@@ -589,16 +592,21 @@ class CMEGChecker(object):
         return prods_cmeg
 
 
-def cmeg_check(outpath=None):
-    scraper = CMEGScraper()
-    df_prods, dfs_adv = scraper.run_scraper()
-    matcher = CMEGMatcher(dfs_adv, df_prods)
-    with TemporaryDirectory() as ixfolder_cme, TemporaryDirectory() as ixfolder_cbot:
-        dfs_matched = matcher.run_pd_mtch((ixfolder_cme, ixfolder_cbot), True)
-    checker = CMEGChecker(matcher)
-    outcols = [F_PRODUCT_NAME, F_PRODUCT_GROUP, F_CLEARED_AS, F_CLEARING, F_GLOBEX, checker.adv_colname, RECORDED]
-    checker.run_pd_check(dfs_matched, outpath=outpath, outcols=outcols)
+class CMEGTask(TaskBase):
+    def __init__(self):
+        super().__init__(CMEGConfig.VOLLIM, CMEGConfig.OUTDIR, CMEGConfig.OUTFILE)
+
+    def check(self, vol_threshold, outpath):
+        scraper = CMEGScraper()
+        df_prods, dfs_adv = scraper.run_scraper()
+        matcher = CMEGMatcher(dfs_adv, df_prods)
+        with TemporaryDirectory() as ixfolder_cme, TemporaryDirectory() as ixfolder_cbot:
+            dfs_matched = matcher.run_pd_mtch((ixfolder_cme, ixfolder_cbot), True)
+        checker = CMEGChecker(matcher)
+        outcols = [F_PRODUCT_NAME, F_PRODUCT_GROUP, F_CLEARED_AS, F_CLEARING, F_GLOBEX, checker.adv_colname, RECORDED]
+        checker.run_pd_check(dfs_matched, vol_threshold, outpath, outcols)
 
 
-outpath='CMEG_checked.xlsx'
-cmeg_check(outpath)
+if __name__ == '__main__':
+    task = CMEGTask()
+    task.run()

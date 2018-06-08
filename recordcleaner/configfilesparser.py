@@ -76,11 +76,10 @@ def get_default_destfiles():
     return {e: e + '.xlsx' for e in EXCHANGES}
 
 
-def get_src_file(exch, pkey_path='/home/slan/.ssh/id_rsa'):
-    pkey = paramiko.RSAKey.from_private_key_file(pkey_path)
+def get_src_file(exch, pkey_path=os.path.expanduser('~/.ssh/id_rsa')):
     with paramiko.SSHClient() as ssh_client:
         ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh_client.connect(hostname=REACTOR_BOX, username=USERNAME, pkey=pkey)
+        ssh_client.connect(hostname=REACTOR_BOX, username=USERNAME, key_filename=pkey_path)
         print('Connected to {}@{}'.format(USERNAME, REACTOR_BOX))
         file_path = os.path.join(CONFIG_PATH, exch + XML_SUFFIX)
         sftp_client = ssh_client.open_sftp()

@@ -44,11 +44,6 @@ ASCII_PATTERN = '([A-Za-z0-9/\(\)\.%&$,-]|(?<! ) (?! ))+'
 LETTER_PATTERN = '[A-Za-z]+'
 
 
-def get_safe_phrase_pattern(pattern):
-    pattern_phrase = '(^|(?<=((?<!\S) ))){}($|(?=( (?!\S))))'
-    return pattern_phrase.format(pattern)
-
-
 def get_char_phrases(string, p_separator='^ +| {2,}| +$', p_chars=ASCII_PATTERN):
     return [match for match in re.split(p_separator, string) if re.match(p_chars, match)]
 

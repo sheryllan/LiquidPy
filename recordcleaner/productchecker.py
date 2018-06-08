@@ -1,12 +1,10 @@
-import pandas as pd
 from collections import namedtuple
 from sortedcontainers import SortedDict
 
-from configparser import *
-from productmatcher import *
-from commonlib.iohelper import XlsxWriter
 from commonlib.datastruct import namedtuple_with_defaults
-
+from commonlib.iohelper import XlsxWriter
+from configfilesparser import *
+from productmatcher import *
 
 RECORDED = 'Recorded'
 
@@ -109,20 +107,6 @@ def filter_mark_prods(data_rows, filterfunc, keyfunc, config_dict):
             continue
         recorded = keyfunc(row) in config_dict
         yield {**row, RECORDED: recorded}
-
-
-
-
-# xl_consolidate(test_input, test_output)
-# xl = pd.ExcelFile(test_input[0][0])
-# summary = xl.parse(test_input[0][1])
-# products = xl.parse(test_input[1][1])['commodity_name']
-# exp = lambda x: x in products.tolist()
-# results = summary[list(filter(summary, 'Globex',  exp))]
-# print((summary[list(filter(summary, 'Globex',  exp))].head()))
-
-# cmechecker = CMEGChecker()
-# cmechecker.run_pd_check(dict())
 
 
 

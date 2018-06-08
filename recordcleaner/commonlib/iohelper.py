@@ -28,8 +28,9 @@ class XlsxWriter(object):
     @staticmethod
     def auto_size_cols(ws):
         i = 0
-        while i < ws.max_column:
-            max_len = max([len(str(row.value)) for row in list(ws.columns)[i]])
+        ws_cols = list(ws.columns)
+        while i < len(ws_cols):
+            max_len = max([len(str(row.value)) for row in ws_cols[i]])
             ws.column_dimensions[get_column_letter(i + 1)].width = max_len + 2
             i += 1
 

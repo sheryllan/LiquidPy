@@ -1,6 +1,5 @@
 from collections import Iterable
 import types
-import re
 
 
 def nontypes_iterable(arg, excl_types=(str,)):
