@@ -1,50 +1,31 @@
 #!/bin/bash
 
-export DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-export VENV_NAME=venv
-export VENV_PATH = ${DIR}/${VENV_NAME}
-export VENV_BIN=${VENV_PATH}/bin
-export OUTDIR=${DIR}/results
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd $DIR
+echo "running under current directory $PWD"
 
-readArgs()
+VENV_NAME=venv
+if [ -d ${VENV_NAME} ];then 
+	rm -rf ${VENV_NAME}
+	echo "deleted the existing virual environment ${VENV_NAME}"
+fi
 
-if [ "${CLEAN}" = true ] || [ -d ${VENV_PATH} ]; then
-	setupEnv()
-if
+mkdir ${VENV_NAME}
+scl enable rh-python36 "virtualenv ${VENV_NAME}"
+echo "virutal environment ${VENV_NAME} created"
 
-source ${VENV_BIN}/activate
-echo -e "\nRunning cmegcheck.py"
-python cmegcheck.py -d "${OUTDIR}"
+source ${VENV_NAME}/bin/activate
+echo "virtual environment ${VENV_NAME} activated"
+
+echo "Installing missing packages from requirements.txt"
+pip install -r requirements.txt
+
+echo "packages installed in ${VENV_NAME}:"
+pip freeze
+
+echo -e "\nrunning cmegcheck.py"
+python cmegcheck.py
+
 deactivate
 
 
-readArgs() {
-	while [[ $# -gt 0 ]]
-	do
-		key="$1"
-	case $key in
-		--clean)
-		CLEAN=true
-		shift
-		;;
-	esac
-	done
-	
-	
-setupEnv() {
-	rm -rf ${VENV_PATH}
-
-	mkdir ${VENV_PATH}
-	scl enable rh-python36 "virtualenv ${VENV_NAME}"
-	echo "Virutal environment ${VENV_NAME} created"
-
-	source ${VENV_BIN}/activate
-	echo "virtual environment ${VENV_NAME} activated"
-
-	echo "Installing missing packages from requirements.txt"
-	pip install -r requirements.txt
-
-	echo "Packages installed in ${VENV_NAME}:"
-	pip freeze
-	
-	deactivate

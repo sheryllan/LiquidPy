@@ -588,25 +588,30 @@ class CMEGChecker(object):
         if outpath is not None:
             outdf_dict = {exch: pd.DataFrame(prods, columns=outcols) if outcols else pd.DataFrame(prods)
                           for exch, prods in prods_cmeg.items()}
-            return XlsxWriter.save_sheets(outpath, outdf_dict)
+            XlsxWriter.save_sheets(outpath, outdf_dict)
         return prods_cmeg
 
 
 class CMEGTask(TaskBase):
     def __init__(self):
         super().__init__(CMEGConfig.VOLLIM, CMEGConfig.OUTDIR, CMEGConfig.OUTFILE)
+        self.aparser.add_argument('-m', '--matchfile', type=int, help='the volume threshold to filter out products')
 
-    def check(self, vol_threshold, outpath):
+    def check(self, vol_threshold, outpath, match_outpath=None):
         scraper = CMEGScraper()
         df_prods, dfs_adv = scraper.run_scraper()
         matcher = CMEGMatcher(dfs_adv, df_prods)
         with TemporaryDirectory() as ixfolder_cme, TemporaryDirectory() as ixfolder_cbot:
             dfs_matched = matcher.run_pd_mtch((ixfolder_cme, ixfolder_cbot), True)
+            if match_outpath is not None:
+                XlsxWriter.save_sheets(match_outpath, dfs_matched)
         checker = CMEGChecker(matcher)
         outcols = [F_PRODUCT_NAME, F_PRODUCT_GROUP, F_CLEARED_AS, F_CLEARING, F_GLOBEX, checker.adv_colname, RECORDED]
-        checker.run_pd_check(dfs_matched, vol_threshold, outpath, outcols)
+        return checker.run_pd_check(dfs_matched, vol_threshold, outpath, outcols)
 
 
 if __name__ == '__main__':
     task = CMEGTask()
-    task.run()
+    results = task.run()
+
+
