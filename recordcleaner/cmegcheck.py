@@ -8,7 +8,7 @@ from extrawhoosh.query import *
 from extrawhoosh.searching import *
 from productchecker import *
 from baseclasses import TaskBase
-from checkconfigs import CMEGConfig
+from settings import CMEGSetting
 
 
 A_PRODUCT_NAME = 'Product Name'
@@ -523,7 +523,7 @@ class CMEGMatcher(object):
             rows_matched = list(match_rows())
         return pd.DataFrame(rows_matched, columns=list(df_adv.columns) + ix.schema.stored_names())
 
-    def run_pd_mtch(self, ix_names, clean=True):
+    def run_pd_mtch(self, ix_names, clean=True, outpath=None):
         gdf_exch = {exch: df.reset_index(drop=True) for exch, df in df_groupby(self.df_prods, [F_EXCHANGE]).items()}
 
         df_nymex_comex_prods = pd.concat([gdf_exch[NYMEX], gdf_exch[COMEX]], ignore_index=True)
@@ -534,7 +534,10 @@ class CMEGMatcher(object):
                                          CMEGMatcher.CME_NOTFOUND_PRODS, CMEGMatcher.CME_MULTI_MATCH)
         mdf_cbot = self.match_by_prodname(self.dfs_adv[CBOT], ix_cbot, CMEGMatcher.CBOT_EXACT_MAPPING,
                                           multi_match=CMEGMatcher.CBOT_MULTI_MATCH)
-        return {CME: mdf_cme, CBOT: mdf_cbot, NYMEX: mdf_nymex}
+        mdfs = {CME: mdf_cme, CBOT: mdf_cbot, NYMEX: mdf_nymex}
+        if outpath:
+            XlsxWriter.save_sheets(outpath, mdfs)
+        return mdfs
 
 
 class CMEGChecker(object):
@@ -594,20 +597,18 @@ class CMEGChecker(object):
 
 class CMEGTask(TaskBase):
     def __init__(self):
-        super().__init__(CMEGConfig.VOLLIM, CMEGConfig.OUTDIR, CMEGConfig.OUTFILE)
-        self.aparser.add_argument('-m', '--matchfile', type=int, help='the volume threshold to filter out products')
+        super().__init__(CMEGSetting.VOLLIM, CMEGSetting.OUTPATH)
+        self.aparser.add_argument('-mo', '--match_outpath', type=str, help='the output path of the matching results')
 
-    def check(self, vol_threshold, outpath, match_outpath=None):
+    def check(self, vollim, outpath, match_outpath=CMEGSetting.MATCH_OUTPATH):
         scraper = CMEGScraper()
         df_prods, dfs_adv = scraper.run_scraper()
         matcher = CMEGMatcher(dfs_adv, df_prods)
         with TemporaryDirectory() as ixfolder_cme, TemporaryDirectory() as ixfolder_cbot:
-            dfs_matched = matcher.run_pd_mtch((ixfolder_cme, ixfolder_cbot), True)
-            if match_outpath is not None:
-                XlsxWriter.save_sheets(match_outpath, dfs_matched)
+            dfs_matched = matcher.run_pd_mtch((ixfolder_cme, ixfolder_cbot), True, match_outpath)
         checker = CMEGChecker(matcher)
         outcols = [F_PRODUCT_NAME, F_PRODUCT_GROUP, F_CLEARED_AS, F_CLEARING, F_GLOBEX, checker.adv_colname, RECORDED]
-        return checker.run_pd_check(dfs_matched, vol_threshold, outpath, outcols)
+        return checker.run_pd_check(dfs_matched, vollim, outpath, outcols)
 
 
 if __name__ == '__main__':

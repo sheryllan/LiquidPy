@@ -3,25 +3,32 @@ import argparse
 
 
 class TaskBase(object):
-    def __init__(self, vollim_dflt, outdir_dflt, outfile_dflt):
-        self.vollim_dflt = vollim_dflt
-        self.outdir_dflt = outdir_dflt
-        self.outfile_dflt = outfile_dflt
-        self.aparser = argparse.ArgumentParser()
-        self.aparser.add_argument('-d', '--outdir', type=str, help='the output directory of the check results')
-        self.aparser.add_argument('-f', '--outfile', type=str, help='the filename of the output results')
-        self.aparser.add_argument('-v', '--vollim', type=int, help='the volume threshold to filter out products')
+    OUTPATH = 'outpath'
+    VOLLIM = 'vollim'
 
-    def check(self, vol_threshold, outpath):
+    def __init__(self, vollim_dflt, outpath_dflt):
+        self.vollim_dflt = vollim_dflt
+        self.outpath_dflt = outpath_dflt
+        self.aparser = argparse.ArgumentParser()
+        self.aparser.add_argument('-o', '--' + self.OUTPATH, type=str, help='the output path of the check results')
+        self.aparser.add_argument('-v', '--' + self.VOLLIM, type=int, help='the volume threshold to filter out products')
+
+    def check(self, vollim, outpath, **kwargs):
         raise NotImplementedError("Please Implement this method")
 
-    def run(self):
-        args = self.aparser.parse_args()
-        outdir = self.outdir_dflt if args.outdir is None else args.outdir
-        if not os.path.exists(outdir):
-            os.makedirs(outdir)
-        vollim = self.vollim_dflt if args.vollim is None else args.vollim
-        outfile = self.outfile_dflt if args.outfile is None else args.outfile
-        outpath = os.path.join(outdir, outfile)
-        print('results output to {}'.format(outpath))
-        return self.check(vollim, outpath)
+    def get_args(self):
+        args = vars(self.aparser.parse_args())
+        if args[self.OUTPATH] is None:
+            args[self.OUTPATH] = self.outpath_dflt
+            os.makedirs(os.path.dirname(args[self.OUTPATH]), exist_ok=True)
+        if args[self.VOLLIM] is None:
+            args[self.VOLLIM] = self.vollim_dflt
+        must_args = {self.OUTPATH: args[self.OUTPATH], self.VOLLIM: args[self.VOLLIM]}
+        opt_args = {k: args[k] for k in args if k not in must_args and args[k] is not None}
+        return must_args, opt_args
+
+    def run(self, **kwargs):
+        must_args, opt_args = self.get_args()
+        print('Results output to {}'.format(must_args[self.OUTPATH]))
+        opt_args.update(kwargs)
+        return self.check(must_args[self.VOLLIM], must_args[self.OUTPATH], **opt_args)

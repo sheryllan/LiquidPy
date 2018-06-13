@@ -54,7 +54,7 @@ def xl_consolidate(file2sheet, dest):
 def print_duplicate(group, duplicate):
     print()
     print('In group: {}'.format(group))
-    print('duplicate: {}'.format(str(duplicate)))
+    print('Duplicate: {}'.format(str(duplicate)))
 
 
 def dfgroupby_aggr(df, group_key, aggr_col, aggr_func):
