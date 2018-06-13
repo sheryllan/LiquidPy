@@ -97,7 +97,7 @@ def parse_config(exch, tag=TAG_PRODUCT, attrs=None, mapping_cols=CF_OUTCOLS_MAPP
     src = get_src_file(exch)
     attrs = ATTR_NAMES[exch] if attrs is None else attrs
     data_parsed = fltr_attrs(make_soup(src).find_all(tag), attrs, mapping_cols)
-    config_data = (dict_updated(d, {CO_TYPE: INSTRUMENT_TYPES.get(d[CO_TYPE], d[CO_TYPE])}) for d in data_parsed)
+    config_data = (mapping_updated(d, {CO_TYPE: INSTRUMENT_TYPES.get(d[CO_TYPE], d[CO_TYPE])}) for d in data_parsed)
     if to_df:
         renamed_cols = (mapping_cols.get(c, c) for c in attrs)
         config_data = pd.DataFrame(list(config_data), columns=renamed_cols)

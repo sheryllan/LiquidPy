@@ -330,16 +330,17 @@ class CMEGMatcher(object):
                  'by', 'to', 'you', 'be', 'we', 'that', 'may', 'not', 'with', 'tbd', 'a', 'on', 'your',
                  'this', 'of', 'will', 'can', 'the', 'or', 'are']
 
-    def __init__(self, dfs_adv, df_prods, filter_col_adv=get_ytd_header, out_adv_col=A_ADV_YTD):
-        self.adv_colname = out_adv_col
-        prods_cols = [F_PRODUCT_NAME, F_PRODUCT_GROUP, F_CLEARED_AS, F_CLEARING, F_GLOBEX, F_SUB_GROUP, F_EXCHANGE]
-        self.df_prods = df_prods[prods_cols]
-        adv_cols = {CME: MUST_COLS, CBOT: MUST_COLS, NYMEX: MUST_COLS + [A_COMMODITY]}
+    ADV_OUTCOLS = {CME: MUST_COLS + [A_ADV_YTD],
+                   CBOT: MUST_COLS + [A_ADV_YTD],
+                   NYMEX: MUST_COLS + [A_COMMODITY, A_ADV_YTD]}
+
+    PRODS_OUTCOLS = [F_PRODUCT_NAME, F_PRODUCT_GROUP, F_CLEARED_AS, F_CLEARING, F_GLOBEX, F_SUB_GROUP, F_EXCHANGE]
+
+    def __init__(self, dfs_adv, df_prods, filter_col_adv=get_ytd_header):
+        self.df_prods = df_prods[self.PRODS_OUTCOLS]
         for exch, df in dfs_adv.items():
             adv_colname = filter_col_adv(df)
-            df = df.rename(columns={adv_colname: self.adv_colname})
-            adv_cols[exch] = adv_cols[exch] + to_list(self.adv_colname)
-            dfs_adv[exch] = df[adv_cols[exch]]
+            dfs_adv[exch] = df.rename(columns={adv_colname: A_ADV_YTD})[self.ADV_OUTCOLS[exch]]
         self.dfs_adv = dfs_adv
 
     # region Private methods for grouping
@@ -448,9 +449,8 @@ class CMEGMatcher(object):
 
     def __join_row_results(self, row, results):
         for result in results:
-            row_result = result.fields()
-            row_result.update(row)
-            yield row_result
+            row_result = pd.Series(result.fields())
+            yield pd.concat([row, row_result])
 
     # endregion
 
@@ -502,48 +502,45 @@ class CMEGMatcher(object):
 
     def match_by_prodcode(self, df_prods, df_adv, on_prods=F_CLEARING, on_adv=A_COMMODITY):
         prod_dict = ({str(row[on_prods]): row for _, row in df_prods.iterrows()})
-        matched_rows = [row.append(prod_dict[str(row[on_adv])]) for _, row in df_adv.iterrows()
-                        if str(row[on_adv]) in prod_dict]
-        cols = list(df_adv.columns) + list(df_prods.columns)
-        return pd.DataFrame(matched_rows, columns=cols)
+        return (row.append(prod_dict[str(row[on_adv])])
+                for _, row in df_adv.iterrows() if str(row[on_adv]) in prod_dict)
+        # cols = list(df_adv.columns) + list(df_prods.columns)
+        # return pd.DataFrame(matched_rows, columns=cols)
 
     def match_by_prodname(self, df_adv, ix, exact_mapping=None, notfound=None, multi_match=None):
         with ix.searcher() as searcher:
             lexicons = get_idx_lexicon(searcher, F_PRODUCT_GROUP, F_CLEARED_AS, **{F_PRODUCT_GROUP: F_SUB_GROUP})
+            for i, row in df_adv.iterrows():
+                results = self.__match_a_row(row, lexicons, exact_mapping, notfound, multi_match, ix.schema,
+                                             searcher)
+                matched = True if results else False
+                for row_result in self.__join_row_results(row, results):
+                    self.__prt_match_status(matched, row_result)
+                    yield row_result
 
-            def match_rows():
-                for i, row in df_adv.iterrows():
-                    results = self.__match_a_row(row, lexicons, exact_mapping, notfound, multi_match, ix.schema,
-                                                 searcher)
-                    matched = True if results else False
-                    for row_result in self.__join_row_results(row, results):
-                        self.__prt_match_status(matched, row_result)
-                        yield row_result
-
-            rows_matched = list(match_rows())
-        return pd.DataFrame(rows_matched, columns=list(df_adv.columns) + ix.schema.stored_names())
+        #     def match_rows():
+        #
+        #     rows_matched = list(match_rows())
+        # return pd.DataFrame(rows_matched, columns=list(df_adv.columns) + ix.schema.stored_names())
 
     def run_pd_mtch(self, ix_names, clean=True, outpath=None):
         gdf_exch = {exch: df.reset_index(drop=True) for exch, df in df_groupby(self.df_prods, [F_EXCHANGE]).items()}
 
         df_nymex_comex_prods = pd.concat([gdf_exch[NYMEX], gdf_exch[COMEX]], ignore_index=True)
-        mdf_nymex = self.match_by_prodcode(df_nymex_comex_prods, self.dfs_adv[NYMEX])
+        data_nymex = list(self.match_by_prodcode(df_nymex_comex_prods, self.dfs_adv[NYMEX]))
 
         ix_cme, ix_cbot = self.init_ix_cme_cbot(gdf_exch, *ix_names, clean)
-        mdf_cme = self.match_by_prodname(self.dfs_adv[CME], ix_cme, CMEGMatcher.CME_EXACT_MAPPING,
-                                         CMEGMatcher.CME_NOTFOUND_PRODS, CMEGMatcher.CME_MULTI_MATCH)
-        mdf_cbot = self.match_by_prodname(self.dfs_adv[CBOT], ix_cbot, CMEGMatcher.CBOT_EXACT_MAPPING,
-                                          multi_match=CMEGMatcher.CBOT_MULTI_MATCH)
-        mdfs = {CME: mdf_cme, CBOT: mdf_cbot, NYMEX: mdf_nymex}
+        data_cme = list(self.match_by_prodname(self.dfs_adv[CME], ix_cme, CMEGMatcher.CME_EXACT_MAPPING,
+                                         CMEGMatcher.CME_NOTFOUND_PRODS, CMEGMatcher.CME_MULTI_MATCH))
+        data_cbot = list(self.match_by_prodname(self.dfs_adv[CBOT], ix_cbot, CMEGMatcher.CBOT_EXACT_MAPPING,
+                                          multi_match=CMEGMatcher.CBOT_MULTI_MATCH))
+        mdata = {CME: data_cme, CBOT: data_cbot, NYMEX: data_nymex}
         if outpath:
-            XlsxWriter.save_sheets(outpath, mdfs)
-        return mdfs
+            XlsxWriter.save_sheets(outpath, mdata)
+        return mdata
 
 
 class CMEGChecker(object):
-    def __init__(self, matcher):
-        self.adv_colname = matcher.adv_colname
-
     def get_prod_code(self, row):
         if not pd.isnull(row[F_GLOBEX]):
             return row[F_GLOBEX]
@@ -561,37 +558,30 @@ class CMEGChecker(object):
             return ProductKey(pd_code, row[F_CLEARED_AS])
         return None
 
-    def check_cme_cbot(self, dfs_dict, config_dict, filterfunc):
-        df_cme, df_cbot = dfs_dict[CME], dfs_dict[CBOT]
+    def get_group_key(self, row):
+        group_key = [A_PRODUCT_NAME, A_CLEARED_AS]
+        if isinstance(row, pd.Series):
+            return tuple(row.loc[group_key])
+        elif isinstance(row, dict):
+            return tuple(select_dict(row, group_key))
+        else:
+            raise ValueError('Invalid type of row: must be either pandas Series or dict')
 
-        group_key = [[A_PRODUCT_NAME, A_CLEARED_AS]]
-        aggrows_cme = dfgroupby_aggr(df_cme, group_key, self.adv_colname, sum_unique)
-        aggrows_cbot = dfgroupby_aggr(df_cbot, group_key, self.adv_colname, sum_unique)
+    def check_filter_prods(self, data, config_dict, filterfunc, aggrfunc=False):
+        rows = data if not aggrfunc else groupby_aggr(data, self.get_group_key, A_ADV_YTD, sum_unique)
+        return list(filter_mark_rows(rows, filterfunc, self.get_prod_key, config_dict))
 
-        prods_cme = list(filter_mark_prods(aggrows_cme, filterfunc, self.get_prod_key, config_dict))
-        prods_cbot = list(filter_mark_prods(aggrows_cbot, filterfunc, self.get_prod_key, config_dict))
-
-        return {CME: pd.DataFrame(prods_cme),
-                CBOT: pd.DataFrame(prods_cbot)}
-
-    def check_nymex(self, dfs_dict, config_dict, filterfunc):
-        df_nymex = dfs_dict[NYMEX]
-        rows_nymex = map(lambda x: x[1], df_nymex.iterrows())
-        prods_nymex = list(filter_mark_prods(rows_nymex, filterfunc, self.get_prod_key, config_dict))
-        return {NYMEX: pd.DataFrame(prods_nymex)}
-
-    def run_pd_check(self, dfs_dict, vol_threshold, outpath=None, outcols=None):
+    def run_pd_check(self, data, vol_threshold, outpath=None, outcols=None):
         config_dict = get_config_dict(cme)
-        filterfunc = lambda x: x[self.adv_colname] >= vol_threshold
+        filterfunc = lambda x: x[A_ADV_YTD] >= vol_threshold
 
-        prods_cme_cbot = self.check_cme_cbot(dfs_dict, config_dict, filterfunc)
-        prods_nymex = self.check_nymex(dfs_dict, config_dict, filterfunc)
-        prods_cmeg = {**prods_cme_cbot, **prods_nymex}
+        prods_cme = self.check_filter_prods(data[CME], config_dict, filterfunc, True)
+        prods_cbot = self.check_filter_prods(data[CBOT], config_dict, filterfunc, True)
+        prods_nymex = self.check_filter_prods(data[NYMEX], config_dict, filterfunc, False)
 
-        if outpath is not None:
-            outdf_dict = {exch: pd.DataFrame(prods, columns=outcols) if outcols else pd.DataFrame(prods)
-                          for exch, prods in prods_cmeg.items()}
-            XlsxWriter.save_sheets(outpath, outdf_dict)
+        prods_cmeg = {CME: prods_cme, CBOT: prods_cbot, NYMEX: prods_nymex}
+        if outpath:
+            XlsxWriter.save_sheets(outpath, prods_cmeg, columns=outcols)
         return prods_cmeg
 
 
@@ -605,14 +595,15 @@ class CMEGTask(TaskBase):
         df_prods, dfs_adv = scraper.run_scraper()
         matcher = CMEGMatcher(dfs_adv, df_prods)
         with TemporaryDirectory() as ixfolder_cme, TemporaryDirectory() as ixfolder_cbot:
-            dfs_matched = matcher.run_pd_mtch((ixfolder_cme, ixfolder_cbot), True, match_outpath)
-        checker = CMEGChecker(matcher)
-        outcols = [F_PRODUCT_NAME, F_PRODUCT_GROUP, F_CLEARED_AS, F_CLEARING, F_GLOBEX, checker.adv_colname, RECORDED]
-        return checker.run_pd_check(dfs_matched, vollim, outpath, outcols)
+            data_matched = matcher.run_pd_mtch((ixfolder_cme, ixfolder_cbot), True, match_outpath)
+        checker = CMEGChecker()
+        outcols = [A_PRODUCT_NAME, F_PRODUCT_NAME, F_PRODUCT_GROUP, F_CLEARED_AS, F_CLEARING, F_GLOBEX, A_ADV_YTD, RECORDED]
+        return checker.run_pd_check(data_matched, vollim, outpath, outcols)
 
 
 if __name__ == '__main__':
     task = CMEGTask()
     results = task.run()
+    print()
 
 

@@ -1,5 +1,6 @@
 from collections import namedtuple
 from sortedcontainers import SortedDict
+from itertools import groupby
 
 from commonlib.datastruct import namedtuple_with_defaults
 from commonlib.iohelper import XlsxWriter
@@ -37,8 +38,9 @@ class ProductKey(namedtuple_with_defaults(namedtuple('ProductKey', [CO_PRODCODE,
         return hash(self.hashing_type())
 
 
-def sum_unique(subdf, aggr_col):
-    return sum(subdf[aggr_col].unique())
+def sum_unique(data, aggr_col):
+    if nontypes_iterable(data):
+        return sum(set(map(lambda x: x[aggr_col], data)))
 
 
 # parameter file2sheet is a tuple
@@ -64,6 +66,14 @@ def dfgroupby_aggr(df, group_key, aggr_col, aggr_func):
         for _, row in subdf.iterrows():
             row[aggr_col] = aggr_val
             yield row
+
+
+def groupby_aggr(data, groupfunc, aggr_col, aggr_func):
+    for key, group in groupby(data, key=groupfunc):
+        rows = list(group)
+        aggr_val = aggr_func(rows, aggr_col)
+        for row in rows:
+            yield mapping_updated(row, pd.Series({aggr_col: aggr_val}))
 
 
 def df_todict(df, keyfunc):
@@ -101,12 +111,12 @@ def get_config_dict(exch, keycols=(ProductKey.FD_PRODCODE, ProductKey.FD_TYPE), 
     return {keygen(**select_dict(d, keycols)): d for d in config_data}
 
 
-def filter_mark_prods(data_rows, filterfunc, keyfunc, config_dict):
+def filter_mark_rows(data_rows, filterfunc, keyfunc, config_dict):
     for row in data_rows:
         if filterfunc and not filterfunc(row):
             continue
         recorded = keyfunc(row) in config_dict
-        yield {**row, RECORDED: recorded}
+        yield pd.concat([row, pd.Series({RECORDED: recorded})])
 
 
 

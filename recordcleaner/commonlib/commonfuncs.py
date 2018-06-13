@@ -56,14 +56,12 @@ def to_dict(items, tkey, tval):
     return {tkey(x): tval(x) for x in items}
 
 
-def dict_updated(dct, values):
+def mapping_updated(dct, values):
     dct.update(values)
     return dct
 
 
 def select_dict(dct, keys):
-    if not isinstance(dct, dict):
-        raise ValueError('The first argument should be of dict type')
     return {k: dct.get(k, None) for k in keys}
 
 
