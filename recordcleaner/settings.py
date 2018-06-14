@@ -8,11 +8,16 @@ if os.getenv('DIR') is None:
 envfile = 'envfile.sh'
 load_dotenv(dotenv_path=envfile)
 
-OUTDIR = os.getenv('OUTDIR')
-
 
 class SettingBase(object):
-    OUTDIR = OUTDIR
+    OUTDIR = os.getenv('OUTDIR')
+    ICINGA_HOST = os.getenv('ICINGA_HOST')
+    ICINGA_API_PORT = os.getenv('ICINGA_API_PORT')
+    ICINGA_PCR = os.getenv('ICINGA_PCR')
+
+    OUTPATH = None
+    VOLLIM = 0
+    TO_ICINGA = 'TO_ICINGA'
 
 
 class CMEGSetting(SettingBase):
@@ -21,3 +26,4 @@ class CMEGSetting(SettingBase):
     OUTPATH = os.path.join(SettingBase.OUTDIR, OUTFILE)
     MATCH_OUTPATH = os.path.join(SettingBase.OUTDIR, MATCH_FILE)
     VOLLIM = 1000
+    SERVICE = os.getenv('SVC_CME')

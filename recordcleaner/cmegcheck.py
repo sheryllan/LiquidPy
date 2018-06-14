@@ -541,6 +541,9 @@ class CMEGMatcher(object):
 
 
 class CMEGChecker(object):
+    def __init__(self):
+        self.config_dict = get_config_dict(cme)
+
     def get_prod_code(self, row):
         if not pd.isnull(row[F_GLOBEX]):
             return row[F_GLOBEX]
@@ -560,24 +563,21 @@ class CMEGChecker(object):
 
     def get_group_key(self, row):
         group_key = [A_PRODUCT_NAME, A_CLEARED_AS]
-        if isinstance(row, pd.Series):
-            return tuple(row.loc[group_key])
-        elif isinstance(row, dict):
-            return tuple(select_dict(row, group_key))
-        else:
-            raise ValueError('Invalid type of row: must be either pandas Series or dict')
+        try:
+            return tuple(select_mapping(row, group_key).values())
+        except AttributeError as e:
+            raise ValueError('Invalid type of row: must be either pandas Series or dict').with_traceback(e.__traceback__)
 
     def check_filter_prods(self, data, config_dict, filterfunc, aggrfunc=False):
         rows = data if not aggrfunc else groupby_aggr(data, self.get_group_key, A_ADV_YTD, sum_unique)
         return list(filter_mark_rows(rows, filterfunc, self.get_prod_key, config_dict))
 
     def run_pd_check(self, data, vol_threshold, outpath=None, outcols=None):
-        config_dict = get_config_dict(cme)
         filterfunc = lambda x: x[A_ADV_YTD] >= vol_threshold
 
-        prods_cme = self.check_filter_prods(data[CME], config_dict, filterfunc, True)
-        prods_cbot = self.check_filter_prods(data[CBOT], config_dict, filterfunc, True)
-        prods_nymex = self.check_filter_prods(data[NYMEX], config_dict, filterfunc, False)
+        prods_cme = self.check_filter_prods(data[CME], self.config_dict, filterfunc, True)
+        prods_cbot = self.check_filter_prods(data[CBOT], self.config_dict, filterfunc, True)
+        prods_nymex = self.check_filter_prods(data[NYMEX], self.config_dict, filterfunc, False)
 
         prods_cmeg = {CME: prods_cme, CBOT: prods_cbot, NYMEX: prods_nymex}
         if outpath:
@@ -586,11 +586,14 @@ class CMEGChecker(object):
 
 
 class CMEGTask(TaskBase):
-    def __init__(self):
-        super().__init__(CMEGSetting.VOLLIM, CMEGSetting.OUTPATH)
-        self.aparser.add_argument('-mo', '--match_outpath', type=str, help='the output path of the matching results')
+    MATCH_OUTPATH = 'match_outpath'
 
-    def check(self, vollim, outpath, match_outpath=CMEGSetting.MATCH_OUTPATH):
+    def __init__(self):
+        super().__init__(CMEGSetting)
+        self.dft_settings.update({self.MATCH_OUTPATH: CMEGSetting.MATCH_OUTPATH})
+        self.aparser.add_argument('-mo', '--' + self.MATCH_OUTPATH, type=str, help='the output path of the matching results')
+
+    def check(self, vollim, outpath, match_outpath=None, **kwargs):
         scraper = CMEGScraper()
         df_prods, dfs_adv = scraper.run_scraper()
         matcher = CMEGMatcher(dfs_adv, df_prods)

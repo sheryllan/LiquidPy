@@ -1,4 +1,6 @@
+from itertools import chain
 from collections import Iterable
+from sortedcontainers import SortedDict
 import types
 
 
@@ -52,16 +54,14 @@ def swap(a, b):
     return a, b
 
 
-def to_dict(items, tkey, tval):
-    return {tkey(x): tval(x) for x in items}
-
-
 def mapping_updated(dct, values):
     dct.update(values)
     return dct
 
 
-def select_dict(dct, keys):
+def select_mapping(dct, keys):
+    if keys is None:
+        return dct
     return {k: dct.get(k, None) for k in keys}
 
 
@@ -91,6 +91,31 @@ def verify_non_decreasing(array):
         if array[i - 1] > array[i]:
             return False
     return True
+
+
+def peek_iter(items):
+    if not nontypes_iterable(items):
+        return items
+    gen = iter(items)
+    peek = next(gen, None)
+    items = chain([peek], gen) if peek is not None else iter('')
+    return peek, items
+
+
+def hierarch_groupby(orig_dict, key_funcs, sort=False):
+
+    def groupby_rcsv(entry, key_funcs, output_dict):
+        if not key_funcs:
+            return entry
+        new_key = key_funcs[0](entry)
+        new_outdict = output_dict[new_key] if new_key in output_dict else dict()
+        output_dict.update({new_key: groupby_rcsv(entry, key_funcs[1:], new_outdict)})
+        return output_dict
+
+    output_dict = SortedDict() if sort else dict()
+    for k, v in orig_dict.items():
+        groupby_rcsv(v, key_funcs, output_dict)
+    return output_dict
 
 
 # def validate_dfcols(dfs_dict, cols_dict):

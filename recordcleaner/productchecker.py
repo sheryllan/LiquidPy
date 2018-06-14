@@ -1,6 +1,6 @@
 from collections import namedtuple
-from sortedcontainers import SortedDict
 from itertools import groupby
+import numpy as np
 
 from commonlib.datastruct import namedtuple_with_defaults
 from commonlib.iohelper import XlsxWriter
@@ -43,29 +43,10 @@ def sum_unique(data, aggr_col):
         return sum(set(map(lambda x: x[aggr_col], data)))
 
 
-# parameter file2sheet is a tuple
-def xl_consolidate(file2sheet, dest):
-    wrt = XlsxWriter.create_xlwriter(dest, False)
-    for fl, sht in file2sheet:
-        xl = pd.ExcelFile(fl)
-        dt = xl.parse(sht)
-        XlsxWriter.to_xlsheet(dt, wrt, sht)
-    wrt.save()
-
-
 def print_duplicate(group, duplicate):
     print()
     print('In group: {}'.format(group))
     print('Duplicate: {}'.format(str(duplicate)))
-
-
-def dfgroupby_aggr(df, group_key, aggr_col, aggr_func):
-    groups = df_groupby(df, group_key)
-    for group, subdf in groups.items():
-        aggr_val = aggr_func(subdf, aggr_col)
-        for _, row in subdf.iterrows():
-            row[aggr_col] = aggr_val
-            yield row
 
 
 def groupby_aggr(data, groupfunc, aggr_col, aggr_func):
@@ -76,9 +57,44 @@ def groupby_aggr(data, groupfunc, aggr_col, aggr_func):
             yield mapping_updated(row, pd.Series({aggr_col: aggr_val}))
 
 
-def df_todict(df, keyfunc):
-    return {keyfunc(row): row for _, row in df.iterrows()}
+def get_config_dict(exch, keycols=(ProductKey.FD_PRODCODE, ProductKey.FD_TYPE), keygen=ProductKey, valcols=None):
+    config_data = parse_config(exch, attrs=valcols)
+    return {keygen(**select_mapping(d, keycols)): d for d in config_data}
 
+
+def filter_mark_rows(data_rows, filterfunc, keyfunc, config_dict):
+    for row in data_rows:
+        if filterfunc and not filterfunc(row):
+            continue
+        recorded = keyfunc(row) in config_dict
+        yield pd.concat([row, pd.Series({RECORDED: recorded})])
+
+
+def count_unique(data, col=RECORDED):
+    arr = np.array(data[col] if isinstance(data, pd.DataFrame) else [d[col] for d in data])
+    uniques, counts = np.unique(arr, return_counts=True)
+    return {key: val for key, val in zip(uniques, counts)}
+
+
+# region unused methods
+
+# parameter file2sheet is a tuple
+def xl_consolidate(file2sheet, dest):
+    wrt = XlsxWriter.create_xlwriter(dest, False)
+    for fl, sht in file2sheet:
+        xl = pd.ExcelFile(fl)
+        dt = xl.parse(sht)
+        XlsxWriter.to_xlsheet(dt, wrt, sht)
+    wrt.save()
+
+
+def dfgroupby_aggr(df, group_key, aggr_col, aggr_func):
+    groups = df_groupby(df, group_key)
+    for group, subdf in groups.items():
+        aggr_val = aggr_func(subdf, aggr_col)
+        for _, row in subdf.iterrows():
+            row[aggr_col] = aggr_val
+            yield row
 
 def divide_dict_by(orig_dict, key_cols, left_sort=False, right_sort=False):
     left_dict = SortedDict() if left_sort else dict()
@@ -90,34 +106,5 @@ def divide_dict_by(orig_dict, key_cols, left_sort=False, right_sort=False):
     return left_dict, right_dict
 
 
-def hierarch_groupby(orig_dict, key_funcs, sort=False):
-
-    def groupby_rcsv(entry, key_funcs, output_dict):
-        if not key_funcs:
-            return entry
-        new_key = key_funcs[0](entry)
-        new_outdict = output_dict[new_key] if new_key in output_dict else dict()
-        output_dict.update({new_key: groupby_rcsv(entry, key_funcs[1:], new_outdict)})
-        return output_dict
-
-    output_dict = SortedDict() if sort else dict()
-    for k, v in orig_dict.items():
-        groupby_rcsv(v, key_funcs, output_dict)
-    return output_dict
-
-
-def get_config_dict(exch, keycols=(ProductKey.FD_PRODCODE, ProductKey.FD_TYPE), keygen=ProductKey, valcols=None):
-    config_data = parse_config(exch, attrs=valcols)
-    return {keygen(**select_dict(d, keycols)): d for d in config_data}
-
-
-def filter_mark_rows(data_rows, filterfunc, keyfunc, config_dict):
-    for row in data_rows:
-        if filterfunc and not filterfunc(row):
-            continue
-        recorded = keyfunc(row) in config_dict
-        yield pd.concat([row, pd.Series({RECORDED: recorded})])
-
-
-
+# endregion
 
