@@ -243,7 +243,7 @@ class SpecialWordFilter(Filter):
 
         def update_rcrs(value, items):
             if not isinstance(value, dict) and isinstance(value, list):
-                item_list = to_list(items)
+                item_list = to_iter(items)
                 return item_list + [v for v in value if v not in item_list]
 
             for k, v in value.items():
@@ -259,7 +259,7 @@ class SpecialWordFilter(Filter):
         if not isinstance(tk_cpy, TokenSub):
             raise TypeError('The first argument must be of type TokenSub')
 
-        values = to_list(self.word_dict[tk_cpy.text])
+        values = to_iter(self.word_dict[tk_cpy.text])
         return [TokenSub(tk.text, val.boost * tk_cpy.boost,
                         val.ignored or tk_cpy.ignored,
                         val.required or tk_cpy.required)
@@ -315,7 +315,7 @@ class SpecialWordFilter(Filter):
         return all_in, all_mapped, all_notmapped, all_yielded, all_notyielded
 
     def __gen_tokens(self, trans_tokens, memory=None, ismapped=False):
-        trans_tokens = to_list(trans_tokens)
+        trans_tokens = to_iter(trans_tokens)
         if memory is not None:
             all_in, all_mapped, all_notmapped, all_yielded, all_notyielded = self.__multi_all(trans_tokens, memory)
             to_yield = not all_in or (all_in and

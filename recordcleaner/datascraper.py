@@ -68,19 +68,6 @@ def run_pdftotext(pdf, txt=None, encoding='utf-8', **kwargs):
     return out if txt == '-' else txt
 
 
-def pdftotext_parse_by_pages(pdf_name, parse_func, end_page, start_page=1):
-    tables = list()
-    for page in range(start_page, end_page + 1):
-        txt = run_pdftotext(pdf_name, f=page, l=page)
-        df = parse_func(txt)
-        tables.append(df)
-    return pd.concat(tables, ignore_index=True)
-
-
-def get_pdf_num_pages(f_pdf):
-    return PdfFileReader(f_pdf).getNumPages()
-
-
 def text_to_num(values):
     pattern = '^-?[\d\.,]+%?$'
     for i, value in enumerate(values):
@@ -89,6 +76,21 @@ def text_to_num(values):
             result = result.replace('%', '').replace(',', '')
             result = float(result) if '.' in result else int(result)
         yield result
+
+
+class PdfParser(object):
+    def __init__(self, f_pdf):
+        self.f_pdf = f_pdf
+        self.pdf_reader = PdfFileReader(f_pdf)
+
+    def get_num_pages(self):
+        return self.pdf_reader.getNumPages()
+
+    def pdftotext_bypages(self, start_page=1, end_page=None):
+        tot_pages = self.get_num_pages()
+        end_page = tot_pages if end_page is None or end_page > tot_pages else end_page
+        for page in range(start_page, end_page + 1):
+            yield run_pdftotext(self.f_pdf.name, f=page, l=page)
 
 
 class TabularTxtParser(object):

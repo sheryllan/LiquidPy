@@ -18,7 +18,7 @@ def and_query(fieldname, schema, qstring, boost=1, termclass=Term, **kwargs):
     terms = []
     if termclass == Term:
         parser = qparser.QueryParser(fieldname, schema=schema)
-        terms = to_list(parser.term_query(fieldname, qstring, termclass=termclass, boost=boost))
+        terms = to_iter(parser.term_query(fieldname, qstring, termclass=termclass, boost=boost))
     elif termclass == FuzzyTerm:
         terms = fuzzy_terms(fieldname, schema, qstring, **kwargs)
     return And(terms, boost=boost)

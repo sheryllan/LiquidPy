@@ -5,12 +5,9 @@
       <change beforePath="$PROJECT_DIR$/baseclasses.py" afterPath="$PROJECT_DIR$/baseclasses.py" />
       <change beforePath="$PROJECT_DIR$/cmegcheck.py" afterPath="$PROJECT_DIR$/cmegcheck.py" />
       <change beforePath="$PROJECT_DIR$/commonlib/commonfuncs.py" afterPath="$PROJECT_DIR$/commonlib/commonfuncs.py" />
-      <change beforePath="$PROJECT_DIR$/envfile.sh" afterPath="$PROJECT_DIR$/envfile.sh" />
-      <change beforePath="$PROJECT_DIR$/icinga_resultsparser.py" afterPath="$PROJECT_DIR$/icinga_resultsparser.py" />
-      <change beforePath="$PROJECT_DIR$/productchecker.py" afterPath="$PROJECT_DIR$/productchecker.py" />
-      <change beforePath="$PROJECT_DIR$/settings.py" afterPath="$PROJECT_DIR$/settings.py" />
-      <change beforePath="$PROJECT_DIR$/tests/commonfuncstest.py" afterPath="$PROJECT_DIR$/tests/commonfuncstest.py" />
-      <change beforePath="$PROJECT_DIR$/tests/pdmatchertest.py" afterPath="$PROJECT_DIR$/tests/pdmatchertest.py" />
+      <change beforePath="$PROJECT_DIR$/datascraper.py" afterPath="$PROJECT_DIR$/datascraper.py" />
+      <change beforePath="$PROJECT_DIR$/extrawhoosh/analysis.py" afterPath="$PROJECT_DIR$/extrawhoosh/analysis.py" />
+      <change beforePath="$PROJECT_DIR$/extrawhoosh/query.py" afterPath="$PROJECT_DIR$/extrawhoosh/query.py" />
     </list>
     <ignored path="$PROJECT_DIR$/.idea/shelf/" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -40,8 +37,8 @@
             <file leaf-file-name="productchecker.py" pinned="false" current-in-tab="true">
               <entry file="file://$PROJECT_DIR$/productchecker.py">
                 <provider selected="true" editor-type-id="text-editor">
-                  <state relative-caret-position="702">
-                    <caret line="75" column="58" lean-forward="false" selection-start-line="75" selection-start-column="58" selection-end-line="75" selection-end-column="58" />
+                  <state relative-caret-position="268">
+                    <caret line="54" column="0" lean-forward="false" selection-start-line="54" selection-start-column="0" selection-end-line="54" selection-end-column="0" />
                     <folding>
                       <element signature="e#0#34#0" expanded="true" />
                     </folding>
@@ -52,8 +49,8 @@
             <file leaf-file-name="datascraper.py" pinned="false" current-in-tab="false">
               <entry file="file://$PROJECT_DIR$/datascraper.py">
                 <provider selected="true" editor-type-id="text-editor">
-                  <state relative-caret-position="774">
-                    <caret line="51" column="0" lean-forward="false" selection-start-line="51" selection-start-column="0" selection-end-line="51" selection-end-column="0" />
+                  <state relative-caret-position="333">
+                    <caret line="92" column="0" lean-forward="false" selection-start-line="92" selection-start-column="0" selection-end-line="92" selection-end-column="0" />
                     <folding>
                       <element signature="e#0#11#0" expanded="true" />
                     </folding>
@@ -68,20 +65,20 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file leaf-file-name="cmegcheck.py" pinned="false" current-in-tab="false">
+      <file leaf-file-name="cmegcheck.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/cmegcheck.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="462">
-              <caret line="608" column="24" lean-forward="true" selection-start-line="608" selection-start-column="24" selection-end-line="608" selection-end-column="24" />
+            <state relative-caret-position="389">
+              <caret line="176" column="33" lean-forward="false" selection-start-line="176" selection-start-column="25" selection-end-line="176" selection-end-column="33" />
               <folding>
                 <element signature="e#0#38#0" expanded="true" />
-                <element signature="e#6952#7751#0" expanded="false" />
-                <element signature="e#7778#8385#0" expanded="false" />
-                <element signature="e#8409#9075#0" expanded="false" />
-                <element signature="e#9099#11104#0" expanded="false" />
-                <element signature="e#11127#12809#0" expanded="false" />
-                <element signature="e#12837#14122#0" expanded="false" />
-                <element signature="e#14424#14446#0" expanded="false" />
+                <element signature="e#7201#8000#0" expanded="false" />
+                <element signature="e#8027#8634#0" expanded="false" />
+                <element signature="e#8658#9324#0" expanded="false" />
+                <element signature="e#9348#11353#0" expanded="false" />
+                <element signature="e#11376#13058#0" expanded="false" />
+                <element signature="e#13086#14371#0" expanded="false" />
+                <element signature="e#14673#14695#0" expanded="false" />
               </folding>
             </state>
           </provider>
@@ -90,8 +87,8 @@
       <file leaf-file-name="commonfuncs.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/commonlib/commonfuncs.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="380">
-              <caret line="116" column="36" lean-forward="true" selection-start-line="116" selection-start-column="36" selection-end-line="116" selection-end-column="36" />
+            <state relative-caret-position="143">
+              <caret line="35" column="66" lean-forward="false" selection-start-line="35" selection-start-column="66" selection-end-line="35" selection-end-column="66" />
               <folding>
                 <element signature="e#0#27#0" expanded="true" />
               </folding>
@@ -102,8 +99,8 @@
       <file leaf-file-name="icinga_resultsparser.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/icinga_resultsparser.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="506">
-              <caret line="37" column="58" lean-forward="true" selection-start-line="37" selection-start-column="58" selection-end-line="37" selection-end-column="58" />
+            <state relative-caret-position="-53">
+              <caret line="8" column="22" lean-forward="true" selection-start-line="8" selection-start-column="22" selection-end-line="8" selection-end-column="22" />
               <folding>
                 <element signature="e#0#19#0" expanded="true" />
               </folding>
@@ -111,11 +108,11 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="baseclasses.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="baseclasses.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/baseclasses.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="218">
-              <caret line="14" column="18" lean-forward="false" selection-start-line="14" selection-start-column="18" selection-end-line="14" selection-end-column="18" />
+            <state relative-caret-position="407">
+              <caret line="67" column="0" lean-forward="false" selection-start-line="67" selection-start-column="0" selection-end-line="67" selection-end-column="0" />
               <folding>
                 <element signature="e#0#9#0" expanded="true" />
               </folding>
@@ -126,8 +123,8 @@
       <file leaf-file-name="envfile.sh" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/envfile.sh">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="252">
-              <caret line="14" column="14" lean-forward="false" selection-start-line="14" selection-start-column="7" selection-end-line="14" selection-end-column="14" />
+            <state relative-caret-position="288">
+              <caret line="16" column="0" lean-forward="true" selection-start-line="16" selection-start-column="0" selection-end-line="16" selection-end-column="0" />
               <folding />
             </state>
           </provider>
@@ -136,11 +133,9 @@
       <file leaf-file-name="settings.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/settings.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="504">
-              <caret line="28" column="34" lean-forward="true" selection-start-line="28" selection-start-column="34" selection-end-line="28" selection-end-column="34" />
-              <folding>
-                <element signature="e#0#9#0" expanded="true" />
-              </folding>
+            <state relative-caret-position="0">
+              <caret line="0" column="2" lean-forward="false" selection-start-line="0" selection-start-column="2" selection-end-line="0" selection-end-column="2" />
+              <folding />
             </state>
           </provider>
         </entry>
@@ -178,8 +173,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>token</find>
-      <find>COLS_MAPPING</find>
       <find>tXT</find>
       <find>COLS_ADV_CME</find>
       <find>OUT_COLS_PRODS</find>
@@ -208,6 +201,8 @@
       <find>cp</find>
       <find>.loc</find>
       <find>SortedDict</find>
+      <find>to_l</find>
+      <find>TabularTxtParser</find>
     </findStrings>
     <replaceStrings>
       <replace>cls</replace>
@@ -239,7 +234,6 @@
         <option value="$PROJECT_DIR$/commonlib/websourcing.py" />
         <option value="$PROJECT_DIR$/osecheck.py" />
         <option value="$PROJECT_DIR$/configparser.py" />
-        <option value="$PROJECT_DIR$/datascraper.py" />
         <option value="$PROJECT_DIR$/configfilesparser.py" />
         <option value="$PROJECT_DIR$/checkconfigs.py" />
         <option value="$PROJECT_DIR$/sub.sh" />
@@ -249,12 +243,13 @@
         <option value="$PROJECT_DIR$/icinga_resultsparser.py" />
         <option value="$PROJECT_DIR$/tests/commonfuncstest.py" />
         <option value="$PROJECT_DIR$/tests/pdmatchertest.py" />
-        <option value="$PROJECT_DIR$/commonlib/commonfuncs.py" />
         <option value="$PROJECT_DIR$/productchecker.py" />
-        <option value="$PROJECT_DIR$/cmegcheck.py" />
         <option value="$PROJECT_DIR$/envfile.sh" />
         <option value="$PROJECT_DIR$/settings.py" />
         <option value="$PROJECT_DIR$/baseclasses.py" />
+        <option value="$PROJECT_DIR$/commonlib/commonfuncs.py" />
+        <option value="$PROJECT_DIR$/datascraper.py" />
+        <option value="$PROJECT_DIR$/cmegcheck.py" />
       </list>
     </option>
   </component>
@@ -326,7 +321,7 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Python tests.Unittests for pdmatchertest.MatcherTester.test_hierarch_groupby">
+  <component name="RunManager" selected="Python.cmegcheck">
     <configuration name="checkscripts" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -422,8 +417,8 @@
     </list>
     <recent_temporary>
       <list size="5">
-        <item index="0" class="java.lang.String" itemvalue="Python tests.Unittests for pdmatchertest.MatcherTester.test_hierarch_groupby" />
-        <item index="1" class="java.lang.String" itemvalue="Python.cmegcheck" />
+        <item index="0" class="java.lang.String" itemvalue="Python.cmegcheck" />
+        <item index="1" class="java.lang.String" itemvalue="Python tests.Unittests for pdmatchertest.MatcherTester.test_hierarch_groupby" />
         <item index="2" class="java.lang.String" itemvalue="Python.settings" />
         <item index="3" class="java.lang.String" itemvalue="Python.configfilesparser" />
         <item index="4" class="java.lang.String" itemvalue="Python.checkscripts" />
@@ -486,14 +481,14 @@
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3291262" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
       <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.36796117" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3291262" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.33203885" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
+      <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33203885" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3368932" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.18363403" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="R Packages" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="R Graphics" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3298969" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.23592234" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
-      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.39320388" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
+      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.39320388" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
       <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="Message" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
@@ -547,7 +542,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/cmegcheck.py</url>
-          <line>609</line>
+          <line>594</line>
           <option name="timeStamp" value="249" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
@@ -563,7 +558,7 @@
           </properties>
         </breakpoint>
       </default-breakpoints>
-      <option name="time" value="255" />
+      <option name="time" value="258" />
     </breakpoint-manager>
     <watches-manager />
   </component>
@@ -655,6 +650,9 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="162">
           <caret line="9" column="0" lean-forward="false" selection-start-line="9" selection-start-column="0" selection-end-line="9" selection-end-column="0" />
+          <folding>
+            <element signature="e#0#11#0" expanded="false" />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -739,6 +737,7 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="343">
           <caret line="93" column="11" lean-forward="false" selection-start-line="93" selection-start-column="8" selection-end-line="93" selection-end-column="11" />
+          <folding />
         </state>
       </provider>
     </entry>
@@ -772,16 +771,6 @@
         <state relative-caret-position="5994">
           <caret line="423" column="0" lean-forward="false" selection-start-line="423" selection-start-column="0" selection-end-line="423" selection-end-column="0" />
           <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/datascraper.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="774">
-          <caret line="51" column="0" lean-forward="false" selection-start-line="51" selection-start-column="0" selection-end-line="51" selection-end-column="0" />
-          <folding>
-            <element signature="e#0#11#0" expanded="true" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -897,77 +886,85 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/productchecker.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="702">
-          <caret line="75" column="58" lean-forward="false" selection-start-line="75" selection-start-column="58" selection-end-line="75" selection-end-column="58" />
-          <folding>
-            <element signature="e#0#34#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/commonlib/commonfuncs.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="380">
-          <caret line="116" column="36" lean-forward="true" selection-start-line="116" selection-start-column="36" selection-end-line="116" selection-end-column="36" />
-          <folding>
-            <element signature="e#0#27#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/cmegcheck.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="462">
-          <caret line="608" column="24" lean-forward="true" selection-start-line="608" selection-start-column="24" selection-end-line="608" selection-end-column="24" />
-          <folding>
-            <element signature="e#0#38#0" expanded="true" />
-            <element signature="e#6952#7751#0" expanded="false" />
-            <element signature="e#7778#8385#0" expanded="false" />
-            <element signature="e#8409#9075#0" expanded="false" />
-            <element signature="e#9099#11104#0" expanded="false" />
-            <element signature="e#11127#12809#0" expanded="false" />
-            <element signature="e#12837#14122#0" expanded="false" />
-            <element signature="e#14424#14446#0" expanded="false" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/envfile.sh">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="252">
-          <caret line="14" column="14" lean-forward="false" selection-start-line="14" selection-start-column="7" selection-end-line="14" selection-end-column="14" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/settings.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="504">
-          <caret line="28" column="34" lean-forward="true" selection-start-line="28" selection-start-column="34" selection-end-line="28" selection-end-column="34" />
-          <folding>
-            <element signature="e#0#9#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/icinga_resultsparser.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="506">
-          <caret line="37" column="58" lean-forward="true" selection-start-line="37" selection-start-column="58" selection-end-line="37" selection-end-column="58" />
+        <state relative-caret-position="-53">
+          <caret line="8" column="22" lean-forward="true" selection-start-line="8" selection-start-column="22" selection-end-line="8" selection-end-column="22" />
           <folding>
             <element signature="e#0#19#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/envfile.sh">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="288">
+          <caret line="16" column="0" lean-forward="true" selection-start-line="16" selection-start-column="0" selection-end-line="16" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/settings.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="2" lean-forward="false" selection-start-line="0" selection-start-column="2" selection-end-line="0" selection-end-column="2" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/commonlib/commonfuncs.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="143">
+          <caret line="35" column="66" lean-forward="false" selection-start-line="35" selection-start-column="66" selection-end-line="35" selection-end-column="66" />
+          <folding>
+            <element signature="e#0#27#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/baseclasses.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="218">
-          <caret line="14" column="18" lean-forward="false" selection-start-line="14" selection-start-column="18" selection-end-line="14" selection-end-column="18" />
+        <state relative-caret-position="407">
+          <caret line="67" column="0" lean-forward="false" selection-start-line="67" selection-start-column="0" selection-end-line="67" selection-end-column="0" />
           <folding>
             <element signature="e#0#9#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/datascraper.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="333">
+          <caret line="92" column="0" lean-forward="false" selection-start-line="92" selection-start-column="0" selection-end-line="92" selection-end-column="0" />
+          <folding>
+            <element signature="e#0#11#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/productchecker.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="268">
+          <caret line="54" column="0" lean-forward="false" selection-start-line="54" selection-start-column="0" selection-end-line="54" selection-end-column="0" />
+          <folding>
+            <element signature="e#0#34#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/cmegcheck.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="389">
+          <caret line="176" column="33" lean-forward="false" selection-start-line="176" selection-start-column="25" selection-end-line="176" selection-end-column="33" />
+          <folding>
+            <element signature="e#0#38#0" expanded="true" />
+            <element signature="e#7201#8000#0" expanded="false" />
+            <element signature="e#8027#8634#0" expanded="false" />
+            <element signature="e#8658#9324#0" expanded="false" />
+            <element signature="e#9348#11353#0" expanded="false" />
+            <element signature="e#11376#13058#0" expanded="false" />
+            <element signature="e#13086#14371#0" expanded="false" />
+            <element signature="e#14673#14695#0" expanded="false" />
           </folding>
         </state>
       </provider>

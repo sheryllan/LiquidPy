@@ -2,6 +2,7 @@ from PyPDF2.generic import Destination
 from tempfile import TemporaryDirectory
 
 from datascraper import *
+from datascraper import TabularTxtParser as tp
 from extrawhoosh.analysis import *
 from extrawhoosh.indexing import *
 from extrawhoosh.query import *
@@ -30,13 +31,6 @@ CBOT = 'CBOT'
 NYMEX = 'NYMEX'
 COMEX = 'COMEX'
 
-MUST_COLS = [A_PRODUCT_NAME, A_PRODUCT_GROUP, A_CLEARED_AS]
-
-
-def get_ytd_header(df, year=None):
-    year = last_year() if not year else year
-    header = list(df.columns.values)
-    return find_first_n(header, lambda x: A_ADV_YTD in x and str(year) in x)
 
 
 class CMEGScraper(object):
@@ -44,7 +38,6 @@ class CMEGScraper(object):
     URL_CBOT_ADV = 'http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_ADV_Report_CBOT.pdf'
     URL_NYMEX_COMEX_ADV = 'http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_ADV_Report_NYMEX_COMEX.pdf'
     URL_PRODSLATE = 'http://www.cmegroup.com/CmeWS/mvc/ProductSlate/V1/Download.xls'
-    ALIGNMENT_ADV = TabularTxtParser.RIGHT
 
     P_PRODUCT_NAME = 'Product Name'
     P_PRODUCT_GROUP = 'Product Group'
@@ -54,6 +47,8 @@ class CMEGScraper(object):
     P_SUB_GROUP = 'Sub Group'
     P_EXCHANGE = 'Exchange'
 
+    YTD_PATTERN = A_ADV_YTD
+
     COL2FIELD = {P_PRODUCT_NAME: F_PRODUCT_NAME,
                  P_PRODUCT_GROUP: F_PRODUCT_GROUP,
                  P_CLEARED_AS: F_CLEARED_AS,
@@ -62,88 +57,90 @@ class CMEGScraper(object):
                  P_SUB_GROUP: F_SUB_GROUP,
                  P_EXCHANGE: F_EXCHANGE}
 
-    def default_adv_basenames(self):
-        basename_cme = rreplace(os.path.basename(self.URL_CME_ADV), PDF_SUFFIX, '', 1)
-        basename_cbot = rreplace(os.path.basename(self.URL_CBOT_ADV), PDF_SUFFIX, '', 1)
-        basename_nymex = rreplace(os.path.basename(self.URL_NYMEX_COMEX_ADV), PDF_SUFFIX, '', 1)
-        return basename_cme, basename_cbot, basename_nymex
+    MUST_COLS = [A_PRODUCT_NAME, A_PRODUCT_GROUP, A_CLEARED_AS]
 
-    def default_adv_xlsx(self):
-        basename_cme, basename_cbot, basename_nymex = self.default_adv_basenames()
-        adv_xlsx_cme = basename_cme + XLSX_SUFFIX
-        adv_xlsx_cbot = basename_cbot + XLSX_SUFFIX
-        adv_xlsx_nymex = basename_nymex + XLSX_SUFFIX
-        return adv_xlsx_cme, adv_xlsx_cbot, adv_xlsx_nymex
+    ADV_OUTCOLS = {CME: MUST_COLS + [A_ADV_YTD],
+                   CBOT: MUST_COLS + [A_ADV_YTD],
+                   NYMEX: MUST_COLS + [A_COMMODITY, A_ADV_YTD]}
 
-    # returns a dictionary with key: full group name, and value: (asset, instrument)
-    def get_prod_groups_from_pdf(self, fh):
-        fr = PdfFileReader(fh)
-        outlines = fr.getOutlines()
-        flat_outlines = flatten_iter(outlines, 0, (str, Destination))
-        sections = [(l, o.title) for l, o in flat_outlines if l > 1]
+    PRODS_OUTCOLS = [F_PRODUCT_NAME, F_PRODUCT_GROUP, F_CLEARED_AS, F_CLEARING, F_GLOBEX, F_SUB_GROUP, F_EXCHANGE]
 
-        def parse_flatten_sections():
-            prev_level = sections[0][0]
-            asset = sections[0][1]
-            result = dict()
-            for level, title in sections[1:]:
-                if level < prev_level:
-                    asset = title
-                else:
-                    instrument = title
-                    result[('{} {}'.format(asset, instrument))] = (asset, instrument)
-                prev_level = level
-            return result
 
-        return parse_flatten_sections()
+    class CMEGPdfParser(PdfParser):
 
-    def parse_adv_header(self, lines, p_separator=None, min_splits=None):
-        def merge_headers(h1, h2):
-            h1 = h1.strip()
-            h2 = h2.strip()
-            return ' '.join(filter(None, [h1, h2]))
+        def __init__(self, f_pdf):
+            super().__init__(f_pdf)
+            self.prod_groups = self.__get_prod_groups()
 
-        lines = iter(lines)
-        for line in lines:
-            matches = TabularTxtParser.match_tabular_header(line, p_separator, min_splits)
-            if matches is not None:
-                line1, line2 = line, next(lines, '')
-                cords1 = [m[0] for m in matches]
-                cords2 = [m[0] for m in TabularTxtParser.match_tabular_header(line2, p_separator, min_splits)]
+        # returns a dictionary with key: full group name, and value: (asset, instrument)
+        def __get_prod_groups(self):
+            outlines = self.pdf_reader.getOutlines()
+            flat_outlines = flatten_iter(outlines, 0, (str, Destination))
+            sections = [(l, o.title) for l, o in flat_outlines if l > 1]
 
-                c_selector = 0 if len(cords1) >= len(cords2) else 1
-                merged = TabularTxtParser.merge_2rows(line1, line2, cords1, cords2, merge_headers, self.ALIGNMENT_ADV)
-                return {m[0][c_selector]: m[1] for m in merged}
-        return None
+            def parse_flatten_sections():
+                prev_level = sections[0][0]
+                asset = sections[0][1]
+                result = dict()
+                for level, title in sections[1:]:
+                    if level < prev_level:
+                        asset = title
+                    else:
+                        instrument = title
+                        result[('{} {}'.format(asset, instrument))] = (asset, instrument)
+                    prev_level = level
+                return result
 
-    def parse_table_from_txt(self, pdf, lines):
-        product_groups = self.get_prod_groups_from_pdf(pdf)
-        group, clearedas = None, None
-        lines = iter(lines)
-        header_dict = self.parse_adv_header(lines)
-        if not header_dict:
+            return parse_flatten_sections()
+
+
+        def parse_adv_th(self, lines, p_separator=None, min_splits=None, alignment=tp.RIGHT):
+            def merge_headers(h1, h2):
+                h1 = h1.strip()
+                h2 = h2.strip()
+                return ' '.join(filter(None, [h1, h2]))
+
+            lines = iter(lines)
+            for line in lines:
+                matches = tp.match_tabular_header(line, p_separator, min_splits)
+                if matches is not None:
+                    line1, line2 = line, next(lines, '')
+                    cords1 = [m[0] for m in matches]
+                    cords2 = [m[0] for m in tp.match_tabular_header(line2, p_separator, min_splits)]
+
+                    c_selector = 0 if len(cords1) >= len(cords2) else 1
+                    merged = tp.merge_2rows(line1, line2, cords1, cords2, merge_headers, alignment)
+                    return {m[0][c_selector]: m[1] for m in merged}
             return None
-        cols_benchmark, adv_header = list(header_dict.keys()), list(header_dict.values())
 
-        tbl_rows = list()
-        for line in lines:
-            if not line:
-                continue
-            if TabularTxtParser.match_tabular_header(line) or 'total' in line.lower():
-                break
-            line = line.strip()
-            matches = TabularTxtParser.match_tabular_line(line, min_splits=len(header_dict))
-            if matches:
-                prod_data = [matches[0][1], group, clearedas]
-                match_dict = {m[0]: m[1] for m in matches[1:]}
-                aligned = TabularTxtParser.align_by_min_tot_offset(match_dict.keys(), cols_benchmark,
-                                                                   CMEGScraper.ALIGNMENT_ADV)
-                adv_data = list(text_to_num(match_dict[cords[0]] for cords in aligned))
-                tbl_rows.append(prod_data + adv_data)
-            elif line in product_groups:
-                group, clearedas = product_groups[line]
 
-        return pd.DataFrame.from_records(tbl_rows, columns=MUST_COLS + adv_header)
+        def parse_table_from_txt(self, lines, alignment=tp.RIGHT):
+            lines = iter(lines)
+            header_dict = self.parse_adv_th(lines)
+            if not header_dict:
+                return None
+            cols_benchmark, adv_header = list(header_dict.keys()), list(header_dict.values())
+
+            def parse_adv_tr():
+                group, clearedas = None, None
+                for line in lines:
+                    if not line:
+                        continue
+                    if tp.match_tabular_header(line) or 'total' in line.lower():
+                        break
+                    line = line.strip()
+                    matches = tp.match_tabular_line(line, min_splits=len(header_dict))
+                    if matches:
+                        prod_data = {A_PRODUCT_NAME: matches[0][1], A_PRODUCT_GROUP: group, A_CLEARED_AS: clearedas}
+                        match_dict = {m[0]: m[1] for m in matches[1:]}
+                        aligned = map(lambda x: x[0], tp.align_by_min_tot_offset(match_dict.keys(), cols_benchmark, alignment))
+                        adv_data = {hname: text_to_num(match_dict[cord]) for hname, cord in zip(adv_header, aligned)}
+                        adv_data.update(prod_data)
+                        yield adv_data
+                    elif line in self.prod_groups:
+                        group, clearedas = self.prod_groups[line]
+
+            return pd.DataFrame.from_records(list(parse_adv_tr()))
 
     def get_prods_table(self):
         with tempfile.NamedTemporaryFile() as prods_file:
@@ -154,19 +151,28 @@ class CMEGScraper(object):
 
     def get_adv_table(self, url):
         f_pdf = download(url, tempfile.NamedTemporaryFile())
-        num_pages = get_pdf_num_pages(f_pdf)
-        table = pdftotext_parse_by_pages(f_pdf.name, lambda x: self.parse_table_from_txt(f_pdf, x), num_pages)
+        pdf_parser = self.CMEGPdfParser(f_pdf)
+        tables = [pdf_parser.parse_table_from_txt(page) for page in pdf_parser.pdftotext_bypages()]
         f_pdf.close()
-        return table
+        return pd.concat(tables, ignore_index=True)
 
-    def run_scraper(self):
+    def get_ytd_header(self, df, ytd_pattern=YTD_PATTERN, year=None):
+        year = last_year() if not year else year
+        header = list(df.columns.values)
+        return find_first_n(header, lambda x: ytd_pattern in x and str(year) in x)
+
+    def run_scraper(self, year=None):
         df_prods = self.get_prods_table()
-        df_prods = df_prods.rename(columns=CMEGScraper.COL2FIELD)
+        df_prods = df_prods.rename(columns=CMEGScraper.COL2FIELD)[self.PRODS_OUTCOLS]
 
         df_cme = self.get_adv_table(self.URL_CME_ADV)
         df_cbot = self.get_adv_table(self.URL_CBOT_ADV)
         df_nymex = self.get_adv_table(self.URL_NYMEX_COMEX_ADV)
         adv_dict = {CME: df_cme, CBOT: df_cbot, NYMEX: df_nymex}
+
+        for exch, df in adv_dict.items():
+            adv_colname = self.get_ytd_header(df, year=year)
+            adv_dict[exch] = df.rename(columns={adv_colname: A_ADV_YTD})[self.ADV_OUTCOLS[exch]]
 
         return df_prods, adv_dict
 
@@ -330,18 +336,6 @@ class CMEGMatcher(object):
                  'by', 'to', 'you', 'be', 'we', 'that', 'may', 'not', 'with', 'tbd', 'a', 'on', 'your',
                  'this', 'of', 'will', 'can', 'the', 'or', 'are']
 
-    ADV_OUTCOLS = {CME: MUST_COLS + [A_ADV_YTD],
-                   CBOT: MUST_COLS + [A_ADV_YTD],
-                   NYMEX: MUST_COLS + [A_COMMODITY, A_ADV_YTD]}
-
-    PRODS_OUTCOLS = [F_PRODUCT_NAME, F_PRODUCT_GROUP, F_CLEARED_AS, F_CLEARING, F_GLOBEX, F_SUB_GROUP, F_EXCHANGE]
-
-    def __init__(self, dfs_adv, df_prods, filter_col_adv=get_ytd_header):
-        self.df_prods = df_prods[self.PRODS_OUTCOLS]
-        for exch, df in dfs_adv.items():
-            adv_colname = filter_col_adv(df)
-            dfs_adv[exch] = df.rename(columns={adv_colname: A_ADV_YTD})[self.ADV_OUTCOLS[exch]]
-        self.dfs_adv = dfs_adv
 
     # region Private methods for grouping
     def __match_pdgp(self, s_ref, s_sample):
@@ -504,8 +498,6 @@ class CMEGMatcher(object):
         prod_dict = ({str(row[on_prods]): row for _, row in df_prods.iterrows()})
         return (row.append(prod_dict[str(row[on_adv])])
                 for _, row in df_adv.iterrows() if str(row[on_adv]) in prod_dict)
-        # cols = list(df_adv.columns) + list(df_prods.columns)
-        # return pd.DataFrame(matched_rows, columns=cols)
 
     def match_by_prodname(self, df_adv, ix, exact_mapping=None, notfound=None, multi_match=None):
         with ix.searcher() as searcher:
@@ -518,21 +510,16 @@ class CMEGMatcher(object):
                     self.__prt_match_status(matched, row_result)
                     yield row_result
 
-        #     def match_rows():
-        #
-        #     rows_matched = list(match_rows())
-        # return pd.DataFrame(rows_matched, columns=list(df_adv.columns) + ix.schema.stored_names())
-
-    def run_pd_mtch(self, ix_names, clean=True, outpath=None):
-        gdf_exch = {exch: df.reset_index(drop=True) for exch, df in df_groupby(self.df_prods, [F_EXCHANGE]).items()}
+    def run_pd_mtch(self, df_prods, dfs_adv, ix_names, clean=True, outpath=None):
+        gdf_exch = {exch: df.reset_index(drop=True) for exch, df in df_groupby(df_prods, [F_EXCHANGE]).items()}
 
         df_nymex_comex_prods = pd.concat([gdf_exch[NYMEX], gdf_exch[COMEX]], ignore_index=True)
-        data_nymex = list(self.match_by_prodcode(df_nymex_comex_prods, self.dfs_adv[NYMEX]))
+        data_nymex = list(self.match_by_prodcode(df_nymex_comex_prods, dfs_adv[NYMEX]))
 
         ix_cme, ix_cbot = self.init_ix_cme_cbot(gdf_exch, *ix_names, clean)
-        data_cme = list(self.match_by_prodname(self.dfs_adv[CME], ix_cme, CMEGMatcher.CME_EXACT_MAPPING,
+        data_cme = list(self.match_by_prodname(dfs_adv[CME], ix_cme, CMEGMatcher.CME_EXACT_MAPPING,
                                          CMEGMatcher.CME_NOTFOUND_PRODS, CMEGMatcher.CME_MULTI_MATCH))
-        data_cbot = list(self.match_by_prodname(self.dfs_adv[CBOT], ix_cbot, CMEGMatcher.CBOT_EXACT_MAPPING,
+        data_cbot = list(self.match_by_prodname(dfs_adv[CBOT], ix_cbot, CMEGMatcher.CBOT_EXACT_MAPPING,
                                           multi_match=CMEGMatcher.CBOT_MULTI_MATCH))
         mdata = {CME: data_cme, CBOT: data_cbot, NYMEX: data_nymex}
         if outpath:
@@ -590,18 +577,16 @@ class CMEGTask(TaskBase):
 
     def __init__(self):
         super().__init__(CMEGSetting)
-        self.dft_settings.update({self.MATCH_OUTPATH: CMEGSetting.MATCH_OUTPATH})
+        self.dft_check_params.update({self.MATCH_OUTPATH: CMEGSetting.MATCH_OUTPATH})
         self.aparser.add_argument('-mo', '--' + self.MATCH_OUTPATH, type=str, help='the output path of the matching results')
+        self.scraper, self.matcher, self.checker = CMEGScraper(), CMEGMatcher(), CMEGChecker()
 
     def check(self, vollim, outpath, match_outpath=None, **kwargs):
-        scraper = CMEGScraper()
-        df_prods, dfs_adv = scraper.run_scraper()
-        matcher = CMEGMatcher(dfs_adv, df_prods)
+        df_prods, dfs_adv = self.scraper.run_scraper()
         with TemporaryDirectory() as ixfolder_cme, TemporaryDirectory() as ixfolder_cbot:
-            data_matched = matcher.run_pd_mtch((ixfolder_cme, ixfolder_cbot), True, match_outpath)
-        checker = CMEGChecker()
+            data_matched = self.matcher.run_pd_mtch(df_prods, dfs_adv, (ixfolder_cme, ixfolder_cbot), True, match_outpath)
         outcols = [A_PRODUCT_NAME, F_PRODUCT_NAME, F_PRODUCT_GROUP, F_CLEARED_AS, F_CLEARING, F_GLOBEX, A_ADV_YTD, RECORDED]
-        return checker.run_pd_check(data_matched, vollim, outpath, outcols)
+        return self.checker.run_pd_check(data_matched, vollim, outpath, outcols)
 
 
 if __name__ == '__main__':

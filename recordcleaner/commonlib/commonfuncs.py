@@ -32,8 +32,8 @@ def group_every_n(items, n, gtype=list):
     return (gtype(items[i: i + n]) for i in range(0, len(items), n))
 
 
-def to_list(x, excl_types=(str,)):
-    return [x] if not nontypes_iterable(x, excl_types) else list(x)
+def to_iter(x, excl_types=(str,), ittype=list):
+    return [x] if not nontypes_iterable(x, excl_types) else ittype(x)
 
 
 def find_first_n(arry, condition, n=1):
