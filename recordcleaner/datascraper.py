@@ -40,6 +40,20 @@ def clean_df(df, nonna_subset):
     return df
 
 
+def rename_filter(data, col_mapping=None, outcols=None):
+    def process(d):
+        if col_mapping is not None:
+            d = d.rename(col_mapping)
+        if outcols is not None:
+            d = d[[c for c in outcols if d.keys()]]
+        return d
+
+    if isinstance(data, pd.DataFrame):
+        return process(data)
+    elif nontypes_iterable(data):
+        return (process(d) for d in data)
+
+
 ASCII_PATTERN = '([A-Za-z0-9/\(\)\.%&$,-]|(?<! ) (?! ))+'
 LETTER_PATTERN = '[A-Za-z]+'
 

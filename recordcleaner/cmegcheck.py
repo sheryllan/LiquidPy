@@ -1,6 +1,8 @@
-from PyPDF2.generic import Destination
 from tempfile import TemporaryDirectory
 
+from PyPDF2.generic import Destination
+
+from baseclasses import *
 from datascraper import *
 from datascraper import TabularTxtParser as tp
 from extrawhoosh.analysis import *
@@ -8,9 +10,7 @@ from extrawhoosh.indexing import *
 from extrawhoosh.query import *
 from extrawhoosh.searching import *
 from productchecker import *
-from baseclasses import TaskBase
 from settings import CMEGSetting
-
 
 A_PRODUCT_NAME = 'Product Name'
 A_PRODUCT_GROUP = 'Product Group'
@@ -93,7 +93,6 @@ class CMEGScraper(object):
 
             return parse_flatten_sections()
 
-
         def parse_adv_th(self, lines, p_separator=None, min_splits=None, alignment=tp.RIGHT):
             def merge_headers(h1, h2):
                 h1 = h1.strip()
@@ -112,7 +111,6 @@ class CMEGScraper(object):
                     merged = tp.merge_2rows(line1, line2, cords1, cords2, merge_headers, alignment)
                     return {m[0][c_selector]: m[1] for m in merged}
             return None
-
 
         def parse_table_from_txt(self, lines, alignment=tp.RIGHT):
             lines = iter(lines)
@@ -133,8 +131,9 @@ class CMEGScraper(object):
                     if matches:
                         prod_data = {A_PRODUCT_NAME: matches[0][1], A_PRODUCT_GROUP: group, A_CLEARED_AS: clearedas}
                         match_dict = {m[0]: m[1] for m in matches[1:]}
-                        aligned = map(lambda x: x[0], tp.align_by_min_tot_offset(match_dict.keys(), cols_benchmark, alignment))
-                        adv_data = {hname: text_to_num(match_dict[cord]) for hname, cord in zip(adv_header, aligned)}
+                        aligned_cords = map(lambda x: match_dict[x[0]],
+                                            tp.align_by_min_tot_offset(match_dict.keys(), cols_benchmark, alignment))
+                        adv_data = {adv_header[i]: value for i, value in enumerate(text_to_num(aligned_cords))}
                         adv_data.update(prod_data)
                         yield adv_data
                     elif line in self.prod_groups:
@@ -150,10 +149,9 @@ class CMEGScraper(object):
             return clean_df(set_df_col(df_prods), nonna_subset)
 
     def get_adv_table(self, url):
-        f_pdf = download(url, tempfile.NamedTemporaryFile())
-        pdf_parser = self.CMEGPdfParser(f_pdf)
-        tables = [pdf_parser.parse_table_from_txt(page) for page in pdf_parser.pdftotext_bypages()]
-        f_pdf.close()
+        with download(url, tempfile.NamedTemporaryFile()) as f_pdf:
+            pdf_parser = self.CMEGPdfParser(f_pdf)
+            tables = [pdf_parser.parse_table_from_txt(page) for page in pdf_parser.pdftotext_bypages()]
         return pd.concat(tables, ignore_index=True)
 
     def get_ytd_header(self, df, ytd_pattern=YTD_PATTERN, year=None):
@@ -168,11 +166,9 @@ class CMEGScraper(object):
         df_cme = self.get_adv_table(self.URL_CME_ADV)
         df_cbot = self.get_adv_table(self.URL_CBOT_ADV)
         df_nymex = self.get_adv_table(self.URL_NYMEX_COMEX_ADV)
-        adv_dict = {CME: df_cme, CBOT: df_cbot, NYMEX: df_nymex}
-
-        for exch, df in adv_dict.items():
-            adv_colname = self.get_ytd_header(df, year=year)
-            adv_dict[exch] = df.rename(columns={adv_colname: A_ADV_YTD})[self.ADV_OUTCOLS[exch]]
+        adv_dict = {CME: rename_filter(df_cme, {self.get_ytd_header(df_cme, year=year)}, self.ADV_OUTCOLS[CME]),
+                    CBOT: rename_filter(df_cbot, {self.get_ytd_header(df_cbot, year=year)}, self.ADV_OUTCOLS[CBOT]),
+                    NYMEX: rename_filter(df_nymex, {self.get_ytd_header(df_nymex, year=year)}, self.ADV_OUTCOLS[NYMEX])}
 
         return df_prods, adv_dict
 
@@ -528,6 +524,7 @@ class CMEGMatcher(object):
 
 
 class CMEGChecker(object):
+
     def __init__(self):
         self.config_dict = get_config_dict(cme)
 
@@ -551,22 +548,24 @@ class CMEGChecker(object):
     def get_group_key(self, row):
         group_key = [A_PRODUCT_NAME, A_CLEARED_AS]
         try:
-            return tuple(select_mapping(row, group_key).values())
+            return ' '.join(select_mapping(row, group_key).values())
         except AttributeError as e:
             raise ValueError('Invalid type of row: must be either pandas Series or dict').with_traceback(e.__traceback__)
 
     def check_filter_prods(self, data, config_dict, filterfunc, aggrfunc=False):
-        rows = data if not aggrfunc else groupby_aggr(data, self.get_group_key, A_ADV_YTD, sum_unique)
-        return list(filter_mark_rows(rows, filterfunc, self.get_prod_key, config_dict))
+        rows = data if not aggrfunc else groupby_aggr(data, self.get_group_key, A_ADV_YTD, sum_unique, GROUP)
+        return filter_mark_rows(rows, filterfunc, self.get_prod_key, config_dict)
 
-    def run_pd_check(self, data, vol_threshold, outpath=None, outcols=None):
+    def run_pd_check(self, data, vol_threshold, cols_renaming=None, outcols=None, outpath=None):
         filterfunc = lambda x: x[A_ADV_YTD] >= vol_threshold
 
         prods_cme = self.check_filter_prods(data[CME], self.config_dict, filterfunc, True)
         prods_cbot = self.check_filter_prods(data[CBOT], self.config_dict, filterfunc, True)
         prods_nymex = self.check_filter_prods(data[NYMEX], self.config_dict, filterfunc, False)
 
-        prods_cmeg = {CME: prods_cme, CBOT: prods_cbot, NYMEX: prods_nymex}
+        prods_cmeg = {CME: list(rename_filter(prods_cme, cols_renaming, outcols)),
+                      CBOT: list(rename_filter(prods_cbot, cols_renaming, outcols)),
+                      NYMEX: list(rename_filter(prods_nymex, cols_renaming, outcols))}
         if outpath:
             XlsxWriter.save_sheets(outpath, prods_cmeg, columns=outcols)
         return prods_cmeg
@@ -574,6 +573,13 @@ class CMEGChecker(object):
 
 class CMEGTask(TaskBase):
     MATCH_OUTPATH = 'match_outpath'
+    COLS_MAPPING = {F_GLOBEX: PRODCODE,
+                    F_CLEARED_AS: PRODTYPE,
+                    F_PRODUCT_NAME: PRODNAME,
+                    F_PRODUCT_GROUP: PRODGROUP,
+                    A_ADV_YTD: VOLUME}
+
+    CHECK_COLS = [GROUP, PRODNAME, PRODGROUP, PRODTYPE, PRODCODE, VOLUME, RECORDED]
 
     def __init__(self):
         super().__init__(CMEGSetting)
@@ -585,8 +591,8 @@ class CMEGTask(TaskBase):
         df_prods, dfs_adv = self.scraper.run_scraper()
         with TemporaryDirectory() as ixfolder_cme, TemporaryDirectory() as ixfolder_cbot:
             data_matched = self.matcher.run_pd_mtch(df_prods, dfs_adv, (ixfolder_cme, ixfolder_cbot), True, match_outpath)
-        outcols = [A_PRODUCT_NAME, F_PRODUCT_NAME, F_PRODUCT_GROUP, F_CLEARED_AS, F_CLEARING, F_GLOBEX, A_ADV_YTD, RECORDED]
-        return self.checker.run_pd_check(data_matched, vollim, outpath, outcols)
+
+        return self.checker.run_pd_check(data_matched, vollim, self.COLS_MAPPING, self.CHECK_COLS, outpath)
 
 
 if __name__ == '__main__':

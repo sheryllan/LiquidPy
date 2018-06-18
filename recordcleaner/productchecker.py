@@ -8,6 +8,7 @@ from configfilesparser import *
 from productmatcher import *
 
 RECORDED = 'Recorded'
+GROUP = 'Group'
 
 
 class ProductKey(namedtuple_with_defaults(namedtuple('ProductKey', [CO_PRODCODE, CO_TYPE]))):
@@ -49,11 +50,14 @@ def print_duplicate(group, duplicate):
     print('Duplicate: {}'.format(str(duplicate)))
 
 
-def groupby_aggr(data, groupfunc, aggr_col, aggr_func):
+def groupby_aggr(data, groupfunc, aggr_col, aggr_func, groupkey=None):
     for key, group in groupby(data, key=groupfunc):
         rows = list(group)
         aggr_val = aggr_func(rows, aggr_col)
         for row in rows:
+            row = pd.Series(row)
+            if groupkey is not None:
+                row.update(pd.Series({groupkey: key}))
             yield mapping_updated(row, pd.Series({aggr_col: aggr_val}))
 
 
@@ -64,6 +68,7 @@ def get_config_dict(exch, keycols=(ProductKey.FD_PRODCODE, ProductKey.FD_TYPE), 
 
 def filter_mark_rows(data_rows, filterfunc, keyfunc, config_dict):
     for row in data_rows:
+        row = pd.Series(row)
         if filterfunc and not filterfunc(row):
             continue
         recorded = keyfunc(row) in config_dict
@@ -95,6 +100,7 @@ def dfgroupby_aggr(df, group_key, aggr_col, aggr_func):
         for _, row in subdf.iterrows():
             row[aggr_col] = aggr_val
             yield row
+
 
 def divide_dict_by(orig_dict, key_cols, left_sort=False, right_sort=False):
     left_dict = SortedDict() if left_sort else dict()

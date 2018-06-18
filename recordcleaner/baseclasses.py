@@ -1,10 +1,20 @@
 import os
 import argparse
 import pandas as pd
+import socket
+import json
 from itertools import groupby
 from tabulate import tabulate
-from commonlib.commonfuncs import *
 
+from commonlib.commonfuncs import *
+from productchecker import RECORDED, GROUP
+
+
+PRODCODE = 'Prodcode'
+PRODTYPE = 'Prodtype'
+PRODNAME = 'Prodname'
+PRODGROUP = 'Prodgroup'
+VOLUME = 'Volume'
 
 
 def to_tbstring(data, dtypes, cols=None, tablefmt='simple'):
@@ -41,6 +51,41 @@ def tabulate_rows(data, outcols=None, grouping=None):
         yield from to_tbstring(data, type(first), outcols)
 
 
+class IcingaHelper(object):
+    TYPE = 'type'
+    FILTER = 'filter'
+    SVCNAME = 'service.name'
+    HOSTNAME = 'host.name'
+    EXIT_STATUS =  'exit_status'
+    PLUGIN_OUPUT = 'plugin_output'
+    CHECK_SOURCE = 'check_source'
+    PERF_DATA = 'performance_data'
+
+    SERVICE = 'Service'
+    HOST = 'Host'
+
+    ICINGA_OUTCOLS = {RECORDED, PRODCODE, PRODTYPE, PRODNAME}
+
+
+    @staticmethod
+    def to_json(typecode, fltname, poutput=None, exitcode=0, checksource=socket.gethostname(), perfdata=None):
+        json_dict = {}
+        ctype = IcingaHelper.SERVICE if typecode else IcingaHelper.HOST
+
+        json_dict.update({IcingaHelper.TYPE: ctype})
+        json_dict.update({IcingaHelper.FILTER: {IcingaHelper.SVCNAME: fltname} if typecode else {IcingaHelper.HOST: fltname}})
+        json_dict.update({IcingaHelper.EXIT_STATUS: exitcode})
+        json_dict.update({IcingaHelper.CHECK_SOURCE: checksource})
+
+        if poutput:
+            json_dict.update({IcingaHelper.PLUGIN_OUPUT: poutput})
+        if perfdata:
+            json_dict.update({IcingaHelper.PERF_DATA: perfdata})
+
+        return json.dumps(json_dict)
+
+
+
 class TaskBase(object):
     OUTPATH = 'outpath'
     VOLLIM = 'vollim'
@@ -62,12 +107,21 @@ class TaskBase(object):
         args.update(kwargs)
         return args
 
+    def format_plugin_output(self, data, exch, voltype, vollim, grouping=None):
+        title = '{} products for which {} is higher than {}'.format(exch, voltype, vollim)
+        details = tabulate_rows(data, IcingaHelper.ICINGA_OUTCOLS, grouping)
+        poutput = '\n'.join(details)
+        return '\n'.join([title, poutput])
+
     def run(self, **kwargs):
         args = self.get_args(**kwargs)
         print('Results output to {}'.format(args[self.OUTPATH]))
         results = self.check(**args)
-        # if self.to_icinga:
-        return results
+        if self.to_icinga:
+
+            for exch in results:
+
+
 
 
     # def sendto_icinga(self, results, args):
