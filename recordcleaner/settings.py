@@ -26,4 +26,6 @@ class CMEGSetting(SettingBase):
     OUTPATH = os.path.join(SettingBase.OUTDIR, OUTFILE)
     MATCH_OUTPATH = os.path.join(SettingBase.OUTDIR, MATCH_FILE)
     VOLLIM = 1000
-    SERVICE = os.getenv('SVC_CME')
+    SVC_CME = os.getenv('SVC_CME')
+    SVC_CBOT = os.getenv('SVC_CBOT')
+    SVC_NYMEX = os.getenv('SVC_NYMEX')

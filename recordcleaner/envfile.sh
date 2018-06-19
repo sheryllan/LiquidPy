@@ -13,6 +13,8 @@ export ICINGA_API_PORT=5665
 export ICINGA_PCR=https://${ICINGA_HOST}:${ICINGA_API_PORT}/v1/actions/process-check-result
 
 export SVC_CME=cme_check
+export SVC_CBOT=cbot_check
+export SVC_NYMEX=nymex_check
 export SVC_OSE=ose_check
 
 SHARED_FOLDER=//lcldn-fs1/shared

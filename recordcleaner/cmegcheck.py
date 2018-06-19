@@ -9,8 +9,8 @@ from extrawhoosh.analysis import *
 from extrawhoosh.indexing import *
 from extrawhoosh.query import *
 from extrawhoosh.searching import *
-from productchecker import *
 from settings import CMEGSetting
+
 
 A_PRODUCT_NAME = 'Product Name'
 A_PRODUCT_GROUP = 'Product Group'
@@ -573,26 +573,40 @@ class CMEGChecker(object):
 
 class CMEGTask(TaskBase):
     MATCH_OUTPATH = 'match_outpath'
-    COLS_MAPPING = {F_GLOBEX: PRODCODE,
-                    F_CLEARED_AS: PRODTYPE,
-                    F_PRODUCT_NAME: PRODNAME,
-                    F_PRODUCT_GROUP: PRODGROUP,
-                    A_ADV_YTD: VOLUME}
+    COLS_MAPPING = {F_GLOBEX: TaskBase.PRODCODE,
+                    F_CLEARED_AS: TaskBase.PRODTYPE,
+                    F_PRODUCT_NAME: TaskBase.PRODNAME,
+                    F_PRODUCT_GROUP: TaskBase.PRODGROUP,
+                    A_ADV_YTD: TaskBase.VOLUME}
 
-    CHECK_COLS = [GROUP, PRODNAME, PRODGROUP, PRODTYPE, PRODCODE, VOLUME, RECORDED]
+    CHECK_COLS = [GROUP,
+                  TaskBase.PRODNAME,
+                  TaskBase.PRODGROUP,
+                  TaskBase.PRODTYPE,
+                  TaskBase.PRODCODE,
+                  TaskBase.VOLUME,
+                  RECORDED]
 
     def __init__(self):
         super().__init__(CMEGSetting)
-        self.dft_check_params.update({self.MATCH_OUTPATH: CMEGSetting.MATCH_OUTPATH})
+        self.dflt_args.update({self.MATCH_OUTPATH: CMEGSetting.MATCH_OUTPATH})
         self.aparser.add_argument('-mo', '--' + self.MATCH_OUTPATH, type=str, help='the output path of the matching results')
         self.scraper, self.matcher, self.checker = CMEGScraper(), CMEGMatcher(), CMEGChecker()
+        self.voltype = A_ADV_YTD
+        self.services = {CME: CMEGSetting.SVC_CME,
+                         CBOT: CMEGSetting.SVC_CBOT,
+                         NYMEX: CMEGSetting.SVC_NYMEX}
 
-    def check(self, vollim, outpath, match_outpath=None, **kwargs):
+    def scrape(self):
+        match_outpath = self.task_args.get(self.MATCH_OUTPATH, None)
         df_prods, dfs_adv = self.scraper.run_scraper()
         with TemporaryDirectory() as ixfolder_cme, TemporaryDirectory() as ixfolder_cbot:
-            data_matched = self.matcher.run_pd_mtch(df_prods, dfs_adv, (ixfolder_cme, ixfolder_cbot), True, match_outpath)
+            return self.matcher.run_pd_mtch(df_prods, dfs_adv, (ixfolder_cme, ixfolder_cbot), True, match_outpath)
 
-        return self.checker.run_pd_check(data_matched, vollim, self.COLS_MAPPING, self.CHECK_COLS, outpath)
+    def check(self):
+        vollim = self.task_args[self.VOLLIM]
+        outpath = self.task_args[self.OUTPATH]
+        return self.checker.run_pd_check(self._exch_prods, vollim, self.COLS_MAPPING, self.CHECK_COLS, outpath)
 
 
 if __name__ == '__main__':
