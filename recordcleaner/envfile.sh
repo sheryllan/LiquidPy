@@ -10,7 +10,10 @@ export VENV_BIN=${VENV_PATH}/bin
 export OUTDIR=${DIR}/results
 export ICINGA_HOST=lcldn-icinga1
 export ICINGA_API_PORT=5665
-export ICINGA_PCR=https://${ICINGA_HOST}:${ICINGA_API_PORT}/v1/actions/process-check-result
+export ICINGA_API_PCR=https:v1/actions/process-check-result
+export ICINGA_API_USER=icinga
+export ICINGA_API_PSW=icinga2002
+export CA_CRT=ca.crt
 
 export SVC_CME=cme_check
 export SVC_CBOT=cbot_check

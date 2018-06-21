@@ -11,13 +11,9 @@ load_dotenv(dotenv_path=envfile)
 
 class SettingBase(object):
     OUTDIR = os.getenv('OUTDIR')
-    ICINGA_HOST = os.getenv('ICINGA_HOST')
-    ICINGA_API_PORT = os.getenv('ICINGA_API_PORT')
-    ICINGA_PCR = os.getenv('ICINGA_PCR')
-
+    CA_CRT = os.getenv('CA_CRT')
     OUTPATH = None
     VOLLIM = 0
-    TO_ICINGA = 'TO_ICINGA'
 
 
 class CMEGSetting(SettingBase):
@@ -29,3 +25,4 @@ class CMEGSetting(SettingBase):
     SVC_CME = os.getenv('SVC_CME')
     SVC_CBOT = os.getenv('SVC_CBOT')
     SVC_NYMEX = os.getenv('SVC_NYMEX')
+

@@ -1,11 +1,13 @@
-import urllib.error
-import urllib.parse
-from urllib.request import Request, urlopen
-from bs4 import BeautifulSoup
+import json
 import re
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
+
+import requests
+from bs4 import BeautifulSoup
+from requests.auth import HTTPBasicAuth
 
 from commonlib.commonfuncs import *
-
 
 USER_AGENT = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.0.7; X11; Linux x86_64) ' \
              'Gecko/2009021910 Firefox/3.0.7 Chrome/23.0.1271.64 Safari/537.11'
@@ -17,6 +19,17 @@ A_TAB = 'a'
 HREF_ATTR = 'href'
 
 
+def http_post(url, data, auth=None, cert=False):
+    bdata = data if isinstance(data, str) else json.dumps(data)
+    try:
+        if auth is not None:
+            response = requests.post(url, bdata, verify=cert, auth=HTTPBasicAuth(*auth), headers={'Accept': 'application/json'})
+            print(response.content)
+            return response
+    except Exception as e:
+        print(e)
+
+
 def download(url, fh):
     request = Request(url, headers={'User-Agent': USER_AGENT})
     try:
@@ -26,7 +39,7 @@ def download(url, fh):
         fh.flush()
         print('\n[*] Successfully downloaded to ' + fh.name)
         return fh
-    except urllib.error.HTTPError as e:
+    except HTTPError as e:
         print(e.fp.read())
 
 
