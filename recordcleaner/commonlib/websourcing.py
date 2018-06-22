@@ -1,6 +1,5 @@
 import json
 import re
-from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import requests
@@ -19,33 +18,34 @@ A_TAB = 'a'
 HREF_ATTR = 'href'
 
 
-def http_post(url, data, auth=None, cert=False):
+def http_post(url, data, auth=None, cert=None):
     bdata = data if isinstance(data, str) else json.dumps(data)
-    try:
-        if auth is not None:
-            response = requests.post(url, bdata, verify=cert, auth=HTTPBasicAuth(*auth), headers={'Accept': 'application/json'})
-            print(response.content)
-            return response
-    except Exception as e:
-        print(e)
+    cert = False if cert is None else cert
+    if auth is not None:
+        response = requests.post(url, bdata, verify=cert, auth=HTTPBasicAuth(*auth),
+                                 headers={'Accept': 'application/json'})
+    else:
+        response = requests.post(url, bdata, verify=cert, headers={'Accept': 'application/json'})
+    print(response.content)
+    return response
 
 
 def download(url, fh):
-    request = Request(url, headers={'User-Agent': USER_AGENT})
-    try:
-        response = urlopen(request)
-        print(('\n[*] Downloading from: {}'.format(url)))
-        fh.write(response.read())
+    response = requests.get(url, stream=True, headers={'User-Agent': USER_AGENT})
+    print(('\n[*] Downloading from: {}'.format(url)))
+    for chunk in response.iter_content(1024):
+        if chunk:
+            fh.write(chunk)
         fh.flush()
-        print('\n[*] Successfully downloaded to ' + fh.name)
-        return fh
-    except HTTPError as e:
-        print(e.fp.read())
+    print('\n[*] Successfully downloaded to ' + fh.name)
+    return fh
 
 
 def make_soup_from_url(url):
-    request = Request(url, headers={'User-Agent': USER_AGENT})
-    html = urlopen(request)
+    # request = Request(url, headers={'User-Agent': USER_AGENT})
+    # html = urlopen(request)
+    response = requests.get(url, headers={'User-Agent': USER_AGENT})
+    html = response.text
     soup = BeautifulSoup(html, 'html.parser')
     return soup
 

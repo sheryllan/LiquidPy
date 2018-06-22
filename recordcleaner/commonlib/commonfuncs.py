@@ -59,10 +59,17 @@ def mapping_updated(dct, values):
     return dct
 
 
-def select_mapping(dct, keys):
+def select_mapping(data, keys, keepnone=True):
     if keys is None:
-        return dct
-    return {k: dct.get(k, None) for k in keys}
+        return data
+    selected = {k: data.get(k, None) for k in keys} if keepnone else {k: data[k] for k in keys if k in data}
+    return type(data)(selected)
+
+
+def rename_mapping(data, mapping):
+    if mapping is None:
+        return data
+    return type(data)({mapping.get(k, k): data[k] for k in data})
 
 
 def rreplace(s, old, new, occurrence):

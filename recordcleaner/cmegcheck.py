@@ -166,9 +166,9 @@ class CMEGScraper(object):
         df_cme = self.get_adv_table(self.URL_CME_ADV)
         df_cbot = self.get_adv_table(self.URL_CBOT_ADV)
         df_nymex = self.get_adv_table(self.URL_NYMEX_COMEX_ADV)
-        adv_dict = {CME: rename_filter(df_cme, {self.get_ytd_header(df_cme, year=year)}, self.ADV_OUTCOLS[CME]),
-                    CBOT: rename_filter(df_cbot, {self.get_ytd_header(df_cbot, year=year)}, self.ADV_OUTCOLS[CBOT]),
-                    NYMEX: rename_filter(df_nymex, {self.get_ytd_header(df_nymex, year=year)}, self.ADV_OUTCOLS[NYMEX])}
+        adv_dict = {CME: rename_filter(df_cme, {self.get_ytd_header(df_cme, year=year): A_ADV_YTD}, self.ADV_OUTCOLS[CME]),
+                    CBOT: rename_filter(df_cbot, {self.get_ytd_header(df_cbot, year=year): A_ADV_YTD}, self.ADV_OUTCOLS[CBOT]),
+                    NYMEX: rename_filter(df_nymex, {self.get_ytd_header(df_nymex, year=year): A_ADV_YTD}, self.ADV_OUTCOLS[NYMEX])}
 
         return df_prods, adv_dict
 
@@ -597,6 +597,9 @@ class CMEGTask(TaskBase):
                          CBOT: CMEGSetting.SVC_CBOT,
                          NYMEX: CMEGSetting.SVC_NYMEX}
 
+    def get_count(self, data):
+        return {exch: len(data[exch]) for exch in data}
+
     def scrape(self):
         match_outpath = self.task_args.get(self.MATCH_OUTPATH, None)
         df_prods, dfs_adv = self.scraper.run_scraper()
@@ -608,10 +611,24 @@ class CMEGTask(TaskBase):
         outpath = self.task_args[self.OUTPATH]
         return self.checker.run_pd_check(self._exch_prods, vollim, self.COLS_MAPPING, self.CHECK_COLS, outpath)
 
+    def send_to_icinga(self, exit_status):
+        exit_code, ex = exit_status
+        if not exit_code and ex is None:
+            for exch, data in self._checked_prods.items():
+                service = self.services[exch]
+                json_data = self.to_json_data(data, exch, self.voltype, service, exit_code)
+                self.post_pcr(json_data)
+        elif exit_code:
+            for exch, service in self.services.items():
+                service = self.services[exch]
+                msg = str(ex) if ex is not None else ''
+                json_data = IcingaHelper.to_json(IcingaHelper.SERVICE, service, msg, exit_code)
+                self.post_pcr(json_data)
+
 
 if __name__ == '__main__':
     task = CMEGTask()
-    results = task.run()
+    results = task.run(icinga=True)
     print()
 
 

@@ -2,6 +2,7 @@ import math
 from datetime import datetime
 from subprocess import Popen, PIPE
 
+
 import pandas as pd
 from PyPDF2 import PdfFileReader
 from dateutil.relativedelta import relativedelta
@@ -42,11 +43,9 @@ def clean_df(df, nonna_subset):
 
 def rename_filter(data, col_mapping=None, outcols=None):
     def process(d):
-        if col_mapping is not None:
-            d = d.rename(col_mapping)
-        if outcols is not None:
-            d = d[[c for c in outcols if d.keys()]]
-        return d
+        renamed = rename_mapping(d, col_mapping)
+        selected = select_mapping(renamed, outcols, False)
+        return selected
 
     if isinstance(data, pd.DataFrame):
         return process(data)

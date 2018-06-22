@@ -1,10 +1,9 @@
 import argparse
 import socket
-
 from tabulate import tabulate
 
-from commonlib.websourcing import http_post
 from productchecker import *
+from settings import *
 
 
 def to_tbstring(data, dtypes, cols=None, tablefmt='simple'):
@@ -28,7 +27,7 @@ def to_tbstring(data, dtypes, cols=None, tablefmt='simple'):
         raise TypeError('Inconsistent function input: data parameter must contain data of dtype')
 
 
-def tabulate_rows(data, outcols=None, grouping=None):
+def tabulate_rows(data, outcols=None, grouping=None, tablefmt='simple'):
     first, data = peek_iter(data)
     if first is None:
         return ''
@@ -36,18 +35,13 @@ def tabulate_rows(data, outcols=None, grouping=None):
     if grouping is not None:
         for key, subitems in groupby(data, key=grouping):
             yield tabulate([key], 'plain')
-            yield from to_tbstring(subitems, type(first), outcols)
+            yield from to_tbstring(subitems, type(first), outcols, tablefmt)
     else:
         yield from to_tbstring(data, type(first), outcols)
 
 
 class IcingaHelper(object):
-    HTTPS_HEADER = 'https://'
-    ICINGA_HOST = os.getenv('ICINGA_HOST')
-    ICINGA_API_PORT = os.getenv('ICINGA_API_PORT')
-    ICINGA_API_PCR = os.getenv('ICINGA_API_PCR')
-    ICINGA_API_USER = os.getenv('ICINGA_API_USER')
-    ICINGA_API_PSW = os.getenv('ICINGA_API_PSW')
+    PROCESS_CHECK_URL = get_icinga_api_url(ICINGA_API_PCR)
 
     TYPE = 'type'
     FILTER = 'filter'
@@ -90,18 +84,11 @@ class IcingaHelper(object):
                 raise ValueError('the field \"label\" and \"value\" of PerfData must not be None')
             yield '{}={};{};{};{};{}'.format(d.label, d.value, d.warn, d.crit, d.min, d.max).rstrip(';')
 
-    @staticmethod
-    def process_check_url():
-        host = '{}:{}'.format(IcingaHelper.ICINGA_HOST, IcingaHelper.ICINGA_API_PORT)
-        pcr_path = os.path.join(host, IcingaHelper.ICINGA_API_PCR)
-        return IcingaHelper.HTTPS_HEADER + pcr_path
-
 
 class TaskBase(object):
     OUTPATH = 'outpath'
     VOLLIM = 'vollim'
     ICINGA = 'icinga'
-    CA_CRT = 'cacert'
 
     PRODCODE = 'Prodcode'
     PRODTYPE = 'Prodtype'
@@ -117,11 +104,9 @@ class TaskBase(object):
     ICINGA_OUTCOLS = {RECORDED, PRODCODE, PRODTYPE, PRODNAME}
 
     def __init__(self, settings):
-        self.dflt_args = {self.ICINGA: False, self.CA_CRT: settings.CA_CRT,
-                          self.OUTPATH: settings.OUTPATH, self.VOLLIM: settings.VOLLIM}
+        self.dflt_args = {self.ICINGA: False, self.OUTPATH: settings.OUTPATH, self.VOLLIM: settings.VOLLIM}
         self.aparser = argparse.ArgumentParser()
         self.aparser.add_argument('-icg', '--' + self.ICINGA,  action='store_true', help='set it to enable results transfer to icinga')
-        self.aparser.add_argument('-ca', '--' + self.CA_CRT, type=str, help='the path to the CA certificate for icinga server')
         self.aparser.add_argument('-o', '--' + self.OUTPATH, type=str, help='the output path of the check results')
         self.aparser.add_argument('-v', '--' + self.VOLLIM, type=int, help='the volume threshold to filter out products')
         self.services = None
@@ -156,12 +141,11 @@ class TaskBase(object):
         self.task_args.update(stdin_args)
         self.task_args.update(kwargs)
 
-    def format_plugin_output(self, exch, voltype, vollim, details):
+    def format_plugin_output(self, exch, voltype, data, tablefmt='simple'):
+        vollim = self.task_args[self.VOLLIM]
         title = '{} products for which {} is higher than {}'.format(exch, voltype, vollim)
+        details = '\n'.join(list(tabulate_rows(data, self.ICINGA_OUTCOLS, tablefmt)))
         return '\n'.join([title, details])
-
-    def plugin_output_details(self, data):
-        return '\n'.join(tabulate_rows(data, self.ICINGA_OUTCOLS))
 
     def format_perfdata(self, data, prods_tot, checked_tot):
         cnt_rcd = count_unique(data, RECORDED)
@@ -174,36 +158,29 @@ class TaskBase(object):
 
         return list(IcingaHelper.format_perf_data([recorded, unrecorded, prods_tot, flt_pct]))
 
-    def send_to_icinga(self, exit_status, exmsg=None):
-        url = IcingaHelper.process_check_url()
-        auth = (IcingaHelper.ICINGA_API_USER, IcingaHelper.ICINGA_API_PSW)
+    def to_json_data(self, data, exch, voltype, service, exit_code=0, procfunc=None):
+        poutput = self.format_plugin_output(exch, voltype, data, procfunc)
+        perf_data = self.format_perfdata(data, self._exch_prods[exch], self._checked_prods[exch])
+        return IcingaHelper.to_json(IcingaHelper.SERVICE, service, poutput, exit_code, perfdata=perf_data)
 
-        if not exit_status:
-            vollim = self.task_args[self.VOLLIM]
-            for exch, data in self._checked_prods.items():
-                po_details = self.plugin_output_details(data)
-                perf_data = self.format_perfdata(data, self._exch_prods[exch], self._checked_prods[exch])
-                poutput = self.format_plugin_output(exch, self.voltype, vollim, po_details)
+    def post_pcr(self, data):
+        url = IcingaHelper.PROCESS_CHECK_URL
+        auth = (ICINGA_API_USER, ICINGA_API_PSW)
+        cert = ICINGA_CA_CRT
+        return http_post(url, data, auth, cert)
 
-                json_data = IcingaHelper.to_json(IcingaHelper.SERVICE, self.services[exch],
-                                                 poutput, exit_status, perfdata=perf_data)
-
-                http_post(url, json_data, auth, self.task_args[self.CA_CRT])
-        else:
-            poutput = exmsg
-            for exch, service in self.services.items():
-                json_data = IcingaHelper.to_json(IcingaHelper.SERVICE, service, poutput, exit_status)
-                http_post(url, json_data, auth, self.task_args[self.CA_CRT])
+    def send_to_icinga(self, exit_status):
+        raise NotImplementedError("Please implement this method")
 
     def run(self, **kwargs):
         self.set_task_args(**kwargs)
         print('Results output to {}'.format(self.task_args[self.OUTPATH]))
-        exit_status = 0
+        exit_status = (0, None)
         try:
             self.run_scraping()
             self.run_checking()
-        except Exception:
-            exit_status = 1
+        except Exception as e:
+            exit_status = (1, e)
 
         if self.task_args[self.ICINGA]:
             self.send_to_icinga(exit_status)
