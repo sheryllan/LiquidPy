@@ -546,14 +546,15 @@ class CMEGChecker(object):
         return None
 
     def get_group_key(self, row):
+        row = pd.Series(row)
         group_key = [A_PRODUCT_NAME, A_CLEARED_AS]
         try:
-            return ' '.join(select_mapping(row, group_key).values())
+            return ' '.join(select_mapping(row, group_key).values)
         except AttributeError as e:
             raise ValueError('Invalid type of row: must be either pandas Series or dict').with_traceback(e.__traceback__)
 
-    def check_filter_prods(self, data, config_dict, filterfunc, aggrfunc=False):
-        rows = data if not aggrfunc else groupby_aggr(data, self.get_group_key, A_ADV_YTD, sum_unique, GROUP)
+    def check_filter_prods(self, data, config_dict, filterfunc, aggr=False):
+        rows = data if not aggr else groupby_aggr(data, self.get_group_key, A_ADV_YTD, sum_unique, GROUP)
         return filter_mark_rows(rows, filterfunc, self.get_prod_key, config_dict)
 
     def run_pd_check(self, data, vol_threshold, cols_renaming=None, outcols=None, outpath=None):

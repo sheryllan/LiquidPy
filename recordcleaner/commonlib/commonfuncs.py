@@ -54,9 +54,12 @@ def swap(a, b):
     return a, b
 
 
-def mapping_updated(dct, values):
-    dct.update(values)
-    return dct
+def mapping_updated(data, values, insert=True):
+    val_dict = dict(values)
+    for k in val_dict:
+        if insert or k in data:
+            data[k] = val_dict[k]
+    return data
 
 
 def select_mapping(data, keys, keepnone=True):
@@ -69,7 +72,7 @@ def select_mapping(data, keys, keepnone=True):
 def rename_mapping(data, mapping):
     if mapping is None:
         return data
-    return type(data)({mapping.get(k, k): data[k] for k in data})
+    return type(data)({mapping.get(k, k): data[k] for k in data.keys()})
 
 
 def rreplace(s, old, new, occurrence):
@@ -102,11 +105,13 @@ def verify_non_decreasing(array):
 
 def peek_iter(items):
     if not nontypes_iterable(items):
-        return items
-    gen = iter(items)
-    peek = next(gen, None)
-    items = chain([peek], gen) if peek is not None else iter('')
-    return peek, items
+        raise TypeError('The input must be iterable')
+    if hasattr(items, '__getitem__'):
+        return (None, items) if not items else (list(items)[0], items)
+    if hasattr(items, '__next__'):
+        peek = next(items, None)
+        gen = chain([peek], items) if peek is not None else iter('')
+        return peek, gen
 
 
 def hierarch_groupby(orig_dict, key_funcs, sort=False):

@@ -6,38 +6,16 @@ from productchecker import *
 from settings import *
 
 
-def to_tbstring(data, dtypes, cols=None, tablefmt='simple'):
-    if nontypes_iterable(data, dtypes):
-        for d in data:
-            yield to_tbstring(d, dtypes, cols, tablefmt)
-    elif isinstance(data, dtypes):
-        try:
-            table = select_mapping(data, cols)
-        except AttributeError as e:
-            raise ValueError('Invalid type of row: must be either pandas Series or dict').with_traceback(
-                e.__traceback__)
+def to_tbstring(data, fltcols=None, tablefmt='simple', tolist_func=None, headers=None):
+    def tolist(d):
+        return d.values() if isinstance(d, dict) else list(d)
 
-        if isinstance(table, pd.Series):
-            return tabulate([table.tolist()], tablefmt)
-        elif isinstance(table, dict):
-            return tabulate([table.values()], tablefmt)
-        else:
-            return tabulate([list(table)], tablefmt)
+    tolist_func = tolist if tolist_func is None else tolist_func
+    table = [tolist_func(select_mapping(d, fltcols)) for d in data]
+    if headers is None:
+        return tabulate(table, tablefmt=tablefmt)
     else:
-        raise TypeError('Inconsistent function input: data parameter must contain data of dtype')
-
-
-def tabulate_rows(data, outcols=None, grouping=None, tablefmt='simple'):
-    first, data = peek_iter(data)
-    if first is None:
-        return ''
-
-    if grouping is not None:
-        for key, subitems in groupby(data, key=grouping):
-            yield tabulate([key], 'plain')
-            yield from to_tbstring(subitems, type(first), outcols, tablefmt)
-    else:
-        yield from to_tbstring(data, type(first), outcols)
+        return tabulate(table, headers, tablefmt)
 
 
 class IcingaHelper(object):
@@ -47,7 +25,7 @@ class IcingaHelper(object):
     FILTER = 'filter'
     SVCNAME = 'service.name'
     HOSTNAME = 'host.name'
-    EXIT_STATUS =  'exit_status'
+    EXIT_STATUS = 'exit_status'
     PLUGIN_OUPUT = 'plugin_output'
     CHECK_SOURCE = 'check_source'
     PERF_DATA = 'performance_data'
@@ -101,7 +79,7 @@ class TaskBase(object):
     PERF_TOT_PRODS = 'prods_tot'
     PERF_FLT_PERCENTAGE = 'flt_pct'
 
-    ICINGA_OUTCOLS = {RECORDED, PRODCODE, PRODTYPE, PRODNAME}
+    ICINGA_OUTCOLS = [RECORDED, PRODCODE, PRODTYPE, PRODNAME, VOLUME]
 
     def __init__(self, settings):
         self.dflt_args = {self.ICINGA: False, self.OUTPATH: settings.OUTPATH, self.VOLLIM: settings.VOLLIM}
@@ -141,26 +119,39 @@ class TaskBase(object):
         self.task_args.update(stdin_args)
         self.task_args.update(kwargs)
 
-    def format_plugin_output(self, exch, voltype, data, tablefmt='simple'):
+    def tabulate_rows(self, data, outcols=None, tablefmt=None):
+        tablefmt = 'simple' if tablefmt is None else tablefmt
+        first, data = peek_iter(data)
+        if first is None:
+            return ''
+        if GROUP in first:
+            for key, subitems in groupby(data, key=lambda x: x[GROUP]):
+                yield key
+                yield to_tbstring(subitems, outcols, tablefmt)
+        else:
+            yield to_tbstring(data, outcols, tablefmt)
+
+    def format_plugin_output(self, exch, voltype, data, tablefmt=None):
         vollim = self.task_args[self.VOLLIM]
         title = '{} products for which {} is higher than {}'.format(exch, voltype, vollim)
-        details = '\n'.join(list(tabulate_rows(data, self.ICINGA_OUTCOLS, tablefmt)))
+        details = '\n'.join(list(self.tabulate_rows(data, self.ICINGA_OUTCOLS, tablefmt)))
+        print(details)
         return '\n'.join([title, details])
 
     def format_perfdata(self, data, prods_tot, checked_tot):
         cnt_rcd = count_unique(data, RECORDED)
+        flt_pct = '{}%'.format(round(checked_tot / prods_tot * 100), 2)
 
         recorded = IcingaHelper.PerfData(self.PERF_RECORDED, cnt_rcd[True])
         unrecorded = IcingaHelper.PerfData(self.PERF_UNRECORDED, cnt_rcd[False])
         prods_tot = IcingaHelper.PerfData(self.PERF_TOT_PRODS, prods_tot)
-        flt_pct = '{}%'.format(checked_tot / prods_tot * 100)
         flt_pct = IcingaHelper.PerfData(self.PERF_FLT_PERCENTAGE, flt_pct)
 
         return list(IcingaHelper.format_perf_data([recorded, unrecorded, prods_tot, flt_pct]))
 
-    def to_json_data(self, data, exch, voltype, service, exit_code=0, procfunc=None):
-        poutput = self.format_plugin_output(exch, voltype, data, procfunc)
-        perf_data = self.format_perfdata(data, self._exch_prods[exch], self._checked_prods[exch])
+    def to_json_data(self, data, exch, voltype, service, exit_code=0, tablefmt='simple'):
+        poutput = self.format_plugin_output(exch, voltype, data, tablefmt)
+        perf_data = self.format_perfdata(data, self._tot_exch[exch], self._tot_checked[exch])
         return IcingaHelper.to_json(IcingaHelper.SERVICE, service, poutput, exit_code, perfdata=perf_data)
 
     def post_pcr(self, data):
@@ -180,7 +171,9 @@ class TaskBase(object):
             self.run_scraping()
             self.run_checking()
         except Exception as e:
+            print(str(e))
             exit_status = (1, e)
+            raise
 
         if self.task_args[self.ICINGA]:
             self.send_to_icinga(exit_status)

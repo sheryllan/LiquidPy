@@ -44,8 +44,7 @@ def clean_df(df, nonna_subset):
 def rename_filter(data, col_mapping=None, outcols=None):
     def process(d):
         renamed = rename_mapping(d, col_mapping)
-        selected = select_mapping(renamed, outcols, False)
-        return selected
+        return select_mapping(renamed, outcols, False)
 
     if isinstance(data, pd.DataFrame):
         return process(data)

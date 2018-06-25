@@ -1,7 +1,9 @@
 import unittest as ut
-
+from pandas.testing import assert_series_equal
 from datascraper import *
 import re
+
+from osecheck import OSEScraper
 
 
 class MainTests(ut.TestCase):
@@ -62,6 +64,23 @@ class MainTests(ut.TestCase):
 
         self.assertListEqual(expected1, actual1)
         self.assertEqual(expected2, actual2)
+
+    def test_rename_filter(self):
+        index = ['a', 'b', 'c', 'd']
+        r1 = pd.Series([0, 1, 2, 3], index)
+        r2 = pd.Series([4, 5, 6, 7], index)
+        r3 = pd.Series([8, 9, 10, 11], index)
+        data = iter([r1, r2, r3])
+
+        outcols = ['a', 'e']
+        actual = list(rename_filter(data, {'c': 'e'}, outcols))
+
+        expected = [pd.Series([0, 2], outcols),
+                    pd.Series([4, 6], outcols),
+                    pd.Series([8, 10], outcols)]
+
+        for a, e in zip(actual, expected):
+            assert_series_equal(a, e)
 
 
 class TxtFormatterTests(ut.TestCase):

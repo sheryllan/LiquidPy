@@ -57,8 +57,8 @@ def groupby_aggr(data, groupfunc, aggr_col, aggr_func, groupkey=None):
         for row in rows:
             row = pd.Series(row)
             if groupkey is not None:
-                row.update(pd.Series({groupkey: key}))
-            yield mapping_updated(row, pd.Series({aggr_col: aggr_val}))
+                mapping_updated(row, {groupkey: key})
+            yield mapping_updated(row, {aggr_col: aggr_val})
 
 
 def get_config_dict(exch, keycols=(ProductKey.FD_PRODCODE, ProductKey.FD_TYPE), keygen=ProductKey, valcols=None):
