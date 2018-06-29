@@ -2,7 +2,7 @@ from tempfile import TemporaryDirectory
 
 from PyPDF2.generic import Destination
 
-from baseclasses import *
+from taskbase import *
 from datascraper import *
 from datascraper import TabularTxtParser as tp
 from extrawhoosh.analysis import *
@@ -30,7 +30,6 @@ CME = 'CME'
 CBOT = 'CBOT'
 NYMEX = 'NYMEX'
 COMEX = 'COMEX'
-
 
 
 class CMEGScraper(object):
@@ -65,9 +64,7 @@ class CMEGScraper(object):
 
     PRODS_OUTCOLS = [F_PRODUCT_NAME, F_PRODUCT_GROUP, F_CLEARED_AS, F_CLEARING, F_GLOBEX, F_SUB_GROUP, F_EXCHANGE]
 
-
     class CMEGPdfParser(PdfParser):
-
         def __init__(self, f_pdf):
             super().__init__(f_pdf)
             self.prod_groups = self.__get_prod_groups()
@@ -623,13 +620,13 @@ class CMEGTask(TaskBase):
             for exch, service in self.services.items():
                 service = self.services[exch]
                 msg = str(ex) if ex is not None else ''
-                json_data = IcingaHelper.to_json(IcingaHelper.SERVICE, service, msg, exit_code)
+                json_data = IcingaHelper.to_json(True, service, msg, exit_code)
                 self.post_pcr(json_data)
 
 
 if __name__ == '__main__':
     task = CMEGTask()
-    results = task.run(icinga=True)
+    results = task.run()
     print()
 
 

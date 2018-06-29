@@ -19,13 +19,13 @@ HREF_ATTR = 'href'
 
 
 def http_post(url, data, auth=None, cert=None):
-    bdata = data if isinstance(data, str) else json.dumps(data)
+    json_data = data if isinstance(data, str) else json.dumps(data)
     cert = False if cert is None else cert
     if auth is not None:
-        response = requests.post(url, bdata, verify=cert, auth=HTTPBasicAuth(*auth),
+        response = requests.post(url, json_data, verify=cert, auth=HTTPBasicAuth(*auth),
                                  headers={'Accept': 'application/json'})
     else:
-        response = requests.post(url, bdata, verify=cert, headers={'Accept': 'application/json'})
+        response = requests.post(url, json_data, verify=cert, headers={'Accept': 'application/json'})
     print(response.content)
     return response
 

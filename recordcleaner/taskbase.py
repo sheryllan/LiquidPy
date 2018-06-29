@@ -6,18 +6,6 @@ from productchecker import *
 from settings import *
 
 
-def to_tbstring(data, fltcols=None, tablefmt='simple', tolist_func=None, headers=None):
-    def tolist(d):
-        return d.values() if isinstance(d, dict) else list(d)
-
-    tolist_func = tolist if tolist_func is None else tolist_func
-    table = [tolist_func(select_mapping(d, fltcols)) for d in data]
-    if headers is None:
-        return tabulate(table, tablefmt=tablefmt)
-    else:
-        return tabulate(table, headers, tablefmt)
-
-
 class IcingaHelper(object):
     PROCESS_CHECK_URL = get_icinga_api_url(ICINGA_API_PCR)
 
@@ -44,7 +32,7 @@ class IcingaHelper(object):
         ctype = IcingaHelper.SERVICE if typecode else IcingaHelper.HOST
 
         json_dict.update({IcingaHelper.TYPE: ctype})
-        json_dict.update({IcingaHelper.FILTER: {IcingaHelper.SVCNAME: fltname} if typecode else {IcingaHelper.HOST: fltname}})
+        json_dict.update({IcingaHelper.FILTER: '{}==\"{}\"'.format(IcingaHelper.SVCNAME if typecode else IcingaHelper.HOST, fltname)})
         json_dict.update({IcingaHelper.EXIT_STATUS: exitcode})
         json_dict.update({IcingaHelper.CHECK_SOURCE: checksource})
 
@@ -79,10 +67,10 @@ class TaskBase(object):
     PERF_TOT_PRODS = 'prods_tot'
     PERF_FLT_PERCENTAGE = 'flt_pct'
 
-    ICINGA_OUTCOLS = [RECORDED, PRODCODE, PRODTYPE, PRODNAME, VOLUME]
+    ICINGA_OUTCOLS = [PRODNAME, RECORDED, PRODCODE, PRODTYPE, VOLUME]
 
     def __init__(self, settings):
-        self.dflt_args = {self.ICINGA: False, self.OUTPATH: settings.OUTPATH, self.VOLLIM: settings.VOLLIM}
+        self.dflt_args = {self.ICINGA: settings.ICINGA, self.OUTPATH: settings.OUTPATH, self.VOLLIM: settings.VOLLIM}
         self.aparser = argparse.ArgumentParser()
         self.aparser.add_argument('-icg', '--' + self.ICINGA,  action='store_true', help='set it to enable results transfer to icinga')
         self.aparser.add_argument('-o', '--' + self.OUTPATH, type=str, help='the output path of the check results')
@@ -119,23 +107,30 @@ class TaskBase(object):
         self.task_args.update(stdin_args)
         self.task_args.update(kwargs)
 
-    def tabulate_rows(self, data, outcols=None, tablefmt=None):
-        tablefmt = 'simple' if tablefmt is None else tablefmt
-        first, data = peek_iter(data)
-        if first is None:
-            return ''
-        if GROUP in first:
-            for key, subitems in groupby(data, key=lambda x: x[GROUP]):
-                yield key
-                yield to_tbstring(subitems, outcols, tablefmt)
-        else:
-            yield to_tbstring(data, outcols, tablefmt)
+    def row_tolist(self, d):
+        return list(d.values()) if isinstance(d, dict) else to_iter(d)
 
-    def format_plugin_output(self, exch, voltype, data, tablefmt=None):
+    def delimit_grouped_data(self, data, fltcols=None, gcol=GROUP, delimit=None):
+        first = peek_iter(data)
+        if first is not None and gcol in first:
+            for key, subitems in groupby(data, key=lambda x: x[gcol]):
+                yield key
+                for sub in subitems:
+                    yield select_mapping(sub, fltcols)
+                if delimit is not None:
+                    yield delimit
+        else:
+            for d in data:
+                yield select_mapping(d, fltcols)
+
+    def tabulate_rows(self, data, outcols, tablefmt='simple', numalign='right'):
+        table = [self.row_tolist(gd) for gd in self.delimit_grouped_data(data, outcols, delimit='')]
+        return tabulate(table, outcols, tablefmt, numalign=numalign)
+
+    def format_plugin_output(self, exch, voltype, data, outcols=ICINGA_OUTCOLS, tablefmt='simple', numalign='right'):
         vollim = self.task_args[self.VOLLIM]
-        title = '{} products for which {} is higher than {}'.format(exch, voltype, vollim)
-        details = '\n'.join(list(self.tabulate_rows(data, self.ICINGA_OUTCOLS, tablefmt)))
-        print(details)
+        title = '{} products for which {} is higher than {}:'.format(exch, voltype, vollim)
+        details = self.tabulate_rows(data, outcols, tablefmt, numalign)
         return '\n'.join([title, details])
 
     def format_perfdata(self, data, prods_tot, checked_tot):
@@ -149,10 +144,10 @@ class TaskBase(object):
 
         return list(IcingaHelper.format_perf_data([recorded, unrecorded, prods_tot, flt_pct]))
 
-    def to_json_data(self, data, exch, voltype, service, exit_code=0, tablefmt='simple'):
-        poutput = self.format_plugin_output(exch, voltype, data, tablefmt)
+    def to_json_data(self, data, exch, voltype, service, exit_code=0, tablefmt='simple', numalign='right'):
+        poutput = self.format_plugin_output(exch, voltype, data, tablefmt=tablefmt, numalign=numalign)
         perf_data = self.format_perfdata(data, self._tot_exch[exch], self._tot_checked[exch])
-        return IcingaHelper.to_json(IcingaHelper.SERVICE, service, poutput, exit_code, perfdata=perf_data)
+        return IcingaHelper.to_json(True, service, poutput, exit_code, perfdata=perf_data)
 
     def post_pcr(self, data):
         url = IcingaHelper.PROCESS_CHECK_URL
@@ -173,7 +168,6 @@ class TaskBase(object):
         except Exception as e:
             print(str(e))
             exit_status = (1, e)
-            raise
 
         if self.task_args[self.ICINGA]:
             self.send_to_icinga(exit_status)

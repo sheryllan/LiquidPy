@@ -1,48 +1,25 @@
 #!/bin/bash
 
-cd "$( dirname "${BASH_SOURCE[0]}" )"
-ENVFILE=envfile.sh
-source ${ENVFILE}
-
-readArgs() {
-	while [[ $# -gt 0 ]]
-	do
-		key="$1"
-	case $key in
-		--clean)
-		CLEAN=true
+while [[ $# -gt 0 ]]
+do
+	key="$1"
+case $key in
+	--clean)
+		CLEAN=--clean
 		shift
-		;;
-	esac
-	done
-}
-	
-setupEnv() {
-	rm -rf ${VENV_PATH}
+	;;
+	--icinga)
+		ICINGA=--icinga
+		shift
+	;;
+esac
+done
 
-	mkdir ${VENV_PATH}
-	scl enable rh-python36 "virtualenv ${VENV_NAME}"
-	echo "Virutal environment ${VENV_NAME} created"
-
-	source ${VENV_BIN}/activate
-	echo "virtual environment ${VENV_NAME} activated"
-
-	echo "Installing missing packages from requirements.txt"
-	pip install -r requirements.txt
-
-	echo "Packages installed in ${VENV_NAME}:"
-	pip freeze
-
-	deactivate
-}
-
-
-readArgs
-if [ "${CLEAN}" = true ] || ! [ -d ${VENV_PATH} ]; then
-    setupEnv
-fi
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source ${DIR}/env_setup.sh ${CLEAN}
 
 source ${VENV_BIN}/activate
-echo -e "\nRunning cmegcheck.py"
-python cmegcheck.py
+echo -e "\nRunning ${CMEGCHECK_PY}"
+python ${CMEGCHECK_PY} ${ICINGA}
+
 deactivate

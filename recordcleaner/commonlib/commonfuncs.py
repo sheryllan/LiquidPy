@@ -1,7 +1,8 @@
-from itertools import chain
-from collections import Iterable
-from sortedcontainers import SortedDict
 import types
+from collections import Iterable
+from itertools import tee
+import warnings
+from sortedcontainers import SortedDict
 
 
 def nontypes_iterable(arg, excl_types=(str,)):
@@ -65,9 +66,14 @@ def mapping_updated(data, values, insert=True):
 def select_mapping(data, keys, keepnone=True):
     if keys is None:
         return data
-    selected = {k: data.get(k, None) for k in keys} if keepnone else {k: data[k] for k in keys if k in data}
-    return type(data)(selected)
 
+    result = type(data)()
+    for k in keys:
+        if keepnone:
+            result[k] = data.get(k, None)
+        elif k in data:
+            result[k] = data[k]
+    return result
 
 def rename_mapping(data, mapping):
     if mapping is None:
@@ -103,15 +109,21 @@ def verify_non_decreasing(array):
     return True
 
 
-def peek_iter(items):
+def peek_iter(items, n=1):
     if not nontypes_iterable(items):
         raise TypeError('The input must be iterable')
-    if hasattr(items, '__getitem__'):
-        return (None, items) if not items else (list(items)[0], items)
-    if hasattr(items, '__next__'):
-        peek = next(items, None)
-        gen = chain([peek], items) if peek is not None else iter('')
-        return peek, gen
+    if n > 20:
+        warnings.warn('Costly using this method if n > 20: suggest to use list instead')
+
+    _, iteritems = tee(items)
+    return next(iteritems, None) if n == 1 else list(filter(None, (next(iteritems, None) for _ in range(0, n))))
+
+    # if hasattr(items, '__getitem__'):
+    #     return (None, items) if not items else (list(items)[0], items)
+    # if hasattr(items, '__next__'):
+    #     peek = next(items, None)
+    #     gen = chain([peek], items) if peek is not None else iter('')
+    #     return peek, gen
 
 
 def hierarch_groupby(orig_dict, key_funcs, sort=False):

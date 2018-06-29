@@ -5,12 +5,17 @@ from dotenv import load_dotenv
 if os.getenv('DIR') is None:
     os.environ.setdefault('DIR', os.getcwd())
 
-envfile = 'envfile.sh'
+
+def cwd_full_path(filename):
+    return os.path.join(os.getenv('DIR'), filename)
+
+
+envfile = cwd_full_path('envfile.sh')
 load_dotenv(dotenv_path=envfile)
 
 HTTPS_HEADER = 'https://'
 OUTDIR = os.getenv('OUTDIR')
-ICINGA_CA_CRT = os.getenv('CA_CRT')
+ICINGA_CA_CRT = cwd_full_path(os.getenv('CA_CRT'))
 ICINGA_HOST = os.getenv('ICINGA_HOST')
 ICINGA_API_PORT = os.getenv('ICINGA_API_PORT')
 ICINGA_API_PCR = os.getenv('ICINGA_API_PCR')
@@ -27,6 +32,7 @@ def get_icinga_api_url(child_dir):
 class SettingBase(object):
     OUTPATH = None
     VOLLIM = 0
+    ICINGA = False
 
 
 class CMEGSetting(SettingBase):
