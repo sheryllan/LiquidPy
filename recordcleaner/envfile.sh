@@ -7,9 +7,9 @@ fi
 export LOGLEVEL=DEBUG
 export CMEGCHECK_PY=${DIR}/cmegcheck.py
 
-export VENV_NAME=venv
-export VENV_PATH=${DIR}/${VENV_NAME}
+export VENV_PATH=${DIR}/venv
 export VENV_BIN=${VENV_PATH}/bin
+export REQUIREMENTS=${DIR}/requirements.txt
 export OUTDIR=${DIR}/results
 
 export ICINGA_HOST=lcldn-icinga1
