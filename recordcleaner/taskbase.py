@@ -1,7 +1,7 @@
 import argparse
 import socket
 import sys
-import warnings
+
 from tabulate import tabulate
 
 from productchecker import *
