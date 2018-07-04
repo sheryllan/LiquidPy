@@ -1,5 +1,7 @@
 import argparse
 import socket
+import sys
+import warnings
 from tabulate import tabulate
 
 from productchecker import *
@@ -55,6 +57,8 @@ class TaskBase(object):
     OUTPATH = 'outpath'
     VOLLIM = 'vollim'
     ICINGA = 'icinga'
+    LOGLEVEL = 'loglevel'
+    LOGFILE = 'logfile'
 
     PRODCODE = 'Prodcode'
     PRODTYPE = 'Prodtype'
@@ -68,13 +72,19 @@ class TaskBase(object):
     PERF_FLT_PERCENTAGE = 'flt_pct'
 
     ICINGA_OUTCOLS = [PRODNAME, RECORDED, PRODCODE, PRODTYPE, VOLUME]
+    ROOT_FMT = "%(levelname)s:[%(name)s.%(funcName)s:%(lineno)d]: %(message)s"
 
     def __init__(self, settings):
-        self.dflt_args = {self.ICINGA: settings.ICINGA, self.OUTPATH: settings.OUTPATH, self.VOLLIM: settings.VOLLIM}
+        self.dflt_args = {self.ICINGA: settings.ICINGA, self.OUTPATH: settings.OUTPATH,
+                          self.VOLLIM: settings.VOLLIM, self.LOGLEVEL: settings.LOGLEVEL,
+                          self.LOGFILE: settings.LOGFILE}
         self.aparser = argparse.ArgumentParser()
         self.aparser.add_argument('-icg', '--' + self.ICINGA,  action='store_true', help='set it to enable results transfer to icinga')
         self.aparser.add_argument('-o', '--' + self.OUTPATH, type=str, help='the output path of the check results')
         self.aparser.add_argument('-v', '--' + self.VOLLIM, type=int, help='the volume threshold to filter out products')
+        self.aparser.add_argument('-ll', '--' + self.LOGLEVEL, type=str,
+                                  help='input level name or number: DEBUG(10), INFO(20), WARNING(30), ERROR(40) or CRITICAL(50)')
+        self.aparser.add_argument('-lf', '--' + self.LOGFILE, type=str, help='the path to log file')
         self.services = None
         self.voltype = ''
         self.task_args = None
@@ -83,6 +93,8 @@ class TaskBase(object):
         self._tot_checked = None
         self._exch_prods = None
         self._checked_prods = None
+
+        self.logger = logging.getLogger(__name__)
 
     def get_count(self, data):
         raise NotImplementedError("Please implement this method")
@@ -153,23 +165,45 @@ class TaskBase(object):
         url = IcingaHelper.PROCESS_CHECK_URL
         auth = (ICINGA_API_USER, ICINGA_API_PSW)
         cert = ICINGA_CA_CRT
+        self.logger.info('Posting data to {}, user: {}, certificate: {}'.format(url, auth, cert))
         return http_post(url, data, auth, cert)
 
     def send_to_icinga(self, exit_status):
         raise NotImplementedError("Please implement this method")
 
+    def set_logger(self):
+        level = self.task_args[self.LOGLEVEL]
+        logging.basicConfig(level=level,
+                            format=self.ROOT_FMT,
+                            stream=sys.stdout)
+
+        logfile = self.task_args[self.LOGFILE]
+        if logfile is not None:
+            fh = logging.FileHandler(logfile)
+            fh.setLevel(level)
+            fh.setFormatter(logging.Formatter('%(asctime)s ' + self.ROOT_FMT, datefmt="%Y-%m-%d %H:%M:%S"))
+            logging.getLogger().addHandler(fh)
+
     def run(self, **kwargs):
         self.set_task_args(**kwargs)
-        print('Results output to {}'.format(self.task_args[self.OUTPATH]))
         exit_status = (0, None)
-        try:
-            self.run_scraping()
-            self.run_checking()
-        except Exception as e:
-            print(str(e))
-            exit_status = (1, e)
+        self.set_logger()
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings('error')
+            try:
+                self.logger.info('Start running scraping')
+                self.run_scraping()
+                self.logger.info('Start running checking')
+                self.run_checking()
+            except Warning as w:
+                self.logger.warning(str(w))
+            except Exception as e:
+                self.logger.error('Failed running the task', exc_info=True)
+                exit_status = (1, e)
 
         if self.task_args[self.ICINGA]:
+            self.logger.info('Sending results to icinga')
             self.send_to_icinga(exit_status)
 
 

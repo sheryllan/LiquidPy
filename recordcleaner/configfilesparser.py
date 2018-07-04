@@ -1,12 +1,9 @@
-import tempfile
-import pandas as pd
-import paramiko
 import os
 
-from commonlib.websourcing import *
+import pandas as pd
+import paramiko
 
-# BASE_PATH = '/home/slan/Documents/config_files/'
-# source_files = {e: e + '.xml' for e in EXCHANGES}
+from commonlib.websourcing import *
 
 XML_SUFFIX = '.xml'
 
@@ -77,23 +74,21 @@ def get_default_destfiles():
 
 
 def get_src_file(exch, pkey_path=os.path.expanduser('~/.ssh/id_rsa')):
+    logger = logging.getLogger(__name__)
+    logger.debug('SSH to remote config files for the symbol information')
     with paramiko.SSHClient() as ssh_client:
         ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh_client.connect(hostname=REACTOR_BOX, username=USERNAME, key_filename=pkey_path)
-        print('Connected to {}@{}'.format(USERNAME, REACTOR_BOX))
+        logger.debug('Connected to {}@{}'.format(USERNAME, REACTOR_BOX))
         file_path = os.path.join(CONFIG_PATH, exch + XML_SUFFIX)
         sftp_client = ssh_client.open_sftp()
         with sftp_client.open(file_path) as remote_file:
+            logger.debug('Reading the configs for {} from the remote file {}'.format(exch, file_path))
             return remote_file.read()
 
 
-def get_raw_file(filename):
-    full_url = '/'.join([REPO_URL, filename])
-    f_temp = tempfile.NamedTemporaryFile()
-    download(full_url, f_temp)
-
-
 def parse_config(exch, tag=TAG_PRODUCT, attrs=None, mapping_cols=CF_OUTCOLS_MAPPING, to_df=False):
+    logger = logging.getLogger(__name__)
     src = get_src_file(exch)
     attrs = ATTR_NAMES[exch] if attrs is None else attrs
     data_parsed = fltr_attrs(make_soup(src).find_all(tag), attrs, mapping_cols)
@@ -101,9 +96,15 @@ def parse_config(exch, tag=TAG_PRODUCT, attrs=None, mapping_cols=CF_OUTCOLS_MAPP
     if to_df:
         renamed_cols = (mapping_cols.get(c, c) for c in attrs)
         config_data = pd.DataFrame(list(config_data), columns=renamed_cols)
+    logger.debug('Configs for {} parsed into {}'.format(exch, type(config_data)))
     return config_data
 
 
+# def get_raw_file(filename):
+#     full_url = '/'.join([REPO_URL, filename])
+#     f_temp = tempfile.NamedTemporaryFile()
+#     download(full_url, f_temp)
+#
 # def run_all_configs_parse(dest_files=None, sheetname=None):
 #     results = dict()
 #     for exch in EXCHANGES:

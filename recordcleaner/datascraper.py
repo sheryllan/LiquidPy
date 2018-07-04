@@ -1,7 +1,7 @@
 import math
 from datetime import datetime
 from subprocess import Popen, PIPE
-
+import logging
 
 import pandas as pd
 from PyPDF2 import PdfFileReader
@@ -76,7 +76,7 @@ def run_pdftotext(pdf, txt=None, encoding='utf-8', **kwargs):
         out = out.splitlines()
     if err is not None:
         raise RuntimeError(err)
-    print('\n[*] Successfully convert {} to {}'.format(pdf, 'stdout' if txt == '-' else txt))
+
     return out if txt == '-' else txt
 
 
@@ -94,6 +94,7 @@ class PdfParser(object):
     def __init__(self, f_pdf):
         self.f_pdf = f_pdf
         self.pdf_reader = PdfFileReader(f_pdf)
+        self.logger = logging.getLogger(__name__)
 
     def get_num_pages(self):
         return self.pdf_reader.getNumPages()
@@ -101,8 +102,10 @@ class PdfParser(object):
     def pdftotext_bypages(self, start_page=1, end_page=None):
         tot_pages = self.get_num_pages()
         end_page = tot_pages if end_page is None or end_page > tot_pages else end_page
+        pdf = self.f_pdf.name
         for page in range(start_page, end_page + 1):
-            yield run_pdftotext(self.f_pdf.name, f=page, l=page)
+            yield run_pdftotext(pdf, f=page, l=page)
+            self.logger.debug('Successfully convert page#{} in pdf {} to {}'.format(page, pdf, 'stdout'))
 
 
 class TabularTxtParser(object):

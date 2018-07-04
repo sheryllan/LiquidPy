@@ -1,7 +1,6 @@
 import json
 import re
-from urllib.request import Request, urlopen
-
+import logging
 import requests
 from bs4 import BeautifulSoup
 from requests.auth import HTTPBasicAuth
@@ -19,6 +18,7 @@ HREF_ATTR = 'href'
 
 
 def http_post(url, data, auth=None, cert=None):
+    logger = logging.getLogger(__name__)
     json_data = data if isinstance(data, str) else json.dumps(data)
     cert = False if cert is None else cert
     if auth is not None:
@@ -26,24 +26,22 @@ def http_post(url, data, auth=None, cert=None):
                                  headers={'Accept': 'application/json'})
     else:
         response = requests.post(url, json_data, verify=cert, headers={'Accept': 'application/json'})
-    print(response.content)
+    logger.info(response.content.decode())
     return response
 
 
 def download(url, fh):
+    logger = logging.getLogger(__name__)
     response = requests.get(url, stream=True, headers={'User-Agent': USER_AGENT})
-    print(('\n[*] Downloading from: {}'.format(url)))
     for chunk in response.iter_content(1024):
         if chunk:
             fh.write(chunk)
         fh.flush()
-    print('\n[*] Successfully downloaded to ' + fh.name)
+    logger.info('Successfully downloaded to ' + fh.name)
     return fh
 
 
 def make_soup_from_url(url):
-    # request = Request(url, headers={'User-Agent': USER_AGENT})
-    # html = urlopen(request)
     response = requests.get(url, headers={'User-Agent': USER_AGENT})
     html = response.text
     soup = BeautifulSoup(html, 'html.parser')

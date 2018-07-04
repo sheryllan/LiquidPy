@@ -4,6 +4,7 @@ if [ -z "${DIR}" ]; then
 export DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 fi
 
+export LOGLEVEL=DEBUG
 export CMEGCHECK_PY=${DIR}/cmegcheck.py
 
 export VENV_NAME=venv

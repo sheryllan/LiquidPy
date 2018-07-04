@@ -33,6 +33,8 @@ class SettingBase(object):
     OUTPATH = None
     VOLLIM = 0
     ICINGA = False
+    LOGLEVEL = os.getenv('LOGLEVEL')
+    LOGFILE = None
 
 
 class CMEGSetting(SettingBase):

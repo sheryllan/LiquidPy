@@ -1,5 +1,4 @@
-from tempfile import TemporaryDirectory
-
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 from PyPDF2.generic import Destination
 
 from taskbase import *
@@ -63,6 +62,9 @@ class CMEGScraper(object):
                    NYMEX: MUST_COLS + [A_COMMODITY, A_ADV_YTD]}
 
     PRODS_OUTCOLS = [F_PRODUCT_NAME, F_PRODUCT_GROUP, F_CLEARED_AS, F_CLEARING, F_GLOBEX, F_SUB_GROUP, F_EXCHANGE]
+
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
 
     class CMEGPdfParser(PdfParser):
         def __init__(self, f_pdf):
@@ -139,14 +141,15 @@ class CMEGScraper(object):
             return pd.DataFrame.from_records(list(parse_adv_tr()))
 
     def get_prods_table(self):
-        with tempfile.NamedTemporaryFile() as prods_file:
+        with NamedTemporaryFile() as prods_file:
             xls = pd.ExcelFile(download(self.URL_PRODSLATE, prods_file).name, on_demand=True)
             df_prods = pd.read_excel(xls)
             nonna_subset = [A_PRODUCT_NAME, A_PRODUCT_GROUP, A_CLEARED_AS]
             return clean_df(set_df_col(df_prods), nonna_subset)
 
     def get_adv_table(self, url):
-        with download(url, tempfile.NamedTemporaryFile()) as f_pdf:
+        self.logger.info(('Downloading from: {}'.format(url)))
+        with download(url, NamedTemporaryFile()) as f_pdf:
             pdf_parser = self.CMEGPdfParser(f_pdf)
             tables = [pdf_parser.parse_table_from_txt(page) for page in pdf_parser.pdftotext_bypages()]
         return pd.concat(tables, ignore_index=True)
@@ -159,6 +162,7 @@ class CMEGScraper(object):
     def run_scraper(self, year=None):
         df_prods = self.get_prods_table()
         df_prods = df_prods.rename(columns=CMEGScraper.COL2FIELD)[self.PRODS_OUTCOLS]
+        self.logger.debug('Renamed and filtered product slate dataframe columns to {}'.format(list(df_prods.columns)))
 
         df_cme = self.get_adv_table(self.URL_CME_ADV)
         df_cbot = self.get_adv_table(self.URL_CBOT_ADV)
@@ -166,7 +170,8 @@ class CMEGScraper(object):
         adv_dict = {CME: rename_filter(df_cme, {self.get_ytd_header(df_cme, year=year): A_ADV_YTD}, self.ADV_OUTCOLS[CME]),
                     CBOT: rename_filter(df_cbot, {self.get_ytd_header(df_cbot, year=year): A_ADV_YTD}, self.ADV_OUTCOLS[CBOT]),
                     NYMEX: rename_filter(df_nymex, {self.get_ytd_header(df_nymex, year=year): A_ADV_YTD}, self.ADV_OUTCOLS[NYMEX])}
-
+        for exch in adv_dict:
+            self.logger.debug('Renamed and filterd {} dataframe columns to {}'.format(exch, list(adv_dict[exch].columns)))
         return df_prods, adv_dict
 
 
@@ -329,6 +334,9 @@ class CMEGMatcher(object):
                  'by', 'to', 'you', 'be', 'we', 'that', 'may', 'not', 'with', 'tbd', 'a', 'on', 'your',
                  'this', 'of', 'will', 'can', 'the', 'or', 'are']
 
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+
 
     # region Private methods for grouping
     def __match_pdgp(self, s_ref, s_sample):
@@ -430,9 +438,9 @@ class CMEGMatcher(object):
 
     def __prt_match_status(self, matched, row):
         if not matched:
-            print('Failed matching {}'.format(row[A_PRODUCT_NAME]))
+            self.logger.debug('Failed matching {}'.format(row[A_PRODUCT_NAME]))
         else:
-            print('Successful matching {} with {}'.format(row[A_PRODUCT_NAME], row[F_PRODUCT_NAME]))
+            self.logger.debug('Successful matching {} with {}'.format(row[A_PRODUCT_NAME], row[F_PRODUCT_NAME]))
 
     def __join_row_results(self, row, results):
         for result in results:
@@ -482,8 +490,9 @@ class CMEGMatcher(object):
                 F_EXCHANGE: ID}
 
     def init_ix_cme_cbot(self, gdf_exch, ixname_cme, ixname_cbot, clean=False):
-
+        self.logger.debug('Creating index {}'.format(ixname_cme))
         ix_cme = setup_ix(self.get_cme_fields(), gdf_exch[CME], ixname_cme, clean)
+        self.logger.debug('Creating index {}'.format(ixname_cbot))
         ix_cbot = setup_ix(self.get_cbot_fields(), gdf_exch[CBOT], ixname_cbot, clean)
         return ix_cme, ix_cbot
 
@@ -517,13 +526,17 @@ class CMEGMatcher(object):
         mdata = {CME: data_cme, CBOT: data_cbot, NYMEX: data_nymex}
         if outpath:
             XlsxWriter.save_sheets(outpath, mdata)
+            self.logger.info('Matched results output to {}'.format(outpath))
         return mdata
 
 
 class CMEGChecker(object):
 
     def __init__(self):
+        self.logger = logging.getLogger(__name__)
         self.config_dict = get_config_dict(cme)
+        self.logger.info('Successfully retrieve pcaps configurations for {}'.format(cme))
+
 
     def get_prod_code(self, row):
         if not pd.isnull(row[F_GLOBEX]):
@@ -555,6 +568,7 @@ class CMEGChecker(object):
         return filter_mark_rows(rows, filterfunc, self.get_prod_key, config_dict)
 
     def run_pd_check(self, data, vol_threshold, cols_renaming=None, outcols=None, outpath=None):
+        self.logger.info('Running product check with {} lower limit {}'.format(A_ADV_YTD, vol_threshold))
         filterfunc = lambda x: x[A_ADV_YTD] >= vol_threshold
 
         prods_cme = self.check_filter_prods(data[CME], self.config_dict, filterfunc, True)
@@ -564,8 +578,12 @@ class CMEGChecker(object):
         prods_cmeg = {CME: list(rename_filter(prods_cme, cols_renaming, outcols)),
                       CBOT: list(rename_filter(prods_cbot, cols_renaming, outcols)),
                       NYMEX: list(rename_filter(prods_nymex, cols_renaming, outcols))}
+        for exch in prods_cmeg:
+            self.logger.debug('Renamed and filterd {} dataframe columns to {}'.format(exch, list(outcols)))
+
         if outpath:
             XlsxWriter.save_sheets(outpath, prods_cmeg, columns=outcols)
+            self.logger.info('Check results output to {}'.format(outpath))
         return prods_cmeg
 
 
@@ -627,6 +645,5 @@ class CMEGTask(TaskBase):
 if __name__ == '__main__':
     task = CMEGTask()
     results = task.run()
-    print()
 
 

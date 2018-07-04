@@ -37,8 +37,8 @@ class XlsxWriter(object):
     @staticmethod
     def save_sheets(path, sheet2data, columns=None, override=True, auto_size=True):
         outdir = os.path.dirname(path)
-        if not os.path.exists(outdir):
-            os.makedirs(outdir)
+        os.makedirs(outdir, exist_ok=True)
+
         wrt = XlsxWriter.create_xlwriter(path, override)
         for sheet, data in list(sheet2data.items()):
             XlsxWriter.to_xlsheet(data, wrt, sheet, columns)

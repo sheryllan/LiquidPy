@@ -3,6 +3,7 @@ from collections import Iterable
 from itertools import tee
 import warnings
 from sortedcontainers import SortedDict
+from argparse import ArgumentTypeError
 
 
 def nontypes_iterable(arg, excl_types=(str,)):
@@ -75,6 +76,7 @@ def select_mapping(data, keys, keepnone=True):
             result[k] = data[k]
     return result
 
+
 def rename_mapping(data, mapping):
     if mapping is None:
         return data
@@ -118,13 +120,6 @@ def peek_iter(items, n=1):
     _, iteritems = tee(items)
     return next(iteritems, None) if n == 1 else list(filter(None, (next(iteritems, None) for _ in range(0, n))))
 
-    # if hasattr(items, '__getitem__'):
-    #     return (None, items) if not items else (list(items)[0], items)
-    # if hasattr(items, '__next__'):
-    #     peek = next(items, None)
-    #     gen = chain([peek], items) if peek is not None else iter('')
-    #     return peek, gen
-
 
 def hierarch_groupby(orig_dict, key_funcs, sort=False):
 
@@ -142,7 +137,15 @@ def hierarch_groupby(orig_dict, key_funcs, sort=False):
     return output_dict
 
 
-# def validate_dfcols(dfs_dict, cols_dict):
-#     for key, df in dfs_dict.items():
-#         if not all(c in df.columns for c in cols_dict[key]):
-#             raise ValueError('Input {} dataframe is missing necessary columns'.format(key))
+def argconv(keeporig=True, **convs):
+    def parse_argument(arg):
+        if arg in convs:
+            return convs[arg]
+        elif not keeporig:
+            msg = "invalid choice: {!r} (choose from {})"
+            choices = ", ".join(sorted(repr(choice) for choice in convs.keys()))
+            raise ArgumentTypeError(msg.format(arg, choices))
+        else:
+            return arg
+    return parse_argument
+
