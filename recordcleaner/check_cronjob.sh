@@ -9,7 +9,7 @@ logit() {
 
 cd "$( dirname "${BASH_SOURCE[0]}" )"
 
-LOG_FILE="log/check_cron_$( date +"%Y%m%d" ).log"
+LOG_FILE="../log/check_cron_$( date +"%Y%m%d" ).log"
 exec 3>&1 1>> >(logit) 2>&1
 
 source ./check.sh --icinga
@@ -30,4 +30,4 @@ RECIPIENT=" slan@liquidcapital.com"
 MAILCMD="mail${TITLE}${ATTS}${RECIPIENT}"
 MAILINFO="echo Check result sent" 
 
-eval ${MAILINFO} | ${MAILCMD}
+eval "${MAILINFO} | ${MAILCMD}"
