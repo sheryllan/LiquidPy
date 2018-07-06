@@ -6,6 +6,8 @@ from tabulate import tabulate
 
 from productchecker import *
 from settings import *
+from commonlib.datastruct import DynamicAttrs
+from commonlib.iohelper import LogWriter
 
 
 class IcingaHelper(object):
@@ -54,12 +56,6 @@ class IcingaHelper(object):
 
 
 class TaskBase(object):
-    OUTPATH = 'outpath'
-    VOLLIM = 'vollim'
-    ICINGA = 'icinga'
-    LOGLEVEL = 'loglevel'
-    LOGFILE = 'logfile'
-
     PRODCODE = 'Prodcode'
     PRODTYPE = 'Prodtype'
     PRODNAME = 'Prodname'
@@ -75,16 +71,26 @@ class TaskBase(object):
     ROOT_FMT = "%(levelname)s:[%(name)s.%(funcName)s:%(lineno)d]: %(message)s"
 
     def __init__(self, settings):
-        self.dflt_args = {self.ICINGA: settings.ICINGA, self.OUTPATH: settings.OUTPATH,
-                          self.VOLLIM: settings.VOLLIM, self.LOGLEVEL: settings.LOGLEVEL,
-                          self.LOGFILE: settings.LOGFILE}
         self.aparser = argparse.ArgumentParser()
-        self.aparser.add_argument('-icg', '--' + self.ICINGA,  action='store_true', help='set it to enable results transfer to icinga')
-        self.aparser.add_argument('-o', '--' + self.OUTPATH, type=str, help='the output path of the check results')
-        self.aparser.add_argument('-v', '--' + self.VOLLIM, type=int, help='the volume threshold to filter out products')
-        self.aparser.add_argument('-ll', '--' + self.LOGLEVEL, type=str,
-                                  help='input level name or number: DEBUG(10), INFO(20), WARNING(30), ERROR(40) or CRITICAL(50)')
-        self.aparser.add_argument('-lf', '--' + self.LOGFILE, type=str, help='the path to log file')
+        self.aparser.add_argument('-icg', '--icinga',
+                                  action='store_true',
+                                  help='set it to enable results transfer to icinga')
+        self.aparser.add_argument('-o', '--outpath',
+                                  type=str,
+                                  nargs='?', const=settings.OUTPATH, default=None,
+                                  help='the output path of the check results')
+        self.aparser.add_argument('-v', '--vollim',
+                                  nargs='?', default=settings.VOLLIM,
+                                  type=int,
+                                  help='the volume threshold to filter out products')
+        self.aparser.add_argument('-ll', '--loglevel',
+                                  type=str,
+                                  nargs='?', default=settings.LOGLEVEL,
+                                  help='level name or number: DEBUG(10), INFO(20), WARNING(30), ERROR(40) or CRITICAL(50)')
+        self.aparser.add_argument('-lf', '--logfile',
+                                  nargs='?', default=settings.LOGFILE,
+                                  type=str,
+                                  help='the path to log file')
         self.services = None
         self.voltype = ''
         self.task_args = None
@@ -114,9 +120,7 @@ class TaskBase(object):
         self._tot_checked = self.get_count(self._checked_prods)
 
     def set_task_args(self, **kwargs):
-        self.task_args = dict(self.dflt_args)
-        stdin_args = {k: v for k, v in vars(self.aparser.parse_args()).items() if v is not None and k not in kwargs}
-        self.task_args.update(stdin_args)
+        self.task_args = DynamicAttrs(vars(self.aparser.parse_args()))
         self.task_args.update(kwargs)
 
     def row_tolist(self, d):
@@ -140,7 +144,7 @@ class TaskBase(object):
         return tabulate(table, outcols, tablefmt, numalign=numalign)
 
     def format_plugin_output(self, exch, voltype, data, outcols=ICINGA_OUTCOLS, tablefmt='simple', numalign='right'):
-        vollim = self.task_args[self.VOLLIM]
+        vollim = self.task_args.vollim
         title = '{} products for which {} is higher than {}:'.format(exch, voltype, vollim)
         details = self.tabulate_rows(data, outcols, tablefmt, numalign)
         return '\n'.join([title, details])
@@ -172,17 +176,18 @@ class TaskBase(object):
         raise NotImplementedError("Please implement this method")
 
     def set_logger(self):
-        level = self.task_args[self.LOGLEVEL]
+        level = self.task_args.loglevel
         logging.basicConfig(level=level,
                             format=self.ROOT_FMT,
                             stream=sys.stdout)
 
-        logfile = self.task_args[self.LOGFILE]
-        if logfile is not None:
+        logfile = self.task_args.logfile
+        if logfile:
             fh = logging.FileHandler(logfile)
-            fh.setLevel(level)
             fh.setFormatter(logging.Formatter('%(asctime)s ' + self.ROOT_FMT, datefmt="%Y-%m-%d %H:%M:%S"))
             logging.getLogger().addHandler(fh)
+
+        sys.stderr = LogWriter(self.logger.warning)
 
     def run(self, **kwargs):
         self.set_task_args(**kwargs)
@@ -202,7 +207,7 @@ class TaskBase(object):
                 self.logger.error('Failed running the task', exc_info=True)
                 exit_status = (1, e)
 
-        if self.task_args[self.ICINGA]:
+        if self.task_args.icinga:
             self.logger.info('Sending results to icinga')
             self.send_to_icinga(exit_status)
 

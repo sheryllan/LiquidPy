@@ -63,3 +63,27 @@ class TreeMap(object):
             yield from self.get_items(head.left)
             yield head.data
             yield from self.get_items(head.right)
+
+
+class DynamicAttrs(object):
+    def __init__(self, obj=None, **kwargs):
+        self.update(obj, **kwargs)
+
+    def update(self, obj=None, insert=True, **kwargs, ):
+        if isinstance(obj, dict):
+            for key in obj:
+                setattr(self, key, obj[key])
+
+        elif obj is not None:
+            for attr in dir(obj):
+                val = getattr(obj, attr)
+                if not callable(val) and not attr.startswith('__'):
+                    setattr(self, attr, val)
+
+        attrs = vars(self)
+        for key in kwargs:
+            if insert or key in attrs:
+                setattr(self, key, kwargs[key])
+
+    def __getattr__(self, item):
+        return getattr(self, item, None)

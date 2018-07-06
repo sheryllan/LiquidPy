@@ -30,4 +30,4 @@ RECIPIENT=" slan@liquidcapital.com"
 MAILCMD="mail${TITLE}${ATTS}${RECIPIENT}"
 MAILINFO="echo Check result sent" 
 
-eval ${MAILINFO} "|" ${MAILCMD}
+eval ${MAILINFO} | ${MAILCMD}

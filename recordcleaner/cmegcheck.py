@@ -513,6 +513,7 @@ class CMEGMatcher(object):
                     yield row_result
 
     def run_pd_mtch(self, df_prods, dfs_adv, ix_names, clean=True, outpath=None):
+        self.logger.info('Running product matching with clean={}'.format(clean))
         gdf_exch = {exch: df.reset_index(drop=True) for exch, df in df_groupby(df_prods, [F_EXCHANGE]).items()}
 
         df_nymex_comex_prods = pd.concat([gdf_exch[NYMEX], gdf_exch[COMEX]], ignore_index=True)
@@ -523,6 +524,8 @@ class CMEGMatcher(object):
                                          CMEGMatcher.CME_NOTFOUND_PRODS, CMEGMatcher.CME_MULTI_MATCH))
         data_cbot = list(self.match_by_prodname(dfs_adv[CBOT], ix_cbot, CMEGMatcher.CBOT_EXACT_MAPPING,
                                           multi_match=CMEGMatcher.CBOT_MULTI_MATCH))
+        self.logger.info('Finished product matching')
+
         mdata = {CME: data_cme, CBOT: data_cbot, NYMEX: data_nymex}
         if outpath:
             XlsxWriter.save_sheets(outpath, mdata)
@@ -534,9 +537,14 @@ class CMEGChecker(object):
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        self.config_dict = get_config_dict(cme)
-        self.logger.info('Successfully retrieve pcaps configurations for {}'.format(cme))
+        self._config_dict = None
 
+    @property
+    def config_dict(self):
+        if self._config_dict is None:
+            self._config_dict = get_config_dict(cme)
+            self.logger.info('Successfully retrieve pcaps configurations for {}'.format(cme))
+        return self._config_dict
 
     def get_prod_code(self, row):
         if not pd.isnull(row[F_GLOBEX]):
@@ -568,7 +576,7 @@ class CMEGChecker(object):
         return filter_mark_rows(rows, filterfunc, self.get_prod_key, config_dict)
 
     def run_pd_check(self, data, vol_threshold, cols_renaming=None, outcols=None, outpath=None):
-        self.logger.info('Running product check with {} lower limit {}'.format(A_ADV_YTD, vol_threshold))
+        self.logger.info('Running product checking with {} lower limit {}'.format(A_ADV_YTD, vol_threshold))
         filterfunc = lambda x: x[A_ADV_YTD] >= vol_threshold
 
         prods_cme = self.check_filter_prods(data[CME], self.config_dict, filterfunc, True)
@@ -578,6 +586,8 @@ class CMEGChecker(object):
         prods_cmeg = {CME: list(rename_filter(prods_cme, cols_renaming, outcols)),
                       CBOT: list(rename_filter(prods_cbot, cols_renaming, outcols)),
                       NYMEX: list(rename_filter(prods_nymex, cols_renaming, outcols))}
+
+        self.logger.info('Finished product checking')
         for exch in prods_cmeg:
             self.logger.debug('Renamed and filterd {} dataframe columns to {}'.format(exch, list(outcols)))
 
@@ -588,7 +598,6 @@ class CMEGChecker(object):
 
 
 class CMEGTask(TaskBase):
-    MATCH_OUTPATH = 'match_outpath'
     COLS_MAPPING = {F_GLOBEX: TaskBase.PRODCODE,
                     F_CLEARED_AS: TaskBase.PRODTYPE,
                     F_PRODUCT_NAME: TaskBase.PRODNAME,
@@ -605,8 +614,10 @@ class CMEGTask(TaskBase):
 
     def __init__(self):
         super().__init__(CMEGSetting)
-        self.dflt_args.update({self.MATCH_OUTPATH: CMEGSetting.MATCH_OUTPATH})
-        self.aparser.add_argument('-mo', '--' + self.MATCH_OUTPATH, type=str, help='the output path of the matching results')
+        self.aparser.add_argument('-mo', '--match_outpath',
+                                  nargs='?', const=CMEGSetting.MATCH_OUTPATH, default=None,
+                                  type=str,
+                                  help='the output path of the matching results')
         self.scraper, self.matcher, self.checker = CMEGScraper(), CMEGMatcher(), CMEGChecker()
         self.voltype = A_ADV_YTD
         self.services = {CME: CMEGSetting.SVC_CME,
@@ -617,14 +628,14 @@ class CMEGTask(TaskBase):
         return {exch: len(data[exch]) for exch in data}
 
     def scrape(self):
-        match_outpath = self.task_args.get(self.MATCH_OUTPATH, None)
+        match_outpath = self.task_args.match_outpath
         df_prods, dfs_adv = self.scraper.run_scraper()
         with TemporaryDirectory() as ixfolder_cme, TemporaryDirectory() as ixfolder_cbot:
             return self.matcher.run_pd_mtch(df_prods, dfs_adv, (ixfolder_cme, ixfolder_cbot), True, match_outpath)
 
     def check(self):
-        vollim = self.task_args[self.VOLLIM]
-        outpath = self.task_args[self.OUTPATH]
+        vollim = self.task_args.vollim
+        outpath = self.task_args.outpath
         return self.checker.run_pd_check(self._exch_prods, vollim, self.COLS_MAPPING, self.CHECK_COLS, outpath)
 
     def send_to_icinga(self, exit_status):

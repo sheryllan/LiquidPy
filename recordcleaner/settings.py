@@ -32,7 +32,6 @@ def get_icinga_api_url(child_dir):
 class SettingBase(object):
     OUTPATH = None
     VOLLIM = 0
-    ICINGA = False
     LOGLEVEL = os.getenv('LOGLEVEL')
     LOGFILE = None
 

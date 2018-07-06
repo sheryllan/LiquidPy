@@ -46,3 +46,15 @@ class XlsxWriter(object):
                 XlsxWriter.auto_size_cols(wrt.sheets[sheet])
         wrt.save()
         return path
+
+
+class LogWriter(object):
+    def __init__(self, loglevel):
+        self.loglevel = loglevel
+
+    def write(self, message):
+        if message != '\n':
+            self.loglevel(message)
+
+    def flush(self):
+        pass
