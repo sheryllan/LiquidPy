@@ -9,10 +9,16 @@ logit() {
 
 cd "$( dirname "${BASH_SOURCE[0]}" )"
 
-LOG_FILE="../log/check_cron_$( date +"%Y%m%d" ).log"
+LOG_PATH="$( dirname "$( pwd )" )/log"
+
+if ! [ -d ${LOG_PATH} ]; then
+    mkdir ${LOG_PATH}
+fi
+
+LOG_FILE="${LOG_PATH}/check_cron_$( date +"%Y%m%d" ).log"
 exec 3>&1 1>> >(logit) 2>&1
 
-source ./check.sh --icinga
+source check.sh --icinga --loglevel INFO
 
 smbclient ${SHARED_FOLDER} ${PASSWD} -W ${DOMAIN} -U ${USER} -c "prompt OFF; lcd ${OUTDIR}; cd ${SHARED_DES}; mput *.xlsx"
 echo "Results copied to shared folder: ${SHARED_FOLDER}/${SHARED_DES}"

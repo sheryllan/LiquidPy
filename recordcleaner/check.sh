@@ -12,14 +12,18 @@ case $key in
 		ICINGA=--icinga
 		shift
 	;;
+	--loglevel)
+	    LOGLEVEL="-ll $2"
+	    shift
+	    shift
 esac
 done
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-source ${DIR}/env_setup.sh ${CLEAN}
+source ${DIR}/use.sh ${CLEAN}
 
 source ${VENV_BIN}/activate
 echo -e "\nRunning ${CMEGCHECK_PY}"
-python ${CMEGCHECK_PY} ${ICINGA}
+python ${CMEGCHECK_PY} ${ICINGA} ${LOGLEVEL}
 
 deactivate

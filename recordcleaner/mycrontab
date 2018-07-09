@@ -40,4 +40,4 @@
 0 0 * * * /var/reactor/support_scripts/GLOBAL-infra/Database/reactor_db_tasks.bash --dbHost lcmrsdb --dbUser postgres --vacuum --dblist "postgres template1"
 
 # Auto products check
-30 11 * * 1-5 /var/reactor/support_scripts/recordcleaner/check_cronjob.sh
+0 17 * * 1-5 /var/reactor/support_scripts/ProductChecks/recordcleaner/check_cronjob.sh
