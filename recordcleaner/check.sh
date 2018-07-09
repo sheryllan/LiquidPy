@@ -13,9 +13,16 @@ case $key in
 		shift
 	;;
 	--loglevel)
-	    LOGLEVEL="-ll $2"
+	    LOGLEVEL="--loglevel $2"
 	    shift
 	    shift
+	;;
+	--outdir)
+	    OUTDIR=$2
+	    shift
+	    shift
+	;;
+
 esac
 done
 
@@ -24,6 +31,6 @@ source ${DIR}/env_setup.sh ${CLEAN}
 
 source ${VENV_BIN}/activate
 echo -e "\nRunning ${CMEGCHECK_PY}"
-python ${CMEGCHECK_PY} ${ICINGA} ${LOGLEVEL}
+python ${CMEGCHECK_PY} ${ICINGA} ${LOGLEVEL} --outpath --match_outpath
 
 deactivate

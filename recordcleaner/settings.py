@@ -4,10 +4,11 @@ from dotenv import load_dotenv
 
 if os.getenv('DIR') is None:
     os.environ.setdefault('DIR', os.getcwd())
+    DIR = os.getenv('DIR')
 
 
 def cwd_full_path(filename):
-    return os.path.join(os.getenv('DIR'), filename)
+    return os.path.join(DIR, filename)
 
 
 envfile = cwd_full_path('envfile.sh')
@@ -32,7 +33,7 @@ def get_icinga_api_url(child_dir):
 class SettingBase(object):
     OUTPATH = None
     VOLLIM = 0
-    LOGLEVEL = os.getenv('LOGLEVEL')
+    LOGLEVEL = 'DEBUG'
     LOGFILE = None
 
 

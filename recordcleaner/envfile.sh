@@ -1,16 +1,21 @@
 #!/bin/bash
 
 if [ -z "${DIR}" ]; then
-export DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+    export DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 fi
 
-export LOGLEVEL=DEBUG
-export CMEGCHECK_PY=${DIR}/cmegcheck.py
+if [ -z "${OUTDIR}" ]; then
+    export OUTDIR=${DIR}/results
+fi
 
-export VENV_PATH=${DIR}/venv
+if [ -z "${VENV_PATH}" ]; then
+    export VENV_PATH=${DIR}/venv
+
+fi
 export VENV_BIN=${VENV_PATH}/bin
+
 export REQUIREMENTS=${DIR}/requirements.txt
-export OUTDIR=${DIR}/results
+export CMEGCHECK_PY=${DIR}/cmegcheck.py
 
 export ICINGA_HOST=lcldn-icinga1
 export ICINGA_API_PORT=5665
