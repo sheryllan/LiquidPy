@@ -20,7 +20,7 @@ esac
 done
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-source ${DIR}/use.sh ${CLEAN}
+source ${DIR}/env_setup.sh ${CLEAN}
 
 source ${VENV_BIN}/activate
 echo -e "\nRunning ${CMEGCHECK_PY}"
