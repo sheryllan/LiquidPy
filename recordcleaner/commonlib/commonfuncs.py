@@ -4,6 +4,7 @@ from itertools import tee
 import warnings
 from sortedcontainers import SortedDict
 from argparse import ArgumentTypeError
+import pandas as pd
 
 
 def nontypes_iterable(arg, excl_types=(str,)):
@@ -80,7 +81,12 @@ def select_mapping(data, keys, keepnone=True):
 def rename_mapping(data, mapping):
     if mapping is None:
         return data
-    return type(data)({mapping.get(k, k): data[k] for k in data.keys()})
+    if isinstance(data, pd.DataFrame):
+        return data.rename(columns=mapping)
+    elif isinstance(data, pd.Series):
+        return data.rename(index=mapping)
+    else:
+        return type(data)({mapping.get(k, k): data[k] for k in data})
 
 
 def rreplace(s, old, new, occurrence):
@@ -119,6 +125,15 @@ def peek_iter(items, n=1):
 
     _, iteritems = tee(items)
     return next(iteritems, None) if n == 1 else list(filter(None, (next(iteritems, None) for _ in range(0, n))))
+
+
+def slicing_gen(items, stopfunc):
+    while items:
+        if stopfunc(items[0]):
+            break
+        else:
+            yield items[0]
+            del items[0]
 
 
 def hierarch_groupby(orig_dict, key_funcs, sort=False):

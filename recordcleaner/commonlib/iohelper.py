@@ -53,6 +53,7 @@ class LogWriter(object):
         self.loglevel = loglevel
 
     def write(self, message):
+        message = message.strip()
         if message != '\n':
             self.loglevel(message)
 

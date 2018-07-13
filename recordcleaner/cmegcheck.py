@@ -1,7 +1,7 @@
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from PyPDF2.generic import Destination
 
-from taskbase import *
+from baseclasses import *
 from datascraper import *
 from datascraper import TabularTxtParser as tp
 from extrawhoosh.analysis import *
@@ -92,53 +92,52 @@ class CMEGScraper(object):
 
             return parse_flatten_sections()
 
-        def parse_adv_th(self, lines, p_separator=None, min_splits=None, alignment=tp.RIGHT):
+        def parse_adv_headers(self, lines, matchfunc, alignment=tp.RIGHT):
             def merge_headers(h1, h2):
                 h1 = h1.strip()
                 h2 = h2.strip()
                 return ' '.join(filter(None, [h1, h2]))
 
-            lines = iter(lines)
-            for line in lines:
-                matches = tp.match_tabular_header(line, p_separator, min_splits)
-                if matches is not None:
-                    line1, line2 = line, next(lines, '')
-                    cords1 = [m[0] for m in matches]
-                    cords2 = [m[0] for m in tp.match_tabular_header(line2, p_separator, min_splits)]
+            def merge_2rows(row1, row2, mergfunc):
+                matches1, matches2 = matchfunc(row1), matchfunc(row2)
+                if matches1 is None or matches2 is None:
+                    return None
+                aligned = TabularTxtParser.align_txt_by_min_dist(matches1, matches2, alignment=alignment, defaultval='')
+                return {cords: mergfunc(*aligned[cords]) for cords in aligned}
 
-                    c_selector = 0 if len(cords1) >= len(cords2) else 1
-                    merged = tp.merge_2rows(line1, line2, cords1, cords2, merge_headers, alignment)
-                    return {m[0][c_selector]: m[1] for m in merged}
+            for line in lines:
+                line1, line2 = line, next(lines, '')
+                merged = merge_2rows(line1, line2, merge_headers)
+                if merged is not None:
+                    return merged
             return None
 
         def parse_table_from_txt(self, lines, alignment=tp.RIGHT):
             lines = iter(lines)
-            header_dict = self.parse_adv_th(lines)
+            match_headers = lambda x: tp.match_tabular_header(x, min_splits=3)
+            header_dict = self.parse_adv_headers(lines, match_headers)
             if not header_dict:
                 return None
-            cols_benchmark, adv_header = list(header_dict.keys()), list(header_dict.values())
+            headers = [A_PRODUCT_NAME, A_PRODUCT_GROUP, A_CLEARED_AS] + list(header_dict.values())
 
-            def parse_adv_tr():
+            def parse_data_lines():
                 group, clearedas = None, None
                 for line in lines:
                     if not line:
                         continue
-                    if tp.match_tabular_header(line) or 'total' in line.lower():
+                    if match_headers(line) or 'total' in line.lower():
                         break
                     line = line.strip()
                     matches = tp.match_tabular_line(line, min_splits=len(header_dict))
                     if matches:
-                        prod_data = {A_PRODUCT_NAME: matches[0][1], A_PRODUCT_GROUP: group, A_CLEARED_AS: clearedas}
-                        match_dict = {m[0]: m[1] for m in matches[1:]}
-                        aligned_cords = map(lambda x: match_dict[x[0]],
-                                            tp.align_by_min_tot_offset(match_dict.keys(), cols_benchmark, alignment))
-                        adv_data = {adv_header[i]: value for i, value in enumerate(text_to_num(aligned_cords))}
-                        adv_data.update(prod_data)
-                        yield adv_data
+                        prod_data = [matches[0][1],  group,  clearedas]
+                        aligned_txt = tp.align_txt_by_min_dist(matches[1:], header_dict, alignment=alignment).values()
+                        adv_data = [text_to_num(t[0]) for t in aligned_txt]
+                        yield prod_data + adv_data
                     elif line in self.prod_groups:
                         group, clearedas = self.prod_groups[line]
 
-            return pd.DataFrame.from_records(list(parse_adv_tr()))
+            return pd.DataFrame(list(parse_data_lines()), columns=headers)
 
     def get_prods_table(self):
         with NamedTemporaryFile() as prods_file:
@@ -151,6 +150,7 @@ class CMEGScraper(object):
         self.logger.info(('Downloading from: {}'.format(url)))
         with download(url, NamedTemporaryFile()) as f_pdf:
             pdf_parser = self.CMEGPdfParser(f_pdf)
+            self.logger.info('Parsing tables from the pdf')
             tables = [pdf_parser.parse_table_from_txt(page) for page in pdf_parser.pdftotext_bypages()]
         return pd.concat(tables, ignore_index=True)
 
@@ -167,9 +167,11 @@ class CMEGScraper(object):
         df_cme = self.get_adv_table(self.URL_CME_ADV)
         df_cbot = self.get_adv_table(self.URL_CBOT_ADV)
         df_nymex = self.get_adv_table(self.URL_NYMEX_COMEX_ADV)
+
         adv_dict = {CME: rename_filter(df_cme, {self.get_ytd_header(df_cme, year=year): A_ADV_YTD}, self.ADV_OUTCOLS[CME]),
                     CBOT: rename_filter(df_cbot, {self.get_ytd_header(df_cbot, year=year): A_ADV_YTD}, self.ADV_OUTCOLS[CBOT]),
                     NYMEX: rename_filter(df_nymex, {self.get_ytd_header(df_nymex, year=year): A_ADV_YTD}, self.ADV_OUTCOLS[NYMEX])}
+        self.logger.info('Finished scraping')
         for exch in adv_dict:
             self.logger.debug('Renamed and filterd {} dataframe columns to {}'.format(exch, list(adv_dict[exch].columns)))
         return df_prods, adv_dict
@@ -533,18 +535,9 @@ class CMEGMatcher(object):
         return mdata
 
 
-class CMEGChecker(object):
-
+class CMEGChecker(CheckerBase):
     def __init__(self):
-        self.logger = logging.getLogger(__name__)
-        self._config_dict = None
-
-    @property
-    def config_dict(self):
-        if self._config_dict is None:
-            self._config_dict = get_config_dict(cme)
-            self.logger.info('Successfully retrieve pcaps configurations for {}'.format(cme))
-        return self._config_dict
+        super().__init__(cme)
 
     def get_prod_code(self, row):
         if not pd.isnull(row[F_GLOBEX]):

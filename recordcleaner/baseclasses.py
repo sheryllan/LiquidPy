@@ -212,9 +212,18 @@ class TaskBase(object):
             self.send_to_icinga(exit_status)
 
 
+class CheckerBase(object):
+    def __init__(self, exch):
+        self.logger = logging.getLogger(__name__)
+        self._config_dict = None
+        self.exch = exch
 
-
-
+    @property
+    def config_dict(self):
+        if self._config_dict is None:
+            self._config_dict = get_config_dict(self.exch)
+            self.logger.info('Successfully retrieve pcaps configurations for {}'.format(self.exch))
+        return self._config_dict
 
 
 

@@ -75,17 +75,21 @@ def find_link(soupobjs, pattern):
 
 
 class HtmlTableParser(object):
-    def __init__(self, src, filterfunc=None):
-        tables = make_soup(src).find_all(TABLE_TAB)
+    # returns tables whose first tr has first th of which text = title
+    @staticmethod
+    def get_tables_by_th(url, title):
+        tables = make_soup(url).find_all(TABLE_TAB)
         if not tables:
             raise ValueError('No tables found in the source')
-        self.table = tables[0] if filterfunc is None else filterfunc(tables)
+        return [tbl for tbl in tables if tbl.find(TR_TAB).find(TH_TAB, text=title)]
 
-    def get_tb_headers(self):
-        return [th.text for th in self.table.find(TR_TAB).find_all(TH_TAB)]
+    @staticmethod
+    def get_tb_headers(table):
+        return [th.text for th in table.find(TR_TAB).find_all(TH_TAB)]
 
-    def get_td_rows(self, filterfunc=None):
-        trs = self.table.find_all(TR_TAB)
+    @staticmethod
+    def get_td_rows(table, filterfunc=None):
+        trs = table.find_all(TR_TAB)
         if filterfunc is not None:
             tds = [filterfunc(tr.find_all(TD_TAB)) for tr in trs if tr.find_all(TD_TAB)]
         else:

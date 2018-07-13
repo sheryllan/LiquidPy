@@ -1,6 +1,5 @@
 import os
 
-import pandas as pd
 import paramiko
 
 from commonlib.websourcing import *
