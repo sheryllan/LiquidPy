@@ -68,10 +68,6 @@ USERNAME = 'rsprod'
 CONFIG_PATH = '/opt/reactor/base/data/tng-cat/products'
 
 
-def get_default_destfiles():
-    return {e: e + '.xlsx' for e in EXCHANGES}
-
-
 def get_src_file(exch, pkey_path=os.path.expanduser('~/.ssh/id_rsa')):
     logger = logging.getLogger(__name__)
     logger.debug('SSH to remote config files for the symbol information')
@@ -86,9 +82,8 @@ def get_src_file(exch, pkey_path=os.path.expanduser('~/.ssh/id_rsa')):
             return remote_file.read()
 
 
-def parse_config(exch, tag=TAG_PRODUCT, attrs=None, mapping_cols=CF_OUTCOLS_MAPPING, to_df=False):
+def parse_config(exch, src, tag=TAG_PRODUCT, attrs=None, mapping_cols=CF_OUTCOLS_MAPPING, to_df=False):
     logger = logging.getLogger(__name__)
-    src = get_src_file(exch)
     attrs = ATTR_NAMES[exch] if attrs is None else attrs
     data_parsed = fltr_attrs(make_soup(src).find_all(tag), attrs, mapping_cols)
     config_data = (mapping_updated(d, {CO_TYPE: INSTRUMENT_TYPES.get(d[CO_TYPE], d[CO_TYPE])}) for d in data_parsed)
@@ -99,6 +94,10 @@ def parse_config(exch, tag=TAG_PRODUCT, attrs=None, mapping_cols=CF_OUTCOLS_MAPP
     return config_data
 
 
+
+# def get_default_destfiles():
+#     return {e: e + '.xlsx' for e in EXCHANGES}
+#
 # def get_raw_file(filename):
 #     full_url = '/'.join([REPO_URL, filename])
 #     f_temp = tempfile.NamedTemporaryFile()

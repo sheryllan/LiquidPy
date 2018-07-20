@@ -4,14 +4,30 @@ import sys
 
 from tabulate import tabulate
 
+from datascraper import *
 from productchecker import *
 from settings import *
 from commonlib.datastruct import DynamicAttrs
 from commonlib.iohelper import LogWriter
 
 
+def finalise_dfs(data, cols_mapping, outcols, logger):
+    for exch in data:
+        if cols_mapping:
+            logger.debug('Renaming data columns: {}'.format(list(cols_mapping.keys())))
+        df = data[exch]
+        df = rename_filter(df, cols_mapping, outcols)
+        logger.debug('Output data columns: {}'.format(list(df.columns)))
+        data[exch] = df
+
+
 class IcingaHelper(object):
-    PROCESS_CHECK_URL = get_icinga_api_url(ICINGA_API_PCR)
+    HTTPS_HEADER = 'https://'
+    ICINGA_HOST = 'lcldn-icinga1'
+    ICINGA_API_PORT = 5665
+    ICINGA_API_PCR = 'v1/actions/process-check-result'
+    ICINGA_API_USER = 'icinga'
+    ICINGA_API_PSW = 'icinga2002'
 
     TYPE = 'type'
     FILTER = 'filter'
@@ -29,14 +45,22 @@ class IcingaHelper(object):
                                                    ['label', 'value', 'warn', 'crit', 'min', 'max']),
                                         {'warn': '', 'crit': '', 'min': '', 'max': ''})
 
+    LOGGER = logging.getLogger(__name__)
 
     @staticmethod
-    def to_json(typecode, fltname, poutput=None, exitcode=0, checksource=socket.gethostname(), perfdata=None):
+    def get_icinga_api_url(child_dir):
+        host = '{}:{}'.format(IcingaHelper.ICINGA_HOST, IcingaHelper.ICINGA_API_PORT)
+        pcr_path = os.path.join(host, child_dir)
+        return IcingaHelper.HTTPS_HEADER + pcr_path
+
+
+    @staticmethod
+    def to_json(is_service, fltname, poutput=None, exitcode=0, checksource=socket.gethostname(), perfdata=None):
         json_dict = {}
-        ctype = IcingaHelper.SERVICE if typecode else IcingaHelper.HOST
+        ctype = IcingaHelper.SERVICE if is_service else IcingaHelper.HOST
 
         json_dict.update({IcingaHelper.TYPE: ctype})
-        json_dict.update({IcingaHelper.FILTER: '{}==\"{}\"'.format(IcingaHelper.SVCNAME if typecode else IcingaHelper.HOST, fltname)})
+        json_dict.update({IcingaHelper.FILTER: '{}==\"{}\"'.format(IcingaHelper.SVCNAME if is_service else IcingaHelper.HOST, fltname)})
         json_dict.update({IcingaHelper.EXIT_STATUS: exitcode})
         json_dict.update({IcingaHelper.CHECK_SOURCE: checksource})
 
@@ -54,6 +78,112 @@ class IcingaHelper(object):
                 raise ValueError('the field \"label\" and \"value\" of PerfData must not be None')
             yield '{}={};{};{};{};{}'.format(d.label, d.value, d.warn, d.crit, d.min, d.max).rstrip(';')
 
+    @staticmethod
+    def post_pcr(data):
+        url = IcingaHelper.get_icinga_api_url(IcingaHelper.ICINGA_API_PCR)
+        auth = (IcingaHelper.ICINGA_API_USER, IcingaHelper.ICINGA_API_PSW)
+        cert = ICINGA_CA_CRT
+        IcingaHelper.LOGGER.info('Posting data to {}, user: {}, certificate: {}'.format(url, auth, cert))
+        return http_post(url, data, auth, cert)
+
+
+class IcingaCheckHandler(object):
+    PERF_RECORDED = 'recorded'
+    PERF_UNRECORDED = 'unrecorded'
+    PERF_TOT_PRODS = 'prods_tot'
+    PERF_FLT_PERCENTAGE = 'flt_pct'
+    PERF_TOT_GROUPS = 'groups_tot'
+    PERF_GROUP_UNREC = 'gp_unrec'
+
+    def __init__(self, df_checked, df_scraped, exch, voltype, vollim):
+        self.logger = logging.getLogger(__name__)
+        self.df_checked = pd.DataFrame(df_checked)
+        self.df_scraped = pd.DataFrame(df_scraped)
+        self.exch = exch
+        self.voltype = voltype
+        self.vollim = vollim
+        self._groups = None
+        self._cnt_checked, self._cnt_groups = {}, {}
+
+    def get_count(self, x):
+        return len(x)
+
+    def is_group_ok(self, df_group):
+        return all(x for x in df_group[RECORDED].values)
+
+    @property
+    def groups(self):
+        if self._groups is None:
+            self._groups = {i: self.is_group_ok(self.df_checked.loc[[i]]) for i in unique_gen(self.df_checked.index)}
+        return self._groups
+
+    @property
+    def checked_tot(self):
+        return self.get_count(self.df_checked)
+
+    @property
+    def scraped_tot(self):
+        return self.get_count(self.df_scraped)
+
+    @property
+    def group_tot(self):
+        return self.get_count(self.groups)
+
+    @property
+    def cnt_checked(self):
+        if not self._cnt_checked:
+            self._cnt_checked = count_unique(self.df_checked)
+        return self._cnt_checked
+
+    @property
+    def cnt_groups(self):
+        if not self._cnt_groups:
+            self._cnt_groups = count_unique(self.groups)
+        return self._cnt_groups
+
+    def tabulate_rows(self, outcols, tablefmt='simple', numalign='right'):
+        outcols = to_iter(outcols)
+        df = self.df_checked[outcols]
+
+        if self.group_tot != self.checked_tot:
+            table = list()
+            for g in self.groups:
+                table.append(g)
+                table = table + df.loc[g].values.tolist()
+        else:
+            table = df.values.tolist()
+
+        return tabulate(table, outcols, tablefmt, numalign=numalign)
+
+    def format_plugin_output(self, outcols, tablefmt='simple', numalign='right'):
+        title = '{} products for which {} is higher than {}:'.format(self.exch, self.voltype, self.vollim)
+        details = self.tabulate_rows(outcols, tablefmt, numalign)
+        return '\n'.join([title, details])
+
+    def format_perfdata(self):
+        flt_pct = '{}%'.format(round(self.checked_tot / self.scraped_tot * 100), 2)
+
+        recorded = IcingaHelper.PerfData(self.PERF_RECORDED, self.cnt_checked.get(True, 0))
+        unrecorded = IcingaHelper.PerfData(self.PERF_UNRECORDED, self.cnt_checked.get(False, 0))
+        prods_tot = IcingaHelper.PerfData(self.PERF_TOT_PRODS, self.scraped_tot)
+        flt_pct = IcingaHelper.PerfData(self.PERF_FLT_PERCENTAGE, flt_pct)
+        perf_data = [recorded, unrecorded, prods_tot, flt_pct]
+        if self.group_tot != self.checked_tot:
+            groups_tot = IcingaHelper.PerfData(self.PERF_TOT_GROUPS, self.group_tot)
+            gp_unrec = IcingaHelper.PerfData(self.PERF_GROUP_UNREC, self.cnt_groups.get(False, 0))
+            perf_data.extend([groups_tot, gp_unrec])
+
+        return list(IcingaHelper.format_perf_data(perf_data))
+
+    def to_json_data(self, service, outcols, tablefmt='simple', numalign='right'):
+        poutput = self.format_plugin_output(outcols, tablefmt, numalign)
+        perf_data = self.format_perfdata()
+        return IcingaHelper.to_json(True, service, poutput, self.exit_code(), perfdata=perf_data)
+
+    def exit_code(self):
+        ok = all(x for x in self.groups.values())
+        return 0 if ok else 1
+
 
 class TaskBase(object):
     PRODCODE = 'Prodcode'
@@ -62,23 +192,24 @@ class TaskBase(object):
     PRODGROUP = 'Prodgroup'
     VOLUME = 'Volume'
 
-    PERF_RECORDED = 'recorded'
-    PERF_UNRECORDED = 'unrecorded'
-    PERF_TOT_PRODS = 'prods_tot'
-    PERF_FLT_PERCENTAGE = 'flt_pct'
+    DFLT_OUTCOLS = [PRODNAME, RECORDED, PRODCODE, PRODTYPE, VOLUME]
 
-    ICINGA_OUTCOLS = [PRODNAME, RECORDED, PRODCODE, PRODTYPE, VOLUME]
     ROOT_FMT = "%(levelname)s:[%(name)s.%(funcName)s:%(lineno)d]: %(message)s"
 
-    def __init__(self, settings):
+    def __init__(self, settings, scraper, checker):
+        self.scraper, self.checker = scraper, checker
         self.aparser = argparse.ArgumentParser()
         self.aparser.add_argument('-icg', '--icinga',
                                   action='store_true',
                                   help='set it to enable results transfer to icinga')
-        self.aparser.add_argument('-o', '--outpath',
+        self.aparser.add_argument('-co', '--coutpath',
                                   type=str,
-                                  nargs='?', const=settings.OUTPATH, default=None,
+                                  nargs='?', const=settings.COUTPATH, default=None,
                                   help='the output path of the check results')
+        self.aparser.add_argument('-so', '--soutpath',
+                                  nargs='?', const=CMEGSetting.SOUTPATH, default=None,
+                                  type=str,
+                                  help='the output path of the matching results')
         self.aparser.add_argument('-v', '--vollim',
                                   nargs='?', default=settings.VOLLIM,
                                   type=int,
@@ -91,89 +222,30 @@ class TaskBase(object):
                                   nargs='?', default=settings.LOGFILE,
                                   type=str,
                                   help='the path to log file')
+
         self.services = None
         self.voltype = ''
         self.task_args = None
 
-        self._tot_exch = None
-        self._tot_checked = None
         self._exch_prods = None
         self._checked_prods = None
 
         self.logger = logging.getLogger(__name__)
 
-    def get_count(self, data):
-        raise NotImplementedError("Please implement this method")
+        self.outcols = self.DFLT_OUTCOLS
 
-    def scrape(self):
-        raise NotImplementedError("Please implement this method")
+    def run_scraper(self):
+        soutpath = self.task_args.soutpath
+        self._exch_prods = self.scraper.run(soutpath)
 
-    def check(self):
-        raise NotImplementedError("Please implement this method")
-
-    def run_scraping(self):
-        self._exch_prods = self.scrape()
-        self._tot_exch = self.get_count(self._exch_prods)
-
-    def run_checking(self):
-        self._checked_prods = self.check()
-        self._tot_checked = self.get_count(self._checked_prods)
+    def run_checker(self):
+        vollim = self.task_args.vollim
+        outpath = self.task_args.coutpath
+        self._checked_prods = self.checker.run(self._exch_prods, vollim, self.outcols, outpath)
 
     def set_task_args(self, **kwargs):
         self.task_args = DynamicAttrs(vars(self.aparser.parse_args()))
         self.task_args.update(kwargs)
-
-    def row_tolist(self, d):
-        return list(d.values()) if isinstance(d, dict) else to_iter(d)
-
-    def delimit_grouped_data(self, data, fltcols=None, gcol=GROUP, delimit=None):
-        first = peek_iter(data)
-        if first is not None and gcol in first:
-            for key, subitems in groupby(data, key=lambda x: x[gcol]):
-                yield key
-                for sub in subitems:
-                    yield select_mapping(sub, fltcols)
-                if delimit is not None:
-                    yield delimit
-        else:
-            for d in data:
-                yield select_mapping(d, fltcols)
-
-    def tabulate_rows(self, data, outcols, tablefmt='simple', numalign='right'):
-        table = [self.row_tolist(gd) for gd in self.delimit_grouped_data(data, outcols, delimit='')]
-        return tabulate(table, outcols, tablefmt, numalign=numalign)
-
-    def format_plugin_output(self, exch, voltype, data, outcols=ICINGA_OUTCOLS, tablefmt='simple', numalign='right'):
-        vollim = self.task_args.vollim
-        title = '{} products for which {} is higher than {}:'.format(exch, voltype, vollim)
-        details = self.tabulate_rows(data, outcols, tablefmt, numalign)
-        return '\n'.join([title, details])
-
-    def format_perfdata(self, data, prods_tot, checked_tot):
-        cnt_rcd = count_unique(data, RECORDED)
-        flt_pct = '{}%'.format(round(checked_tot / prods_tot * 100), 2)
-
-        recorded = IcingaHelper.PerfData(self.PERF_RECORDED, cnt_rcd[True])
-        unrecorded = IcingaHelper.PerfData(self.PERF_UNRECORDED, cnt_rcd[False])
-        prods_tot = IcingaHelper.PerfData(self.PERF_TOT_PRODS, prods_tot)
-        flt_pct = IcingaHelper.PerfData(self.PERF_FLT_PERCENTAGE, flt_pct)
-
-        return list(IcingaHelper.format_perf_data([recorded, unrecorded, prods_tot, flt_pct]))
-
-    def to_json_data(self, data, exch, voltype, service, exit_code=0, tablefmt='simple', numalign='right'):
-        poutput = self.format_plugin_output(exch, voltype, data, tablefmt=tablefmt, numalign=numalign)
-        perf_data = self.format_perfdata(data, self._tot_exch[exch], self._tot_checked[exch])
-        return IcingaHelper.to_json(True, service, poutput, exit_code, perfdata=perf_data)
-
-    def post_pcr(self, data):
-        url = IcingaHelper.PROCESS_CHECK_URL
-        auth = (ICINGA_API_USER, ICINGA_API_PSW)
-        cert = ICINGA_CA_CRT
-        self.logger.info('Posting data to {}, user: {}, certificate: {}'.format(url, auth, cert))
-        return http_post(url, data, auth, cert)
-
-    def send_to_icinga(self, exit_status):
-        raise NotImplementedError("Please implement this method")
 
     def set_logger(self):
         level = self.task_args.loglevel
@@ -189,6 +261,21 @@ class TaskBase(object):
 
         sys.stderr = LogWriter(self.logger.warning)
 
+    def send_to_icinga(self, exit_status, handler_type=IcingaCheckHandler):
+        exit_code, ex = exit_status
+        if not exit_code and ex is None:
+            for exch, data in self._checked_prods.items():
+                handler = handler_type(data, self._exch_prods[exch], exch, self.voltype, self.task_args.vollim)
+                service = self.services[exch]
+                json_data = handler.to_json_data(service, self.DFLT_OUTCOLS)
+                IcingaHelper.post_pcr(json_data)
+        elif exit_code:
+            for exch, service in self.services.items():
+                service = self.services[exch]
+                msg = format_ex_str(ex)
+                json_data = IcingaHelper.to_json(True, service, msg, exit_code)
+                IcingaHelper.post_pcr(json_data)
+
     def run(self, **kwargs):
         self.set_task_args(**kwargs)
         exit_status = (0, None)
@@ -198,9 +285,9 @@ class TaskBase(object):
             warnings.filterwarnings('error')
             try:
                 self.logger.info('Start running scraping')
-                self.run_scraping()
+                self.run_scraper()
                 self.logger.info('Start running checking')
-                self.run_checking()
+                self.run_checker()
             except Warning as w:
                 self.logger.warning(str(w))
             except Exception as e:
@@ -213,17 +300,36 @@ class TaskBase(object):
 
 
 class CheckerBase(object):
-    def __init__(self, exch):
+
+    def __init__(self, exch_cf):
         self.logger = logging.getLogger(__name__)
         self._config_dict = None
-        self.exch = exch
+        self.exch_cf = exch_cf
 
     @property
     def config_dict(self):
         if self._config_dict is None:
-            self._config_dict = get_config_dict(self.exch)
-            self.logger.info('Successfully retrieve pcaps configurations for {}'.format(self.exch))
+            self._config_dict = get_config_dict(self.exch_cf)
+            self.logger.info('Successfully retrieve pcaps configurations for {}'.format(self.exch_cf))
         return self._config_dict
 
+    @property
+    def cols_mapping(self):
+        raise NotImplementedError('Please implement this property')
 
+    def check(self, data, vol_threshold):
+        raise NotImplementedError("Please implement this method")
 
+    def run(self, data, vol_threshold, outcols=None, outpath=None):
+        checked = self.check(data, vol_threshold)
+        if not isinstance(checked, dict):
+            raise TypeError('The checked results must be a dict with keys of exchange')
+        if any(not isinstance(d, pd.DataFrame) for d in data):
+            raise TypeError('The checked data in the results must be a Dataframe')
+
+        finalise_dfs(checked, self.cols_mapping, outcols, self.logger)
+
+        if outpath:
+            XlsxWriter.save_sheets(outpath, checked)
+            self.logger.info('Check results output to {}'.format(outpath))
+        return checked

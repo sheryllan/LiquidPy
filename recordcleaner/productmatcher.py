@@ -2,18 +2,6 @@ import inflect
 import re
 
 
-def df_groupby(df, cols):
-    if not cols:
-        return df
-    else:
-        gpobj = df.groupby(cols[0])
-        group_dict = dict()
-        for group in gpobj.groups.keys():
-            new_df = gpobj.get_group(group)
-            group_dict[group] = df_groupby(new_df, cols[1:])
-        return group_dict
-
-
 class MatchHelper(object):
     vowels = ('a', 'e', 'i', 'o', 'u')
 
@@ -102,6 +90,16 @@ class MatchHelper(object):
                 if found:
                     return found
             return found
+
+
+    @staticmethod
+    def match_in_lexicon(string, lexicons, one=True, stemming=True, casesensitive=False):
+        p = inflect.engine()
+        for l in lexicons:
+            matched = MatchHelper.match_in_string(string, l, one, stemming, casesensitive, p)
+            if matched:
+                return l
+        return None
 
 
 # region TODO: test

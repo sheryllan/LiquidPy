@@ -77,10 +77,12 @@ def find_link(soupobjs, pattern):
 class HtmlTableParser(object):
     # returns tables whose first tr has first th of which text = title
     @staticmethod
-    def get_tables_by_th(url, title):
+    def get_tables_by_th(url, title=None):
         tables = make_soup(url).find_all(TABLE_TAB)
         if not tables:
             raise ValueError('No tables found in the source')
+        if title is None:
+            return tables
         return [tbl for tbl in tables if tbl.find(TR_TAB).find(TH_TAB, text=title)]
 
     @staticmethod
@@ -88,10 +90,31 @@ class HtmlTableParser(object):
         return [th.text for th in table.find(TR_TAB).find_all(TH_TAB)]
 
     @staticmethod
-    def get_td_rows(table, filterfunc=None):
-        trs = table.find_all(TR_TAB)
-        if filterfunc is not None:
-            tds = [filterfunc(tr.find_all(TD_TAB)) for tr in trs if tr.find_all(TD_TAB)]
+    def select_tds_by_index(tags, row=None, column=None):
+
+        def find_tds(_tr):
+            tds = _tr.find_all(TD_TAB)
+            if column is not None and column < len(tds):
+                return tds[column]
+            elif column is None:
+                return tds
+            else:
+                return []
+
+        trs = tags.find_all(TR_TAB) if tags.name != TR_TAB else [tags]
+        if row is not None and row < len(trs):
+            tr = trs[row]
+            return find_tds(tr)
+        elif row is None:
+            return [find_tds(tr) for tr in trs if find_tds(tr)]
         else:
-            tds = [tr.find_all(TD_TAB) for tr in trs if tr.find_all(TD_TAB)]
-        return tds
+            return []
+
+
+    @staticmethod
+    def select_trs(table, **td_attrs):
+        if table.name != TABLE_TAB:
+            return []
+        trs = table.find_all(TR_TAB)
+        return [tr for tr in trs if tr.find_all(TD_TAB, **td_attrs)]
+

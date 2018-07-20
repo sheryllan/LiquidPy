@@ -1,5 +1,5 @@
 import math
-from datetime import datetime
+from datetime import date
 from subprocess import Popen, PIPE
 from itertools import chain
 from PyPDF2 import PdfFileReader
@@ -13,7 +13,23 @@ XLSX_SUFFIX = '.xlsx'
 
 
 def last_year():
-    return (datetime.now() - relativedelta(years=1)).year
+    return (date.today() + relativedelta(years=-1)).year
+
+
+def last_month():
+    return (date.today() + relativedelta(months=-1)).month
+
+
+def this_year():
+    return date.today().year
+
+
+def this_month():
+    return date.today().month
+
+
+def fmt_date(year, month, day=1, fmt='%Y%m'):
+    return date(int(year), int(month), int(day)).strftime(fmt)
 
 
 def first_nonna_index(df):
@@ -84,6 +100,8 @@ def run_pdftotext(pdf, txt=None, encoding='utf-8', **kwargs):
 
 def text_to_num(value):
     pattern = '^-?[\d\.,]+%?$'
+    if value is None:
+        return None
     if not isinstance(value, str):
         raise TypeError('Input must be an instance of str')
 
@@ -322,9 +340,14 @@ class TabularTxtParser(object):
 
 
     @staticmethod
-    def match_tabular_header(line, p_separator=None, min_splits=None):
-        return TabularTxtParser.match_tabular_line(line, p_separator, min_splits,
-                                                   verify_func=lambda x: re.search(LETTER_PATTERN, x))
+    def match_tabular_header(line, p_separator=None, min_splits=None, extra_verfunc=None):
+        matches = TabularTxtParser.match_tabular_line(line, p_separator, min_splits,
+                                                      verify_func=lambda x: re.search(LETTER_PATTERN, x))
+        if extra_verfunc and matches:
+            matches = matches if extra_verfunc(matches) else None
+
+        return matches
+
 
 
 

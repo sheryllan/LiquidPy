@@ -1,109 +1,144 @@
 from datascraper import *
 import jaconv
-import tempfile
+from tempfile import TemporaryDirectory, NamedTemporaryFile
 
 from productchecker import *
-from baseclasses import CheckerBase
+from baseclasses import CheckerBase, TaskBase
+from settings import OSESetting
 
-
+from extrawhoosh.indexing import *
+from extrawhoosh.analysis import *
+from extrawhoosh.query import *
+from extrawhoosh.searching import *
 
 OSE = 'OSE'
-PRODUCT_NAME = 'Product Name'
-ADV_YEARLY = 'ADV Yearly'
+YEARLY_TIME = (last_year(),)
+ADV_YEARLY = 'ADV yearly({})'.format(*YEARLY_TIME)
+MONTHLY_TIME = (this_year(), last_month())
+ADV_MONTHLY = 'ADV monthly({})'.format(fmt_date(*MONTHLY_TIME))
+
+PRODUCT_NAME = 'Product_Name'
+PRODUCT_TYPE = 'Product_Type'
+PRODUCT_CODE = 'Product_Code'
+TRADING_VOLUME = 'Trading_Volume'
+PRODTYPES = {'Futures', 'Options'}
 
 
 class OSEScraper(object):
     URL_OSE = 'http://www.jpx.co.jp'
-    URL_VOLUME = URL_OSE + '/english/markets/statistics-derivatives/trading-volume/01.html'
+    URL_ANNUAL_VOLUME = URL_OSE + '/english/markets/statistics-derivatives/trading-volume/01.html'
+    URL_MONTHLY_VOLUME = URL_OSE + '/english/markets/statistics-derivatives/trading-volume/index.html'
 
     TABLE_TITLE = 'Year'
 
     TYPE = 'Type'
-    VOLUME = 'Trading Volume(units)'
+    TRADING_VOLUME_UNITS = 'Trading Volume(units)'
     DAILY_AVG = 'Daily Average'
     JNET_MKT = 'J-NET Market'
 
-    COLS_MAPPING = {TYPE: PRODUCT_NAME, VOLUME: ADV_YEARLY}
-    OUTCOLS = [PRODUCT_NAME, ADV_YEARLY]
+    COLS_MAPPING = {TYPE: PRODUCT_NAME, TRADING_VOLUME_UNITS: TRADING_VOLUME}
+    OUTCOLS = [PRODUCT_NAME, PRODUCT_TYPE, TRADING_VOLUME]
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-    def find_report_url(self, year=last_year()):
+    def find_annual_report_url(self, year=last_year()):
         year_str = str(year)
-        table = HtmlTableParser.get_tables_by_th(self.URL_VOLUME, self.TABLE_TITLE)[0]
+        table = HtmlTableParser.get_tables_by_th(self.URL_ANNUAL_VOLUME, self.TABLE_TITLE)[0]
         headers = HtmlTableParser.get_tb_headers(table)
 
         # find in headers for the column of the year
         col_idx = headers.index(year_str)
-        tds = HtmlTableParser.get_td_rows(table, lambda x: x[col_idx])
+        tds = HtmlTableParser.select_tds_by_index(table, column=col_idx)
 
         pattern = r'^(?=.*{}.*\.pdf).*$'.format(year_str)
         file_url = find_link(tds, pattern)
         return self.URL_OSE + file_url
 
-    def parse_from_txt(self, lines=None, alignment='centre'):
+    def find_monthly_report_url(self, year=this_year(), month=last_month()):
+        year_str = str(year)
+        table = HtmlTableParser.get_tables_by_th(self.URL_MONTHLY_VOLUME)[0]
+        tr = HtmlTableParser.select_trs(table, text=year_str)[0]
+        tds = HtmlTableParser.select_tds_by_index(tr, column=month)
 
-            def update_coldict(coldict, new_coldict):
-                for k, v in new_coldict.items():
-                    if k in coldict and v is not None:
-                        coldict[k] = v
+        pattern = r'^(?=.*{}.*\.pdf).*$'.format(fmt_date(year, month))
+        file_url = find_link(tds, pattern)
+        return self.URL_OSE + file_url
 
-            def parse_lines():
+    def get_report_url(self, report, rtime):
+        funcs = {'annual': self.find_annual_report_url,
+                 'monthly': self.find_monthly_report_url}
+        return funcs[report](*rtime)
+
+    def parse_tabular_lines(self, lines, header_matches, alignment=TabularTxtParser.CENTRE):
+        coldict = {m[1]: None for m in header_matches}
+        for line in lines:
+            if not line:
+                continue
+            line = '  ' + jaconv.z2h(line, kana=False, digit=True, ascii=True)
+            data_matches = TabularTxtParser.match_tabular_line(line, verify_func=None)
+            if data_matches:
+                data_matches = filter(lambda x: re.match(whole_pattern(ASCII_PATTERN), x[1]), data_matches)
+                aligned_cols = TabularTxtParser.align_txt_by_min_dist(header_matches, data_matches,
+                                                                      alignment=alignment).values()
+                new_coldict = select_mapping({k: text_to_num(v) for k, v in aligned_cols}, coldict.keys())
+                if any(coldict[col] is not None and new_coldict[col] is not None for col in new_coldict):
+                    yield coldict
+                    coldict = new_coldict
+                else:
+                    mapping_updated(coldict, new_coldict, insert=False, condition=lambda k, v: v is not None)
+
+            if all(v is not None for v in coldict.values()):
+                yield coldict
                 coldict = {m[1]: None for m in header_matches}
-                for line in lines:
-                    if not line:
-                        continue
-                    line = '  ' + jaconv.z2h(line, kana=False, digit=True, ascii=True)
-                    data_matches = TabularTxtParser.match_tabular_line(line, verify_func=None)
-                    if data_matches:
-                        data_matches = list(
-                            filter(lambda x: re.match(whole_pattern(ASCII_PATTERN), x[1]), data_matches))
-                        aligned_cols = TabularTxtParser.align_txt_by_min_dist(header_matches, data_matches,
-                                                                              alignment=alignment).values()
-                        aligned_cols = select_mapping({k: v for k, v in aligned_cols}, coldict.keys())
-                        if any(coldict[col] is not None and aligned_cols[col] is not None for col in aligned_cols):
-                            yield coldict
-                            coldict = aligned_cols
-                        else:
-                            update_coldict(coldict, aligned_cols)
 
-                    if all(v is not None for v in coldict.values()):
-                        yield coldict
-                        coldict = {m[1]: None for m in header_matches}
+    def parse_from_txt(self, lines=None, alignment=TabularTxtParser.CENTRE):
 
-            def filter_adv_lines():
-                prodname = ''
-                a = list(parse_lines())
-                for line in a:
-                    typeval = line[self.TYPE]
-                    if typeval is None:
-                        continue
-                    if all(t not in typeval for t in [self.DAILY_AVG, self.JNET_MKT]):
-                        prodname = typeval
-                    elif self.DAILY_AVG in typeval:
-                        record = dict(line)
-                        record[self.TYPE] = prodname
-                        yield record
+        def filter_adv_lines():
+            prodname = ''
+            for line in self.parse_tabular_lines(lines, header_matches, alignment):
+                typeval = line[self.TYPE]
+                if typeval is None:
+                    continue
+                if all(t not in typeval for t in [self.DAILY_AVG, self.JNET_MKT]):
+                    prodname = typeval
+                elif self.DAILY_AVG in typeval:
+                    record = dict(line)
+                    record[self.TYPE] = prodname
+                    yield record
 
-            lines = iter(lines)
-            for line in lines:
-                ln_convt = jaconv.z2h(line, kana=False, digit=True, ascii=True)
-                header_matches = TabularTxtParser.match_tabular_header(ln_convt, min_splits=4)
-                if header_matches:
-                    headers = [h[1] for h in header_matches]
-                    return pd.DataFrame(list(filter_adv_lines()), columns=headers)
+        lines = iter(lines)
+        for line in lines:
+            ln_convt = jaconv.z2h(line, kana=False, digit=True, ascii=True)
+            header_matches = TabularTxtParser.match_tabular_header(ln_convt, min_splits=4,
+                                                                   extra_verfunc=lambda matches: self.TYPE in [m[1] for m in matches])
+            if header_matches:
+                headers = [h[1] for h in header_matches]
+                return pd.DataFrame(list(filter_adv_lines()), columns=headers)
 
-    def run_scraper(self, year=last_year(), outpath=None):
-        dl_url = self.find_report_url(year)
+    def normalise_data(self, data):
+
+        def get_prodtype(name):
+            if not any(t in name for t in PRODTYPES):
+                return 'Futures'
+            return find_first_n(name.split(), lambda x: x in PRODTYPES)
+
+        if not isinstance(data, pd.DataFrame):
+            data = pd.DataFrame(data)
+
+        df = rename_mapping(data, self.COLS_MAPPING)
+        df[PRODUCT_TYPE] = df[PRODUCT_NAME].map(get_prodtype)
+        return select_mapping(df, self.OUTCOLS, False)
+
+    def run_scraper(self, report='monthly', rtime=MONTHLY_TIME, outpath=None):
+        dl_url = self.get_report_url(report, rtime)
         self.logger.info(('Downloading from: {}'.format(dl_url)))
-        with download(dl_url, tempfile.NamedTemporaryFile()) as f_pdf:
+        with download(dl_url, NamedTemporaryFile()) as f_pdf:
             pdfparser = PdfParser(f_pdf)
             self.logger.info('Parsing tables from the pdf')
             tables = [self.parse_from_txt(page) for page in pdfparser.pdftotext_bypages()]
-
-        df = pd.concat(tables, ignore_index=True)
-        df = rename_filter(df, self.COLS_MAPPING, self.OUTCOLS)
+        tbdata = pd.concat(tables, ignore_index=True)
+        df = self.normalise_data(tbdata)
         self.logger.info('Finished scraping')
         if outpath:
             XlsxWriter.save_sheets(outpath, {OSE: df})
@@ -111,13 +146,150 @@ class OSEScraper(object):
         return df
 
 
+class OSEMatcher(object):
+    OSE_COMMON_WORDS = ['futures', 'future', 'options', 'option']
+
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+
+    def get_ix_fields(self):
+        regtk_exp = '[^\s/\(\)]+'
+        regex_tkn = RegexTokenizerExtra(regtk_exp, ignored=False, required=False)
+        lwc_flt = LowercaseFilter()
+        splt_mrg_flt = SplitMergeFilter(splitcase=True, splitnums=True, ignore_splt=True, ignore_mrg=True)
+        stp_flt_norm = StopFilter()
+        stp_flt_spcl = StopFilter(stoplist=self.OSE_COMMON_WORDS)
+
+        ana = regex_tkn | splt_mrg_flt | lwc_flt | stp_flt_norm | stp_flt_spcl
+        return {PRODUCT_NAME: TEXT(stored=True, analyzer=ana),
+                PRODUCT_TYPE: ID(stored=True, unique=True),
+                TRADING_VOLUME: NUMERIC(stored=True)}
+
+    def init_ix(self, df, ix_name, clean=True):
+        self.logger.debug('Creating index {}'.format(ix_name))
+        return setup_ix(self.get_ix_fields(), df, ix_name, clean)
+
+    def __search_for_one(self, searcher, qparams, grouping_q):
+        src_and = search_func(searcher,
+                              *get_query_params('and', **qparams),
+                              filter=grouping_q,
+                              limit=None)
+        src_fuzzy = search_func(searcher,
+                                *get_query_params('and', **{**qparams, TERMCLASS: FuzzyTerm}),
+                                filter=grouping_q,
+                                limit=None)
+        src_andmaybe = search_func(searcher,
+                                   *get_query_params('andmaybe', **qparams),
+                                   filter=grouping_q,
+                                   limit=None)
+        return chain_search([src_and, src_fuzzy, src_andmaybe])
+
+    def match_by_prodname(self, data, ix, searcher=None):
+
+        def search():
+            pdnm, pdtype = data[PRODUCT_NAME], data[PRODUCT_TYPE]
+            qparams = {FIELDNAME: PRODUCT_NAME, SCHEMA: ix.schema, QSTRING: pdnm}
+            grouping_q = filter_query((PRODUCT_TYPE, pdtype))
+            results = self.__search_for_one(searcher, qparams, grouping_q)
+            return next(min_dist_rslt(results, pdnm, PRODUCT_NAME, ix.schema, minboost=0.2)).fields() \
+                if results else None
+
+        if searcher is None:
+            with ix.searcher() as searcher:
+                return search()
+        else:
+            return search()
+
+
 class OSEChecker(CheckerBase):
+    CONFIG_MAPPING = {ProductKey('NK225M', 'Futures'): 'Nikkei 225 mini',
+                      ProductKey('NK225', 'Futures'): 'Nikkei 225 Futures',
+                      ProductKey('NK225', 'Options'): 'Nikkei 225 Options',
+                      ProductKey('NK225W', 'Options'): 'Nikkei 225 Weekly Options',
+                      ProductKey('JN400', 'Futures'): 'JPX-Nikkei Index 400 Futures',
+                      ProductKey('JN400', 'Options'): 'JPX-Nikkei Index 400 Options',
+                      ProductKey('JGBL', 'Futures'): 'JGB Futures',
+                      ProductKey('JGBL', 'Options'): 'Options on 10-yearJGB Futures',
+                      ProductKey('TOPIX', 'Futures'): 'TOPIX Futures',
+                      ProductKey('TOPIXM', 'Futures'): 'mini-TOPIX Futures'}
+
     def __init__(self):
         super().__init__(ose)
-        
+        self.matcher = OSEMatcher()
+
+    def __match_productkey(self, key, ix, searcher=None):
+        if key.type not in PRODTYPES:
+            return None
+
+        if key not in self.CONFIG_MAPPING:
+            self.logger.warning(('No pre-defined mapping found for config key {},'
+                                 'potentially unmatched with indexed products')
+                                .format(key))
+            prodname = self.config_dict[key][CF_DESCRIPTION]
+        else:
+            prodname = self.CONFIG_MAPPING[key]
+        config_data = {PRODUCT_NAME: prodname, PRODUCT_TYPE: key.type}
+        match = self.matcher.match_by_prodname(config_data, ix, searcher)
+        if not match:
+            raise ValueError('Unable to match config record{}'.format(key))
+        self.logger.debug('Successfully match {} with {}'.format(key, match[PRODUCT_NAME]))
+        return match
+
+    def mark_recorded(self, df):
+        labled_df = df.set_index(PRODUCT_NAME, drop=False)
+        labled_df[RECORDED] = False
+        labled_df[PRODUCT_CODE] = None
+        with TemporaryDirectory() as ixfolder:
+            ix = self.matcher.init_ix(df, ixfolder)
+            with ix.searcher() as searcher:
+                for key in self.config_dict:
+                    match = self.__match_productkey(key, ix, searcher)
+                    if match:
+                        labled_df.loc[match[PRODUCT_NAME], RECORDED] = True
+                        labled_df.loc[match[PRODUCT_NAME], PRODUCT_CODE] = key.prod_code
+        return labled_df
+
+    def run_pd_check(self, data, vol_threshold, cols_renaming=None, outcols=None, outpath=None):
+        self.logger.info('Running product checking with {} higher than {}'.format(TRADING_VOLUME, vol_threshold))
+        df = df_lower_limit(data, TRADING_VOLUME, vol_threshold)
+        df_results = self.mark_recorded(df)
+        df_results = rename_filter(df_results, cols_renaming, outcols)
+        if outpath:
+            XlsxWriter.save_sheets(outpath, {OSE: df_results})
+            self.logger.info('Checked results output to {}'.format(outpath))
+        return df_results
 
 
-s = OSEScraper()
-ddd = s.run_scraper()
+class OSETask(TaskBase):
+    VOLTYPES = {'annual': ADV_YEARLY, 'monthly': ADV_MONTHLY}
 
-print(ddd)
+    COLS_MAPPING = {PRODUCT_CODE: TaskBase.PRODCODE,
+                    PRODUCT_TYPE: TaskBase.PRODTYPE,
+                    PRODUCT_NAME: TaskBase.PRODNAME,
+                    TRADING_VOLUME: TaskBase.VOLUME}
+
+    def __init__(self):
+        super().__init__(OSESetting)
+        self.aparser.add_argument('-rp', '--report',
+                                  nargs='?', default=OSESetting.REPORT,
+                                  type=str,
+                                  help='the type of report to evaluate')
+        self.scraper, self.checker = OSEScraper(), OSEChecker()
+        self.services = {OSE: OSESetting.SVC_OSE}
+
+    def scrape(self):
+        report = self.task_args.report
+        return self.scraper.run_scraper(report)
+
+    def check(self):
+        vollim = self.task_args.vollim
+        outpath = self.task_args.outpath
+        return self.checker.run_pd_check(self._exch_prods, vollim, self.COLS_MAPPING, self.CHECK_COLS, outpath)
+
+    def send_to_icinga(self, exit_status):
+        self.voltype = self.VOLTYPES[self.task_args.report]
+
+
+if __name__ == '__main__':
+    task = OSETask()
+    results = task.run()

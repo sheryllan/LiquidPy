@@ -50,6 +50,49 @@ def print_duplicate(group, duplicate):
     print('Duplicate: {}'.format(str(duplicate)))
 
 
+def dfgroupby_aggr(df, group_key, aggr_col, aggr_func, inplace=True):
+    if not inplace:
+        df = df.copy()
+    if group_key in df:
+        for group, subdf in df.groupby(group_key):
+            aggr_val = aggr_func(subdf, aggr_col)
+            df.loc[subdf.index, aggr_col] = aggr_val
+    return df
+
+
+def get_config_dict(exch, keycols=(ProductKey.FD_PRODCODE, ProductKey.FD_TYPE), keygen=ProductKey, valcols=None):
+    src = get_src_file(exch)
+    config_data = parse_config(exch, src, attrs=valcols)
+    return {keygen(**select_mapping(d, keycols)): d for d in config_data}
+
+
+def df_lower_limit(df, col, lower_limit):
+    return df[df[col] >= lower_limit]
+
+
+def mark_recorded(data, col_pcode, col_type, config_dict, inplace=True):
+    df = data.copy() if not inplace else data
+    df[RECORDED] = df[col_pcode, col_type].apply(lambda x: ProductKey(*x) in config_dict, axis=1)
+    return df
+
+
+# def filter_mark_rows(data_rows, filterfunc, keyfunc, config_dict):
+#     for row in data_rows:
+#         row = pd.Series(row)
+#         if filterfunc and not filterfunc(row):
+#             continue
+#         recorded = keyfunc(row) in config_dict
+#         yield pd.concat([row, pd.Series({RECORDED: recorded})])
+
+
+def count_unique(data, col=RECORDED):
+    arr = np.array(data[col] if isinstance(data, pd.DataFrame) else [d[col] for d in data])
+    uniques, counts = np.unique(arr, return_counts=True)
+    return {key: val for key, val in zip(uniques, counts)}
+
+
+# region unused methods
+
 def groupby_aggr(data, groupfunc, aggr_col, aggr_func, groupkey=None):
     for key, group in groupby(data, key=groupfunc):
         rows = list(group)
@@ -61,28 +104,6 @@ def groupby_aggr(data, groupfunc, aggr_col, aggr_func, groupkey=None):
             yield mapping_updated(row, {aggr_col: aggr_val})
 
 
-def get_config_dict(exch, keycols=(ProductKey.FD_PRODCODE, ProductKey.FD_TYPE), keygen=ProductKey, valcols=None):
-    config_data = parse_config(exch, attrs=valcols)
-    return {keygen(**select_mapping(d, keycols)): d for d in config_data}
-
-
-def filter_mark_rows(data_rows, filterfunc, keyfunc, config_dict):
-    for row in data_rows:
-        row = pd.Series(row)
-        if filterfunc and not filterfunc(row):
-            continue
-        recorded = keyfunc(row) in config_dict
-        yield pd.concat([row, pd.Series({RECORDED: recorded})])
-
-
-def count_unique(data, col=RECORDED):
-    arr = np.array(data[col] if isinstance(data, pd.DataFrame) else [d[col] for d in data])
-    uniques, counts = np.unique(arr, return_counts=True)
-    return {key: val for key, val in zip(uniques, counts)}
-
-
-# region unused methods
-
 # parameter file2sheet is a tuple
 def xl_consolidate(file2sheet, dest):
     wrt = XlsxWriter.create_xlwriter(dest, False)
@@ -91,15 +112,6 @@ def xl_consolidate(file2sheet, dest):
         dt = xl.parse(sht)
         XlsxWriter.to_xlsheet(dt, wrt, sht)
     wrt.save()
-
-
-def dfgroupby_aggr(df, group_key, aggr_col, aggr_func):
-    groups = df_groupby(df, group_key)
-    for group, subdf in groups.items():
-        aggr_val = aggr_func(subdf, aggr_col)
-        for _, row in subdf.iterrows():
-            row[aggr_col] = aggr_val
-            yield row
 
 
 def divide_dict_by(orig_dict, key_cols, left_sort=False, right_sort=False):

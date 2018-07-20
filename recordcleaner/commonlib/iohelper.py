@@ -22,7 +22,9 @@ class XlsxWriter(object):
 
     @staticmethod
     def to_xlsheet(data, wrt, sheet, columns=None):
-        df = pd.DataFrame(data) if columns is None else pd.DataFrame(data, columns=columns)
+        df = pd.DataFrame(data)
+        if columns is not None:
+            df = df[columns]
         df.to_excel(wrt, sheet, index=False)
 
     @staticmethod
@@ -40,7 +42,7 @@ class XlsxWriter(object):
         os.makedirs(outdir, exist_ok=True)
 
         wrt = XlsxWriter.create_xlwriter(path, override)
-        for sheet, data in list(sheet2data.items()):
+        for sheet, data in sheet2data.items():
             XlsxWriter.to_xlsheet(data, wrt, sheet, columns)
             if auto_size:
                 XlsxWriter.auto_size_cols(wrt.sheets[sheet])

@@ -5,6 +5,7 @@ import warnings
 from sortedcontainers import SortedDict
 from argparse import ArgumentTypeError
 import pandas as pd
+import traceback
 
 
 def nontypes_iterable(arg, excl_types=(str,)):
@@ -29,6 +30,23 @@ def map_recursive(f, items):
     if isinstance(items, types.GeneratorType):
         return subitems
     return type(items)(subitems)
+
+
+def df_groupby(df, cols):
+    cols = to_iter(cols)
+    if any(c not in df for c in cols):
+        return None
+
+    def groupby_rcs(gdf, rcols):
+        if not rcols:
+            return gdf
+        else:
+            group_dict = dict()
+            for key, new_df in gdf.groupby(rcols[0]):
+                group_dict[key] = groupby_rcs(new_df, rcols[1:])
+            return group_dict
+
+    return groupby_rcs(df, cols)
 
 
 def group_every_n(items, n, gtype=list):
@@ -57,19 +75,20 @@ def swap(a, b):
     return a, b
 
 
-def mapping_updated(data, values, insert=True):
+def mapping_updated(data, values, insert=True, condition=lambda k, v: True):
     val_dict = dict(values)
     for k in val_dict:
-        if insert or k in data:
+        if (insert or k in data) and condition(k, val_dict[k]):
             data[k] = val_dict[k]
     return data
 
 
-def select_mapping(data, keys, keepnone=True):
+def select_mapping(data, keys, keepnone=True, rtype=None):
     if keys is None:
         return data
 
-    result = type(data)()
+    rtype = type(data) if rtype is None else rtype
+    result = rtype()
     for k in keys:
         if keepnone:
             result[k] = data.get(k, None)
@@ -134,6 +153,20 @@ def slicing_gen(items, stopfunc):
         else:
             yield items[0]
             del items[0]
+
+
+def unique_gen(items):
+    seen = set()
+    for item in items:
+        if item in seen:
+            continue
+        yield item
+        seen.add(item)
+
+
+def format_ex_str(ex):
+    return ''.join(traceback.format_exception(type(ex), ex, ex.__traceback__)) \
+                    if isinstance(ex, Exception) else ''
 
 
 def hierarch_groupby(orig_dict, key_funcs, sort=False):

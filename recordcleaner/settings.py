@@ -14,36 +14,37 @@ def cwd_full_path(filename):
 envfile = cwd_full_path('envfile.sh')
 load_dotenv(dotenv_path=envfile)
 
-HTTPS_HEADER = 'https://'
 OUTDIR = os.getenv('OUTDIR')
-ICINGA_CA_CRT = cwd_full_path(os.getenv('CA_CRT'))
-ICINGA_HOST = os.getenv('ICINGA_HOST')
-ICINGA_API_PORT = os.getenv('ICINGA_API_PORT')
-ICINGA_API_PCR = os.getenv('ICINGA_API_PCR')
-ICINGA_API_USER = os.getenv('ICINGA_API_USER')
-ICINGA_API_PSW = os.getenv('ICINGA_API_PSW')
-
-
-def get_icinga_api_url(child_dir):
-    host = '{}:{}'.format(ICINGA_HOST, ICINGA_API_PORT)
-    pcr_path = os.path.join(host, child_dir)
-    return HTTPS_HEADER + pcr_path
+ICINGA_CA_CRT = cwd_full_path('ca.crt')
 
 
 class SettingBase(object):
-    OUTPATH = None
+    COUTPATH = None
+    SOUTPATH = None
     VOLLIM = 0
     LOGLEVEL = 'DEBUG'
     LOGFILE = None
 
 
 class CMEGSetting(SettingBase):
-    OUTFILE = 'CMEG_checked.xlsx'
-    MATCH_FILE = 'CMEG_matched.xlsx'
-    OUTPATH = os.path.join(OUTDIR, OUTFILE)
-    MATCH_OUTPATH = os.path.join(OUTDIR, MATCH_FILE)
+    COUTFILE = 'CMEG_checked.xlsx'
+    SOUTFILE = 'CMEG_all.xlsx'
+    COUTPATH = os.path.join(OUTDIR, COUTFILE)
+    SOUTPATH = os.path.join(OUTDIR, SOUTFILE)
     VOLLIM = 1000
-    SVC_CME = os.getenv('SVC_CME')
-    SVC_CBOT = os.getenv('SVC_CBOT')
-    SVC_NYMEX = os.getenv('SVC_NYMEX')
+    SVC_CME = 'cme_check'
+    SVC_CBOT = 'cbot_check'
+    SVC_NYMEX = 'nymex_check'
+
+
+class OSESetting(SettingBase):
+    COUTFILE = 'OSE_checked.xlsx'
+    SOUTFILE = 'OSE_all.xlsx'
+    COUTPATH = os.path.join(OUTDIR, COUTFILE)
+    SOUTPATH = os.path.join(OUTDIR, SOUTFILE)
+    VOLLIM = 1000
+    REPORT = 'monthly'
+    SVC_OSE = 'ose_check'
+
+
 

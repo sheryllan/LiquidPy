@@ -31,6 +31,6 @@ source ${DIR}/env_setup.sh ${CLEAN}
 
 source ${VENV_BIN}/activate
 echo -e "\nRunning ${CMEGCHECK_PY}"
-python ${CMEGCHECK_PY} ${ICINGA} ${LOGLEVEL} --outpath --match_outpath
+python ${CMEGCHECK_PY} ${ICINGA} ${LOGLEVEL} --coutpath --soutpath
 
 deactivate

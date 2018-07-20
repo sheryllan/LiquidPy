@@ -83,7 +83,7 @@ def every_query(fieldname=None):
 def filter_query(*args):
     qterms = list()
     for arg in args:
-        if all(arg):
+        if all(a is not None for a in arg):
             qterms.append(Term(*arg))
     return And(qterms)
 
