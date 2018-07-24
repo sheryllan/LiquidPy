@@ -6,9 +6,11 @@ from commonlib.datastruct import namedtuple_with_defaults
 from commonlib.iohelper import XlsxWriter
 from configfilesparser import *
 from productmatcher import *
+from datascraper import *
 
 RECORDED = 'Recorded'
 GROUP = 'Group'
+PRODUCTKEY = 'ProductKey'
 
 
 class ProductKey(namedtuple_with_defaults(namedtuple('ProductKey', [CO_PRODCODE, CO_TYPE]))):
@@ -39,24 +41,20 @@ class ProductKey(namedtuple_with_defaults(namedtuple('ProductKey', [CO_PRODCODE,
         return hash(self.hashing_type())
 
 
-def sum_unique(data, aggr_col):
-    if nontypes_iterable(data):
-        return sum(set(map(lambda x: x[aggr_col], data)))
-
-
-def print_duplicate(group, duplicate):
-    print()
-    print('In group: {}'.format(group))
-    print('Duplicate: {}'.format(str(duplicate)))
+def sum_mapping(data, aggr_col):
+    if isinstance(data, pd.DataFrame):
+        return data[aggr_col].sum()
+    elif nontypes_iterable(data, excl_types=[pd.DataFrame, pd.Series, dict]):
+        return sum(map(lambda x: x[aggr_col], data))
 
 
 def dfgroupby_aggr(df, group_key, aggr_col, aggr_func, inplace=True):
     if not inplace:
         df = df.copy()
-    if group_key in df:
-        for group, subdf in df.groupby(group_key):
-            aggr_val = aggr_func(subdf, aggr_col)
-            df.loc[subdf.index, aggr_col] = aggr_val
+
+    for group, subdf in df.groupby(group_key):
+        aggr_val = aggr_func(subdf, aggr_col)
+        df.loc[subdf.index, aggr_col] = aggr_val
     return df
 
 
@@ -70,9 +68,9 @@ def df_lower_limit(df, col, lower_limit):
     return df[df[col] >= lower_limit]
 
 
-def mark_recorded(data, col_pcode, col_type, config_dict, inplace=True):
+def mark_recorded(data, config_dict, inplace=True):
     df = data.copy() if not inplace else data
-    df[RECORDED] = df[col_pcode, col_type].apply(lambda x: ProductKey(*x) in config_dict, axis=1)
+    df[RECORDED] = pd.Series(data.index.get_level_values(PRODUCTKEY).map(lambda x: ProductKey(*x) in config_dict), index=data.index)
     return df
 
 
@@ -84,11 +82,51 @@ def mark_recorded(data, col_pcode, col_type, config_dict, inplace=True):
 #         recorded = keyfunc(row) in config_dict
 #         yield pd.concat([row, pd.Series({RECORDED: recorded})])
 
+def get_prod_keys(data, keyfunc=lambda x: x):
+    return data.apply(lambda x: keyfunc(x), axis=1)
+
 
 def count_unique(data, col=RECORDED):
-    arr = np.array(data[col] if isinstance(data, pd.DataFrame) else [d[col] for d in data])
+    if isinstance(data, pd.DataFrame):
+        arr = np.array(data[col]) if col is not None else data.values
+    else:
+        arr = np.array([d[col] for d in data]) if col is not None else np.array(list(data))
     uniques, counts = np.unique(arr, return_counts=True)
     return {key: val for key, val in zip(uniques, counts)}
+
+
+def set_check_index(data, prod_keys, group_keys=None, inplace=False, duplicates=False):
+    if group_keys is None:
+        names = [PRODUCTKEY]
+        indices = [to_iter(prod_keys)]
+    else:
+        names = [GROUP, PRODUCTKEY]
+        indices = [to_iter(group_keys), to_iter(prod_keys)]
+
+    mindex = pd.MultiIndex.from_arrays(indices, names=names)
+    data_set = data.set_index(mindex, inplace=inplace)
+    if not duplicates:
+        data_set = data_set[~data_set.index.duplicated(keep='first')]
+
+    return data_set
+
+
+def validate_precheck(data):
+    if not isinstance(data, dict):
+        raise TypeError('The checked results must be a dict with keys of exchange')
+    if any(not isinstance(data[e], pd.DataFrame) for e in data):
+        raise TypeError('The checked data in the results must be a Dataframe')
+
+
+def postcheck(data, cols_mapping, outcols, logger):
+    for exch in data:
+        if cols_mapping:
+            logger.debug('Renaming data columns: {}'.format(list(cols_mapping.keys())))
+        df = data[exch]
+        df = rename_filter(df, cols_mapping, outcols)
+        logger.debug('Output data columns: {}'.format(list(df.columns)))
+        data[exch] = df
+
 
 
 # region unused methods

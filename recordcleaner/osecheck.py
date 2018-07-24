@@ -139,7 +139,6 @@ class OSEScraper(object):
             tables = [self.parse_from_txt(page) for page in pdfparser.pdftotext_bypages()]
         tbdata = pd.concat(tables, ignore_index=True)
         df = self.normalise_data(tbdata)
-        self.logger.info('Finished scraping')
         if outpath:
             XlsxWriter.save_sheets(outpath, {OSE: df})
             self.logger.info('Scraper results saved to {}'.format(outpath))

@@ -175,7 +175,6 @@ class CMEGScraper(object):
             NYMEX: rename_filter(df_nymex, {self.get_ytd_header(df_nymex, year=year): A_ADV_YTD},
                                  self.ADV_OUTCOLS[NYMEX])}
 
-        self.logger.info('Finished scraping')
         return df_prods, adv_dict
 
     def run(self, outpath=None):
@@ -501,13 +500,14 @@ class CMEGMatcher(object):
         return ix_cme, ix_cbot
 
     def match_by_prodcode(self, df_prods, df_adv, on_prods=F_CLEARING, on_adv=A_COMMODITY):
-        result = df_adv.merge(df_prods, left_on=on_adv, right_on=on_prods)
+        df_adv[on_adv] = df_adv[on_adv].astype(str)
+        return df_adv.merge(df_prods, left_on=on_adv, right_on=on_prods)
 
-        prod_dict = {str(row[on_prods]): row for _, row in df_prods.iterrows()}
-        for _, row in df_adv.iterrows():
-            if str(row[on_adv]) in prod_dict:
-                row_result = row.append(prod_dict[str(row[on_adv])])
-                yield row_result
+        # prod_dict = {str(row[on_prods]): row for _, row in df_prods.iterrows()}
+        # for _, row in df_adv.iterrows():
+        #     if str(row[on_adv]) in prod_dict:
+        #         row_result = row.append(prod_dict[str(row[on_adv])])
+        #         yield row_result
 
     def match_by_prodname(self, df_adv, ix, exact_mapping=None, notfound=None, multi_match=None):
         with ix.searcher() as searcher:
@@ -525,29 +525,26 @@ class CMEGMatcher(object):
         gdf_exch = {exch: df.reset_index(drop=True) for exch, df in df_prods.groupby(F_EXCHANGE)}
 
         df_nymex_comex_prods = pd.concat([gdf_exch[NYMEX], gdf_exch[COMEX]], ignore_index=True)
-        data_nymex = pd.DataFrame(self.match_by_prodcode(df_nymex_comex_prods, dfs_adv[NYMEX]))
-        ff = list(self.match_by_prodcode(df_nymex_comex_prods, dfs_adv[NYMEX]))
+        data_nymex = self.match_by_prodcode(df_nymex_comex_prods, dfs_adv[NYMEX])
 
         ix_cme, ix_cbot = self.init_ix_cme_cbot(gdf_exch, *ix_names, clean)
-        kk = list(self.match_by_prodname(dfs_adv[CME], ix_cme, CMEGMatcher.CME_EXACT_MAPPING,
-                                         CMEGMatcher.CME_NOTFOUND_PRODS, CMEGMatcher.CME_MULTI_MATCH))
         data_cme = pd.DataFrame(self.match_by_prodname(dfs_adv[CME], ix_cme, CMEGMatcher.CME_EXACT_MAPPING,
-                                         CMEGMatcher.CME_NOTFOUND_PRODS, CMEGMatcher.CME_MULTI_MATCH))
+                                                       CMEGMatcher.CME_NOTFOUND_PRODS, CMEGMatcher.CME_MULTI_MATCH))
         data_cbot = pd.DataFrame(self.match_by_prodname(dfs_adv[CBOT], ix_cbot, CMEGMatcher.CBOT_EXACT_MAPPING,
-                                          multi_match=CMEGMatcher.CBOT_MULTI_MATCH))
+                                                        multi_match=CMEGMatcher.CBOT_MULTI_MATCH))
         self.logger.info('Finished product matching')
 
         return {CME: data_cme, CBOT: data_cbot, NYMEX: data_nymex}
 
 
 class CMEGChecker(CheckerBase):
-    COLS_MAPPING = {F_GLOBEX: TaskBase.PRODCODE,
+    PRODUCT_CODE = 'Product_Code'
+
+    COLS_MAPPING = {PRODUCT_CODE: TaskBase.PRODCODE,
                     F_CLEARED_AS: TaskBase.PRODTYPE,
                     F_PRODUCT_NAME: TaskBase.PRODNAME,
                     F_PRODUCT_GROUP: TaskBase.PRODGROUP,
                     A_ADV_YTD: TaskBase.VOLUME}
-
-    PRODUCT_CODE = 'Product_Code'
 
     def __init__(self):
         super().__init__(cme)
@@ -556,52 +553,45 @@ class CMEGChecker(CheckerBase):
     def cols_mapping(self):
         return self.COLS_MAPPING
 
-    def get_prod_code(self, row):
+    def __prod_code(self, row):
         if not pd.isnull(row[F_GLOBEX]):
             return row[F_GLOBEX]
         elif not pd.isnull(row[F_CLEARING]):
             return row[F_CLEARING]
         else:
-            print('no code: {}'.format(row[F_PRODUCT_NAME]))
+            self.logger.warning('no code: {}'.format(row[F_PRODUCT_NAME]))
             return None
 
-    # def get_prod_key(self, row):
-    #     if pd.isnull(row[F_PRODUCT_NAME]):
-    #         return None
-    #     pd_code = self.get_prod_code(row)
-    #     if pd_code is not None:
-    #         return ProductKey(pd_code, row[F_CLEARED_AS])
-    #     return None
-    #
-    # def get_group_key(self, row):
-    #     group_key = [A_PRODUCT_NAME, A_CLEARED_AS]
-    #     return ' '.join(select_mapping(row, group_key, rtype=dict).values())
+    def __prod_key(self, row):
+        if pd.isnull(row[F_PRODUCT_NAME]):
+            return None
+        if row[self.PRODUCT_CODE] is not None:
+            return row[self.PRODUCT_CODE], row[F_CLEARED_AS]
+        return None
 
-    def assign_dfs(self, data):
-        group_key = [A_PRODUCT_NAME, A_CLEARED_AS]
-        cme_df, cbot_df = data[CME], data[CBOT]
-        cme_df.assign({GROUP: cme_df[group_key].apply(lambda x: ' '.join(x), axis=1),
-                       self.PRODUCT_CODE: cme_df.apply(self.get_prod_code, axis=1)})
-        cbot_df.assign({GROUP: cbot_df[group_key].apply(lambda x: ' '.join(x), axis=1),
-                       self.PRODUCT_CODE: cbot_df.apply(self.get_prod_code, axis=1)})
+    def set_prodcode_col(self, dfs):
+        for exch, df in dfs.items():
+            df[self.PRODUCT_CODE] = df.apply(self.__prod_code, axis=1)
+
+    def get_group_keys(self, data):
+        return data[A_PRODUCT_NAME].astype(str) + ' ' + data[A_CLEARED_AS].astype(str)
 
     def mark_filter_prods(self, data, lower_limit, fcol):
-        df = dfgroupby_aggr(data, GROUP, A_ADV_YTD, sum_unique)
-        df.set_index(GROUP, inplace=True)
-        mark_recorded(df, self.PRODUCT_CODE, F_CLEARED_AS, self.config_dict)
+        df = dfgroupby_aggr(data, data.index.get_level_values(GROUP), A_ADV_YTD, sum_mapping) \
+            if data.index.names[0] == GROUP else data
+        mark_recorded(df, self.config_dict)
         return df_lower_limit(df, fcol, lower_limit)
 
     def check(self, data, vol_threshold):
         self.logger.info('Running product checking with {} higher than {}'.format(A_ADV_YTD, vol_threshold))
 
-        self.assign_dfs(data)
+        self.set_prodcode_col(data)
 
-        prods_cme = self.mark_filter_prods(data[CME], vol_threshold, A_ADV_YTD)
-        prods_cbot = self.mark_filter_prods(data[CBOT], vol_threshold, A_ADV_YTD)
-        prods_nymex = self.mark_filter_prods(data[NYMEX], vol_threshold, A_ADV_YTD)
+        data[CME] = set_check_index(data[CME], get_prod_keys(data[CME], self.__prod_key), self.get_group_keys(data[CME]))
+        data[CBOT] = set_check_index(data[CBOT], get_prod_keys(data[CBOT], self.__prod_key), self.get_group_keys(data[CBOT]))
+        data[NYMEX] = set_check_index(data[NYMEX], get_prod_keys(data[NYMEX], self.__prod_key))
 
-        self.logger.info('Finished checking')
-        return {CME: prods_cme, CBOT: prods_cbot, NYMEX: prods_nymex}
+        return {exch: self.mark_filter_prods(data[exch], vol_threshold, A_ADV_YTD) for exch in data}
 
 
 class CMEGTask(TaskBase):

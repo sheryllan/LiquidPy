@@ -4,21 +4,10 @@ import sys
 
 from tabulate import tabulate
 
-from datascraper import *
 from productchecker import *
 from settings import *
 from commonlib.datastruct import DynamicAttrs
 from commonlib.iohelper import LogWriter
-
-
-def finalise_dfs(data, cols_mapping, outcols, logger):
-    for exch in data:
-        if cols_mapping:
-            logger.debug('Renaming data columns: {}'.format(list(cols_mapping.keys())))
-        df = data[exch]
-        df = rename_filter(df, cols_mapping, outcols)
-        logger.debug('Output data columns: {}'.format(list(df.columns)))
-        data[exch] = df
 
 
 class IcingaHelper(object):
@@ -97,11 +86,11 @@ class IcingaCheckHandler(object):
 
     def __init__(self, df_checked, df_scraped, exch, voltype, vollim):
         self.logger = logging.getLogger(__name__)
-        self.df_checked = pd.DataFrame(df_checked)
-        self.df_scraped = pd.DataFrame(df_scraped)
-        self.exch = exch
-        self.voltype = voltype
-        self.vollim = vollim
+        self._df_checked = pd.DataFrame(df_checked)
+        self._df_scraped = pd.DataFrame(df_scraped)
+        self._exch = exch
+        self._voltype = voltype
+        self._vollim = vollim
         self._groups = None
         self._cnt_checked, self._cnt_groups = {}, {}
 
@@ -114,16 +103,20 @@ class IcingaCheckHandler(object):
     @property
     def groups(self):
         if self._groups is None:
-            self._groups = {i: self.is_group_ok(self.df_checked.loc[[i]]) for i in unique_gen(self.df_checked.index)}
+            if isinstance(self._df_checked.index, pd.MultiIndex):
+                self._groups = {i: self.is_group_ok(self._df_checked.loc[[i]])
+                                for i in unique_gen(self._df_checked.index.get_level_values(0))}
+            else:
+                self._groups = {}
         return self._groups
 
     @property
     def checked_tot(self):
-        return self.get_count(self.df_checked)
+        return self.get_count(self._df_checked)
 
     @property
     def scraped_tot(self):
-        return self.get_count(self.df_scraped)
+        return self.get_count(self._df_scraped)
 
     @property
     def group_tot(self):
@@ -132,31 +125,30 @@ class IcingaCheckHandler(object):
     @property
     def cnt_checked(self):
         if not self._cnt_checked:
-            self._cnt_checked = count_unique(self.df_checked)
+            self._cnt_checked = count_unique(self._df_checked)
         return self._cnt_checked
 
     @property
     def cnt_groups(self):
         if not self._cnt_groups:
-            self._cnt_groups = count_unique(self.groups)
+            self._cnt_groups = count_unique(self.groups.values(), None)
         return self._cnt_groups
 
     def tabulate_rows(self, outcols, tablefmt='simple', numalign='right'):
         outcols = to_iter(outcols)
-        df = self.df_checked[outcols]
+        df = self._df_checked[outcols]
 
-        if self.group_tot != self.checked_tot:
+        if self.group_tot != 0:
             table = list()
             for g in self.groups:
-                table.append(g)
-                table = table + df.loc[g].values.tolist()
+                table = table + [[g]] + df.loc[g].values.tolist() + [[]]
         else:
             table = df.values.tolist()
 
         return tabulate(table, outcols, tablefmt, numalign=numalign)
 
     def format_plugin_output(self, outcols, tablefmt='simple', numalign='right'):
-        title = '{} products for which {} is higher than {}:'.format(self.exch, self.voltype, self.vollim)
+        title = '{} products for which {} is higher than {}:'.format(self._exch, self._voltype, self._vollim)
         details = self.tabulate_rows(outcols, tablefmt, numalign)
         return '\n'.join([title, details])
 
@@ -168,7 +160,7 @@ class IcingaCheckHandler(object):
         prods_tot = IcingaHelper.PerfData(self.PERF_TOT_PRODS, self.scraped_tot)
         flt_pct = IcingaHelper.PerfData(self.PERF_FLT_PERCENTAGE, flt_pct)
         perf_data = [recorded, unrecorded, prods_tot, flt_pct]
-        if self.group_tot != self.checked_tot:
+        if self.group_tot != 0:
             groups_tot = IcingaHelper.PerfData(self.PERF_TOT_GROUPS, self.group_tot)
             gp_unrec = IcingaHelper.PerfData(self.PERF_GROUP_UNREC, self.cnt_groups.get(False, 0))
             perf_data.extend([groups_tot, gp_unrec])
@@ -286,13 +278,16 @@ class TaskBase(object):
             try:
                 self.logger.info('Start running scraping')
                 self.run_scraper()
+                self.logger.info('Finished scraping')
                 self.logger.info('Start running checking')
                 self.run_checker()
+                self.logger.info('Finished checking')
             except Warning as w:
                 self.logger.warning(str(w))
             except Exception as e:
                 self.logger.error('Failed running the task', exc_info=True)
                 exit_status = (1, e)
+                print(format_ex_str(e))
 
         if self.task_args.icinga:
             self.logger.info('Sending results to icinga')
@@ -321,14 +316,10 @@ class CheckerBase(object):
         raise NotImplementedError("Please implement this method")
 
     def run(self, data, vol_threshold, outcols=None, outpath=None):
+        validate_precheck(data)
         checked = self.check(data, vol_threshold)
-        if not isinstance(checked, dict):
-            raise TypeError('The checked results must be a dict with keys of exchange')
-        if any(not isinstance(d, pd.DataFrame) for d in data):
-            raise TypeError('The checked data in the results must be a Dataframe')
 
-        finalise_dfs(checked, self.cols_mapping, outcols, self.logger)
-
+        postcheck(checked, self.cols_mapping, outcols, self.logger)
         if outpath:
             XlsxWriter.save_sheets(outpath, checked)
             self.logger.info('Check results output to {}'.format(outpath))
