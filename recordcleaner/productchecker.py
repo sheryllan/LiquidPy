@@ -74,14 +74,6 @@ def mark_recorded(data, config_dict, inplace=True):
     return df
 
 
-# def filter_mark_rows(data_rows, filterfunc, keyfunc, config_dict):
-#     for row in data_rows:
-#         row = pd.Series(row)
-#         if filterfunc and not filterfunc(row):
-#             continue
-#         recorded = keyfunc(row) in config_dict
-#         yield pd.concat([row, pd.Series({RECORDED: recorded})])
-
 def get_prod_keys(data, keyfunc=lambda x: x):
     return data.apply(lambda x: keyfunc(x), axis=1)
 
@@ -118,13 +110,14 @@ def validate_precheck(data):
         raise TypeError('The checked data in the results must be a Dataframe')
 
 
-def postcheck(data, cols_mapping, outcols, logger):
+def postcheck(data, cols_mapping, outcols, logger=None):
     for exch in data:
         if cols_mapping:
             logger.debug('Renaming data columns: {}'.format(list(cols_mapping.keys())))
         df = data[exch]
         df = rename_filter(df, cols_mapping, outcols)
-        logger.debug('Output data columns: {}'.format(list(df.columns)))
+        if logger is not None:
+            logger.debug('Output data columns: {}'.format(list(df.columns)))
         data[exch] = df
 
 

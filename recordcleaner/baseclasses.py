@@ -4,10 +4,16 @@ import sys
 
 from tabulate import tabulate
 
+from commonlib.iohelper import LogWriter
 from productchecker import *
 from settings import *
-from commonlib.datastruct import DynamicAttrs
-from commonlib.iohelper import LogWriter
+
+ARG_ICINGA = 'icinga'
+ARG_COUTPATH = 'coutpath'
+ARG_SOUTPATH = 'soutpath'
+ARG_VOLLIM = 'vollim'
+ARG_LOGLEVEL = 'loglevel'
+ARG_LOGFILE = 'logfile'
 
 
 class IcingaHelper(object):
@@ -98,16 +104,14 @@ class IcingaCheckHandler(object):
         return len(x)
 
     def is_group_ok(self, df_group):
-        return all(x for x in df_group[RECORDED].values)
+        return any(x for x in df_group[RECORDED].values)
 
     @property
     def groups(self):
         if self._groups is None:
-            if isinstance(self._df_checked.index, pd.MultiIndex):
-                self._groups = {i: self.is_group_ok(self._df_checked.loc[[i]])
-                                for i in unique_gen(self._df_checked.index.get_level_values(0))}
-            else:
-                self._groups = {}
+            self._groups = {i: self.is_group_ok(self._df_checked.loc[[i]])
+                            for i in unique_gen(self._df_checked.index.get_level_values(0))}
+
         return self._groups
 
     @property
@@ -138,7 +142,7 @@ class IcingaCheckHandler(object):
         outcols = to_iter(outcols)
         df = self._df_checked[outcols]
 
-        if self.group_tot != 0:
+        if self.group_tot != self.checked_tot:
             table = list()
             for g in self.groups:
                 table = table + [[g]] + df.loc[g].values.tolist() + [[]]
@@ -160,7 +164,7 @@ class IcingaCheckHandler(object):
         prods_tot = IcingaHelper.PerfData(self.PERF_TOT_PRODS, self.scraped_tot)
         flt_pct = IcingaHelper.PerfData(self.PERF_FLT_PERCENTAGE, flt_pct)
         perf_data = [recorded, unrecorded, prods_tot, flt_pct]
-        if self.group_tot != 0:
+        if self.group_tot != self.checked_tot:
             groups_tot = IcingaHelper.PerfData(self.PERF_TOT_GROUPS, self.group_tot)
             gp_unrec = IcingaHelper.PerfData(self.PERF_GROUP_UNREC, self.cnt_groups.get(False, 0))
             perf_data.extend([groups_tot, gp_unrec])
@@ -191,26 +195,26 @@ class TaskBase(object):
     def __init__(self, settings, scraper, checker):
         self.scraper, self.checker = scraper, checker
         self.aparser = argparse.ArgumentParser()
-        self.aparser.add_argument('-icg', '--icinga',
+        self.aparser.add_argument('-icg', '--' + ARG_ICINGA,
                                   action='store_true',
                                   help='set it to enable results transfer to icinga')
-        self.aparser.add_argument('-co', '--coutpath',
+        self.aparser.add_argument('-co', '--' + ARG_COUTPATH,
                                   type=str,
                                   nargs='?', const=settings.COUTPATH, default=None,
                                   help='the output path of the check results')
-        self.aparser.add_argument('-so', '--soutpath',
+        self.aparser.add_argument('-so', '--' + ARG_SOUTPATH,
                                   nargs='?', const=CMEGSetting.SOUTPATH, default=None,
                                   type=str,
                                   help='the output path of the matching results')
-        self.aparser.add_argument('-v', '--vollim',
+        self.aparser.add_argument('-v', '--' + ARG_VOLLIM,
                                   nargs='?', default=settings.VOLLIM,
                                   type=int,
                                   help='the volume threshold to filter out products')
-        self.aparser.add_argument('-ll', '--loglevel',
+        self.aparser.add_argument('-ll', '--' + ARG_LOGLEVEL,
                                   type=str,
                                   nargs='?', default=settings.LOGLEVEL,
                                   help='level name or number: DEBUG(10), INFO(20), WARNING(30), ERROR(40) or CRITICAL(50)')
-        self.aparser.add_argument('-lf', '--logfile',
+        self.aparser.add_argument('-lf', '--' + ARG_LOGFILE,
                                   nargs='?', default=settings.LOGFILE,
                                   type=str,
                                   help='the path to log file')
@@ -227,25 +231,22 @@ class TaskBase(object):
         self.outcols = self.DFLT_OUTCOLS
 
     def run_scraper(self):
-        soutpath = self.task_args.soutpath
-        self._exch_prods = self.scraper.run(soutpath)
+        self._exch_prods = self.scraper.run(**self.task_args)
 
     def run_checker(self):
-        vollim = self.task_args.vollim
-        outpath = self.task_args.coutpath
-        self._checked_prods = self.checker.run(self._exch_prods, vollim, self.outcols, outpath)
+        self._checked_prods = self.checker.run(self._exch_prods, self.outcols, **self.task_args)
 
     def set_task_args(self, **kwargs):
-        self.task_args = DynamicAttrs(vars(self.aparser.parse_args()))
-        self.task_args.update(kwargs)
+        self.task_args = vars(self.aparser.parse_args())
+        self.task_args.update(**kwargs)
 
     def set_logger(self):
-        level = self.task_args.loglevel
+        level = self.task_args[ARG_LOGLEVEL]
         logging.basicConfig(level=level,
                             format=self.ROOT_FMT,
                             stream=sys.stdout)
 
-        logfile = self.task_args.logfile
+        logfile = self.task_args[ARG_LOGFILE]
         if logfile:
             fh = logging.FileHandler(logfile)
             fh.setFormatter(logging.Formatter('%(asctime)s ' + self.ROOT_FMT, datefmt="%Y-%m-%d %H:%M:%S"))
@@ -257,7 +258,7 @@ class TaskBase(object):
         exit_code, ex = exit_status
         if not exit_code and ex is None:
             for exch, data in self._checked_prods.items():
-                handler = handler_type(data, self._exch_prods[exch], exch, self.voltype, self.task_args.vollim)
+                handler = handler_type(data, self._exch_prods[exch], exch, self.voltype, self.task_args[ARG_VOLLIM])
                 service = self.services[exch]
                 json_data = handler.to_json_data(service, self.DFLT_OUTCOLS)
                 IcingaHelper.post_pcr(json_data)
@@ -289,9 +290,27 @@ class TaskBase(object):
                 exit_status = (1, e)
                 print(format_ex_str(e))
 
-        if self.task_args.icinga:
+        if self.task_args[ARG_ICINGA]:
             self.logger.info('Sending results to icinga')
             self.send_to_icinga(exit_status)
+
+
+class ScraperBase(object):
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+
+    def scrape(self, **kwargs):
+        raise NotImplementedError('Please implement this property')
+
+    def run(self, **kwargs):
+        scraped = self.scrape(**kwargs)
+
+        outpath = kwargs.get(ARG_SOUTPATH, None)
+        if outpath:
+            XlsxWriter.save_sheets(outpath, scraped)
+            self.logger.info('Scraper results output to {}'.format(outpath))
+
+        return scraped
 
 
 class CheckerBase(object):
@@ -312,15 +331,18 @@ class CheckerBase(object):
     def cols_mapping(self):
         raise NotImplementedError('Please implement this property')
 
-    def check(self, data, vol_threshold):
+    def check(self, data, vol_threshold, **kwargs):
         raise NotImplementedError("Please implement this method")
 
-    def run(self, data, vol_threshold, outcols=None, outpath=None):
+    def run(self, data, outcols=None, **kwargs):
         validate_precheck(data)
-        checked = self.check(data, vol_threshold)
 
+        vol_threshold = kwargs[ARG_VOLLIM]
+        checked = self.check(data, vol_threshold, **kwargs)
         postcheck(checked, self.cols_mapping, outcols, self.logger)
+
+        outpath = kwargs.get(ARG_COUTPATH, None)
         if outpath:
             XlsxWriter.save_sheets(outpath, checked)
-            self.logger.info('Check results output to {}'.format(outpath))
+            self.logger.info('Checker results output to {}'.format(outpath))
         return checked

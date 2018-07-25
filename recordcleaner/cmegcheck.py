@@ -11,6 +11,9 @@ from extrawhoosh.searching import *
 from settings import CMEGSetting
 
 
+ARG_YEAR = 'year'
+ARG_CLEAN_MATCH = 'clean_match'
+
 A_PRODUCT_NAME = 'Product Name'
 A_PRODUCT_GROUP = 'Product Group'
 A_CLEARED_AS = 'Cleared As'
@@ -31,7 +34,7 @@ NYMEX = 'NYMEX'
 COMEX = 'COMEX'
 
 
-class CMEGScraper(object):
+class CMEGScraper(ScraperBase):
     URL_CME_ADV = 'http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_ADV_Report_CME.pdf'
     URL_CBOT_ADV = 'http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_ADV_Report_CBOT.pdf'
     URL_NYMEX_COMEX_ADV = 'http://www.cmegroup.com/daily_bulletin/monthly_volume/Web_ADV_Report_NYMEX_COMEX.pdf'
@@ -64,7 +67,7 @@ class CMEGScraper(object):
     PRODS_OUTCOLS = [F_PRODUCT_NAME, F_PRODUCT_GROUP, F_CLEARED_AS, F_CLEARING, F_GLOBEX, F_SUB_GROUP, F_EXCHANGE]
 
     def __init__(self):
-        self.logger = logging.getLogger(__name__)
+        super().__init__()
         self.matcher = CMEGMatcher()
 
     class CMEGPdfParser(PdfParser):
@@ -160,7 +163,10 @@ class CMEGScraper(object):
         header = list(df.columns.values)
         return find_first_n(header, lambda x: ytd_pattern in x and str(year) in x)
 
-    def scrape(self, year=None):
+    def scrape(self, **kwargs):
+        year = kwargs.get(ARG_YEAR, last_year())
+        clean_match = kwargs.get(ARG_CLEAN_MATCH, True)
+
         df_prods = self.get_prods_table()
         df_prods = df_prods.rename(columns=CMEGScraper.COL2FIELD)[self.PRODS_OUTCOLS]
         self.logger.debug('Renamed and filtered product slate dataframe columns to {}'.format(list(df_prods.columns)))
@@ -169,22 +175,14 @@ class CMEGScraper(object):
         df_cbot = self.get_adv_table(self.URL_CBOT_ADV)
         df_nymex = self.get_adv_table(self.URL_NYMEX_COMEX_ADV)
 
-        adv_dict = {
+        dfs_adv = {
             CME: rename_filter(df_cme, {self.get_ytd_header(df_cme, year=year): A_ADV_YTD}, self.ADV_OUTCOLS[CME]),
             CBOT: rename_filter(df_cbot, {self.get_ytd_header(df_cbot, year=year): A_ADV_YTD}, self.ADV_OUTCOLS[CBOT]),
             NYMEX: rename_filter(df_nymex, {self.get_ytd_header(df_nymex, year=year): A_ADV_YTD},
                                  self.ADV_OUTCOLS[NYMEX])}
 
-        return df_prods, adv_dict
-
-    def run(self, outpath=None):
-        df_prods, dfs_adv = self.scrape(last_year())
         with TemporaryDirectory() as ixfolder_cme, TemporaryDirectory() as ixfolder_cbot:
-            mdata = self.matcher.run(df_prods, dfs_adv, (ixfolder_cme, ixfolder_cbot), True)
-        if outpath:
-            XlsxWriter.save_sheets(outpath, mdata)
-            self.logger.info('Scraped results output to {}'.format(outpath))
-        return mdata
+            return self.matcher.run(df_prods, dfs_adv, (ixfolder_cme, ixfolder_cbot), clean_match)
 
 
 class CMEGMatcher(object):
@@ -503,12 +501,6 @@ class CMEGMatcher(object):
         df_adv[on_adv] = df_adv[on_adv].astype(str)
         return df_adv.merge(df_prods, left_on=on_adv, right_on=on_prods)
 
-        # prod_dict = {str(row[on_prods]): row for _, row in df_prods.iterrows()}
-        # for _, row in df_adv.iterrows():
-        #     if str(row[on_adv]) in prod_dict:
-        #         row_result = row.append(prod_dict[str(row[on_adv])])
-        #         yield row_result
-
     def match_by_prodname(self, df_adv, ix, exact_mapping=None, notfound=None, multi_match=None):
         with ix.searcher() as searcher:
             lexicons = get_idx_lexicon(searcher, F_PRODUCT_GROUP, F_CLEARED_AS, **{F_PRODUCT_GROUP: F_SUB_GROUP})
@@ -582,7 +574,7 @@ class CMEGChecker(CheckerBase):
         mark_recorded(df, self.config_dict)
         return df_lower_limit(df, fcol, lower_limit)
 
-    def check(self, data, vol_threshold):
+    def check(self, data, vol_threshold, **kwargs):
         self.logger.info('Running product checking with {} higher than {}'.format(A_ADV_YTD, vol_threshold))
 
         self.set_prodcode_col(data)

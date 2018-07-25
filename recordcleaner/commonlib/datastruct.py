@@ -69,7 +69,7 @@ class DynamicAttrs(object):
     def __init__(self, obj=None, **kwargs):
         self.update(obj, **kwargs)
 
-    def update(self, obj=None, insert=True, **kwargs, ):
+    def update(self, obj=None, insert=True, **kwargs):
         if isinstance(obj, dict):
             for key in obj:
                 setattr(self, key, obj[key])
