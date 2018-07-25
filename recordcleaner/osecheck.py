@@ -1,15 +1,17 @@
-from datascraper import *
 import jaconv
 from tempfile import TemporaryDirectory, NamedTemporaryFile
 
-from productchecker import *
-from baseclasses import CheckerBase, TaskBase
+from baseclasses import *
 from settings import OSESetting
 
 from extrawhoosh.indexing import *
 from extrawhoosh.analysis import *
 from extrawhoosh.query import *
 from extrawhoosh.searching import *
+
+
+ARG_REPORT = 'report'
+ARG_RTIME = 'rtime'
 
 OSE = 'OSE'
 YEARLY_TIME = (last_year(),)
@@ -24,7 +26,7 @@ TRADING_VOLUME = 'Trading_Volume'
 PRODTYPES = {'Futures', 'Options'}
 
 
-class OSEScraper(object):
+class OSEScraper(ScraperBase):
     URL_OSE = 'http://www.jpx.co.jp'
     URL_ANNUAL_VOLUME = URL_OSE + '/english/markets/statistics-derivatives/trading-volume/01.html'
     URL_MONTHLY_VOLUME = URL_OSE + '/english/markets/statistics-derivatives/trading-volume/index.html'
@@ -40,7 +42,7 @@ class OSEScraper(object):
     OUTCOLS = [PRODUCT_NAME, PRODUCT_TYPE, TRADING_VOLUME]
 
     def __init__(self):
-        self.logger = logging.getLogger(__name__)
+        super().__init__()
 
     def find_annual_report_url(self, year=last_year()):
         year_str = str(year)
@@ -130,7 +132,10 @@ class OSEScraper(object):
         df[PRODUCT_TYPE] = df[PRODUCT_NAME].map(get_prodtype)
         return select_mapping(df, self.OUTCOLS, False)
 
-    def run_scraper(self, report='monthly', rtime=MONTHLY_TIME, outpath=None):
+    def scrape(self, **kwargs):
+        report = kwargs.get(ARG_REPORT, 'monthly')
+        rtime = kwargs.get(ARG_RTIME, MONTHLY_TIME)
+
         dl_url = self.get_report_url(report, rtime)
         self.logger.info(('Downloading from: {}'.format(dl_url)))
         with download(dl_url, NamedTemporaryFile()) as f_pdf:
@@ -138,11 +143,7 @@ class OSEScraper(object):
             self.logger.info('Parsing tables from the pdf')
             tables = [self.parse_from_txt(page) for page in pdfparser.pdftotext_bypages()]
         tbdata = pd.concat(tables, ignore_index=True)
-        df = self.normalise_data(tbdata)
-        if outpath:
-            XlsxWriter.save_sheets(outpath, {OSE: df})
-            self.logger.info('Scraper results saved to {}'.format(outpath))
-        return df
+        return {OSE: self.normalise_data(tbdata)}
 
 
 class OSEMatcher(object):
@@ -216,6 +217,10 @@ class OSEChecker(CheckerBase):
         super().__init__(ose)
         self.matcher = OSEMatcher()
 
+    @property
+    def cols_mapping(self):
+        return None
+
     def __match_productkey(self, key, ix, searcher=None):
         if key.type not in PRODTYPES:
             return None
@@ -248,15 +253,14 @@ class OSEChecker(CheckerBase):
                         labled_df.loc[match[PRODUCT_NAME], PRODUCT_CODE] = key.prod_code
         return labled_df
 
-    def run_pd_check(self, data, vol_threshold, cols_renaming=None, outcols=None, outpath=None):
+    def check(self, data, vol_threshold, **kwargs):
         self.logger.info('Running product checking with {} higher than {}'.format(TRADING_VOLUME, vol_threshold))
-        df = df_lower_limit(data, TRADING_VOLUME, vol_threshold)
-        df_results = self.mark_recorded(df)
-        df_results = rename_filter(df_results, cols_renaming, outcols)
-        if outpath:
-            XlsxWriter.save_sheets(outpath, {OSE: df_results})
-            self.logger.info('Checked results output to {}'.format(outpath))
-        return df_results
+
+        for exch in data:
+            df = df_lower_limit(data[exch], TRADING_VOLUME, vol_threshold)
+            data[exch] = self.mark_recorded(df)
+
+        return data
 
 
 class OSETask(TaskBase):
@@ -268,7 +272,7 @@ class OSETask(TaskBase):
                     TRADING_VOLUME: TaskBase.VOLUME}
 
     def __init__(self):
-        super().__init__(OSESetting)
+        super().__init__(OSESetting, OSEScraper(), OSEChecker())
         self.aparser.add_argument('-rp', '--report',
                                   nargs='?', default=OSESetting.REPORT,
                                   type=str,

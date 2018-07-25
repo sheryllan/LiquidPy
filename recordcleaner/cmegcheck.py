@@ -163,10 +163,13 @@ class CMEGScraper(ScraperBase):
         header = list(df.columns.values)
         return find_first_n(header, lambda x: ytd_pattern in x and str(year) in x)
 
-    def scrape(self, **kwargs):
+    def scrape_args(self, kwargs):
         year = kwargs.get(ARG_YEAR, last_year())
         clean_match = kwargs.get(ARG_CLEAN_MATCH, True)
 
+        return {ARG_YEAR: year, ARG_CLEAN_MATCH: clean_match}
+
+    def scrape(self, year, clean_match):
         df_prods = self.get_prods_table()
         df_prods = df_prods.rename(columns=CMEGScraper.COL2FIELD)[self.PRODS_OUTCOLS]
         self.logger.debug('Renamed and filtered product slate dataframe columns to {}'.format(list(df_prods.columns)))
@@ -513,7 +516,7 @@ class CMEGMatcher(object):
                     yield row_result
 
     def run(self, df_prods, dfs_adv, ix_names, clean=True):
-        self.logger.info('Running product matching with clean={}'.format(clean))
+        self.logger.info('Running {} with clean={}'.format(self.__class__.__name__, clean))
         gdf_exch = {exch: df.reset_index(drop=True) for exch, df in df_prods.groupby(F_EXCHANGE)}
 
         df_nymex_comex_prods = pd.concat([gdf_exch[NYMEX], gdf_exch[COMEX]], ignore_index=True)
@@ -524,7 +527,7 @@ class CMEGMatcher(object):
                                                        CMEGMatcher.CME_NOTFOUND_PRODS, CMEGMatcher.CME_MULTI_MATCH))
         data_cbot = pd.DataFrame(self.match_by_prodname(dfs_adv[CBOT], ix_cbot, CMEGMatcher.CBOT_EXACT_MAPPING,
                                                         multi_match=CMEGMatcher.CBOT_MULTI_MATCH))
-        self.logger.info('Finished product matching')
+        self.logger.info('Finish running matching')
 
         return {CME: data_cme, CBOT: data_cbot, NYMEX: data_nymex}
 
@@ -574,16 +577,17 @@ class CMEGChecker(CheckerBase):
         mark_recorded(df, self.config_dict)
         return df_lower_limit(df, fcol, lower_limit)
 
-    def check(self, data, vol_threshold, **kwargs):
-        self.logger.info('Running product checking with {} higher than {}'.format(A_ADV_YTD, vol_threshold))
+    def check_args(self, kwargs):
+        return {ARG_VOLLIM: kwargs[ARG_VOLLIM]}
 
+    def check(self, data, vollim, **kwargs):
         self.set_prodcode_col(data)
 
         data[CME] = set_check_index(data[CME], get_prod_keys(data[CME], self.__prod_key), self.get_group_keys(data[CME]))
         data[CBOT] = set_check_index(data[CBOT], get_prod_keys(data[CBOT], self.__prod_key), self.get_group_keys(data[CBOT]))
         data[NYMEX] = set_check_index(data[NYMEX], get_prod_keys(data[NYMEX], self.__prod_key))
 
-        return {exch: self.mark_filter_prods(data[exch], vol_threshold, A_ADV_YTD) for exch in data}
+        return {exch: self.mark_filter_prods(data[exch], vollim, A_ADV_YTD) for exch in data}
 
 
 class CMEGTask(TaskBase):

@@ -61,3 +61,4 @@ class LogWriter(object):
 
     def flush(self):
         pass
+

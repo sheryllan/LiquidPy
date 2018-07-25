@@ -16,6 +16,19 @@ ARG_LOGLEVEL = 'loglevel'
 ARG_LOGFILE = 'logfile'
 
 
+class MetaBase(type):
+    def __init__(cls, *args):
+        super().__init__(*args)
+
+        # Explicit name mangling
+        logger_attribute_name = '_' + cls.__name__ + '__logger'
+
+        # Logger name derived accounting for inheritance for the bonus marks
+        logger_name = '.'.join([c.__name__ for c in cls.mro()[-2::-1]])
+
+        setattr(cls, logger_attribute_name, logging.getLogger(logger_name))
+
+
 class IcingaHelper(object):
     HTTPS_HEADER = 'https://'
     ICINGA_HOST = 'lcldn-icinga1'
@@ -190,7 +203,7 @@ class TaskBase(object):
 
     DFLT_OUTCOLS = [PRODNAME, RECORDED, PRODCODE, PRODTYPE, VOLUME]
 
-    ROOT_FMT = "%(levelname)s:[%(name)s.%(funcName)s:%(lineno)d]: %(message)s"
+    ROOT_FMT = "%(levelname)s:[%(module)s.%(name)s.%(funcName)s:%(lineno)d]: %(message)s"
 
     def __init__(self, settings, scraper, checker):
         self.scraper, self.checker = scraper, checker
@@ -231,10 +244,14 @@ class TaskBase(object):
         self.outcols = self.DFLT_OUTCOLS
 
     def run_scraper(self):
+        self.logger.info('Start running scraping')
         self._exch_prods = self.scraper.run(**self.task_args)
+        self.logger.info('Finish running scraping')
 
     def run_checker(self):
+        self.logger.info('Start running checking')
         self._checked_prods = self.checker.run(self._exch_prods, self.outcols, **self.task_args)
+        self.logger.info('Finish running checking')
 
     def set_task_args(self, **kwargs):
         self.task_args = vars(self.aparser.parse_args())
@@ -277,12 +294,8 @@ class TaskBase(object):
         with warnings.catch_warnings():
             warnings.filterwarnings('error')
             try:
-                self.logger.info('Start running scraping')
                 self.run_scraper()
-                self.logger.info('Finished scraping')
-                self.logger.info('Start running checking')
                 self.run_checker()
-                self.logger.info('Finished checking')
             except Warning as w:
                 self.logger.warning(str(w))
             except Exception as e:
@@ -299,11 +312,16 @@ class ScraperBase(object):
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
+    def scrape_args(self, kwargs):
+        raise NotImplementedError('Please implement this method')
+
     def scrape(self, **kwargs):
-        raise NotImplementedError('Please implement this property')
+        raise NotImplementedError('Please implement this method')
 
     def run(self, **kwargs):
-        scraped = self.scrape(**kwargs)
+        args = self.scrape_args(kwargs)
+        self.logger.info('Running {} with parameters: {}'.format(self.__class__.__name__, args))
+        scraped = self.scrape(**args)
 
         outpath = kwargs.get(ARG_SOUTPATH, None)
         if outpath:
@@ -313,7 +331,7 @@ class ScraperBase(object):
         return scraped
 
 
-class CheckerBase(object):
+class CheckerBase(object, metaclass=MetaBase):
 
     def __init__(self, exch_cf):
         self.logger = logging.getLogger(__name__)
@@ -331,14 +349,18 @@ class CheckerBase(object):
     def cols_mapping(self):
         raise NotImplementedError('Please implement this property')
 
-    def check(self, data, vol_threshold, **kwargs):
+    def check_args(self, kwargs):
+        raise NotImplementedError("Please implement this method")
+
+    def check(self, data, vollim, **kwargs):
         raise NotImplementedError("Please implement this method")
 
     def run(self, data, outcols=None, **kwargs):
         validate_precheck(data)
 
-        vol_threshold = kwargs[ARG_VOLLIM]
-        checked = self.check(data, vol_threshold, **kwargs)
+        args = self.check_args(kwargs)
+        self.logger.info('Running {} with parameters: {}'.format(self.__class__.__name__, args))
+        checked = self.check(data, **args)
         postcheck(checked, self.cols_mapping, outcols, self.logger)
 
         outpath = kwargs.get(ARG_COUTPATH, None)
