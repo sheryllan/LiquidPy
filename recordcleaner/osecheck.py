@@ -132,15 +132,17 @@ class OSEScraper(ScraperBase):
         df[PRODUCT_TYPE] = df[PRODUCT_NAME].map(get_prodtype)
         return select_mapping(df, self.OUTCOLS, False)
 
-    def scrape(self, **kwargs):
+    def scrape_args(self, kwargs):
         report = kwargs.get(ARG_REPORT, 'monthly')
         rtime = kwargs.get(ARG_RTIME, MONTHLY_TIME)
+        return {ARG_REPORT: report, ARG_RTIME: rtime}
 
+    def scrape(self, report, rtime):
         dl_url = self.get_report_url(report, rtime)
-        self.logger.info(('Downloading from: {}'.format(dl_url)))
+        self.__logger.info(('Downloading from: {}'.format(dl_url)))
         with download(dl_url, NamedTemporaryFile()) as f_pdf:
             pdfparser = PdfParser(f_pdf)
-            self.logger.info('Parsing tables from the pdf')
+            self.__logger.info('Parsing tables from the pdf')
             tables = [self.parse_from_txt(page) for page in pdfparser.pdftotext_bypages()]
         tbdata = pd.concat(tables, ignore_index=True)
         return {OSE: self.normalise_data(tbdata)}
@@ -213,22 +215,27 @@ class OSEChecker(CheckerBase):
                       ProductKey('TOPIX', 'Futures'): 'TOPIX Futures',
                       ProductKey('TOPIXM', 'Futures'): 'mini-TOPIX Futures'}
 
+    COLS_MAPPING = {PRODUCT_NAME: TaskBase.PRODNAME,
+                    PRODUCT_TYPE: TaskBase.PRODTYPE,
+                    PRODUCT_CODE: TaskBase.PRODCODE,
+                    TRADING_VOLUME: TaskBase.VOLUME}
+
     def __init__(self):
         super().__init__(ose)
         self.matcher = OSEMatcher()
 
     @property
     def cols_mapping(self):
-        return None
+        return self.COLS_MAPPING
 
     def __match_productkey(self, key, ix, searcher=None):
         if key.type not in PRODTYPES:
             return None
 
         if key not in self.CONFIG_MAPPING:
-            self.logger.warning(('No pre-defined mapping found for config key {},'
-                                 'potentially unmatched with indexed products')
-                                .format(key))
+            self.__logger.warning(('No pre-defined mapping found for config key {},'
+                                   'potentially unmatched with indexed products')
+                                  .format(key))
             prodname = self.config_dict[key][CF_DESCRIPTION]
         else:
             prodname = self.CONFIG_MAPPING[key]
@@ -236,7 +243,7 @@ class OSEChecker(CheckerBase):
         match = self.matcher.match_by_prodname(config_data, ix, searcher)
         if not match:
             raise ValueError('Unable to match config record{}'.format(key))
-        self.logger.debug('Successfully match {} with {}'.format(key, match[PRODUCT_NAME]))
+        self.__logger.debug('Successfully match {} with {}'.format(key, match[PRODUCT_NAME]))
         return match
 
     def mark_recorded(self, df):
@@ -253,23 +260,15 @@ class OSEChecker(CheckerBase):
                         labled_df.loc[match[PRODUCT_NAME], PRODUCT_CODE] = key.prod_code
         return labled_df
 
-    def check(self, data, vol_threshold, **kwargs):
-        self.logger.info('Running product checking with {} higher than {}'.format(TRADING_VOLUME, vol_threshold))
-
+    def check(self, data, vollim, **kwargs):
         for exch in data:
-            df = df_lower_limit(data[exch], TRADING_VOLUME, vol_threshold)
+            df = df_lower_limit(data[exch], TRADING_VOLUME, vollim)
             data[exch] = self.mark_recorded(df)
-
         return data
 
 
 class OSETask(TaskBase):
     VOLTYPES = {'annual': ADV_YEARLY, 'monthly': ADV_MONTHLY}
-
-    COLS_MAPPING = {PRODUCT_CODE: TaskBase.PRODCODE,
-                    PRODUCT_TYPE: TaskBase.PRODTYPE,
-                    PRODUCT_NAME: TaskBase.PRODNAME,
-                    TRADING_VOLUME: TaskBase.VOLUME}
 
     def __init__(self):
         super().__init__(OSESetting, OSEScraper(), OSEChecker())
@@ -277,20 +276,11 @@ class OSETask(TaskBase):
                                   nargs='?', default=OSESetting.REPORT,
                                   type=str,
                                   help='the type of report to evaluate')
-        self.scraper, self.checker = OSEScraper(), OSEChecker()
         self.services = {OSE: OSESetting.SVC_OSE}
 
-    def scrape(self):
-        report = self.task_args.report
-        return self.scraper.run_scraper(report)
-
-    def check(self):
-        vollim = self.task_args.vollim
-        outpath = self.task_args.outpath
-        return self.checker.run_pd_check(self._exch_prods, vollim, self.COLS_MAPPING, self.CHECK_COLS, outpath)
-
-    def send_to_icinga(self, exit_status):
-        self.voltype = self.VOLTYPES[self.task_args.report]
+    def run_scraper(self):
+        self.voltype = self.task_args[ARG_REPORT]
+        super().run_scraper()
 
 
 if __name__ == '__main__':

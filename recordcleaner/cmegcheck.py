@@ -151,10 +151,10 @@ class CMEGScraper(ScraperBase):
             return clean_df(set_df_col(df_prods), nonna_subset)
 
     def get_adv_table(self, url):
-        self.logger.info(('Downloading from: {}'.format(url)))
+        self.__logger.info(('Downloading from: {}'.format(url)))
         with download(url, NamedTemporaryFile()) as f_pdf:
             pdf_parser = self.CMEGPdfParser(f_pdf)
-            self.logger.info('Parsing tables from the pdf')
+            self.__logger.info('Parsing tables from the pdf')
             tables = [pdf_parser.parse_table_from_txt(page) for page in pdf_parser.pdftotext_bypages()]
         return pd.concat(tables, ignore_index=True)
 
@@ -172,7 +172,7 @@ class CMEGScraper(ScraperBase):
     def scrape(self, year, clean_match):
         df_prods = self.get_prods_table()
         df_prods = df_prods.rename(columns=CMEGScraper.COL2FIELD)[self.PRODS_OUTCOLS]
-        self.logger.debug('Renamed and filtered product slate dataframe columns to {}'.format(list(df_prods.columns)))
+        self.__logger.debug('Renamed and filtered product slate dataframe columns to {}'.format(list(df_prods.columns)))
 
         df_cme = self.get_adv_table(self.URL_CME_ADV)
         df_cbot = self.get_adv_table(self.URL_CBOT_ADV)
@@ -348,7 +348,7 @@ class CMEGMatcher(object):
                  'this', 'of', 'will', 'can', 'the', 'or', 'are']
 
     def __init__(self):
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger(self.__class__.__name__)
 
 
     # region Private methods for grouping
@@ -538,7 +538,6 @@ class CMEGChecker(CheckerBase):
     COLS_MAPPING = {PRODUCT_CODE: TaskBase.PRODCODE,
                     F_CLEARED_AS: TaskBase.PRODTYPE,
                     F_PRODUCT_NAME: TaskBase.PRODNAME,
-                    F_PRODUCT_GROUP: TaskBase.PRODGROUP,
                     A_ADV_YTD: TaskBase.VOLUME}
 
     def __init__(self):
@@ -554,7 +553,7 @@ class CMEGChecker(CheckerBase):
         elif not pd.isnull(row[F_CLEARING]):
             return row[F_CLEARING]
         else:
-            self.logger.warning('no code: {}'.format(row[F_PRODUCT_NAME]))
+            self.__logger.warning('no code: {}'.format(row[F_PRODUCT_NAME]))
             return None
 
     def __prod_key(self, row):
@@ -576,9 +575,6 @@ class CMEGChecker(CheckerBase):
             if data.index.names[0] == GROUP else data
         mark_recorded(df, self.config_dict)
         return df_lower_limit(df, fcol, lower_limit)
-
-    def check_args(self, kwargs):
-        return {ARG_VOLLIM: kwargs[ARG_VOLLIM]}
 
     def check(self, data, vollim, **kwargs):
         self.set_prodcode_col(data)

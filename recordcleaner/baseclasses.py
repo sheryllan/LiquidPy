@@ -24,7 +24,8 @@ class MetaBase(type):
         logger_attribute_name = '_' + cls.__name__ + '__logger'
 
         # Logger name derived accounting for inheritance for the bonus marks
-        logger_name = '.'.join([c.__name__ for c in cls.mro()[-2::-1]])
+        # logger_name = '.'.join([c.__name__ for c in cls.mro()[-2::-1]])
+        logger_name = cls.mro()[-2].__name__
 
         setattr(cls, logger_attribute_name, logging.getLogger(logger_name))
 
@@ -194,16 +195,15 @@ class IcingaCheckHandler(object):
         return 0 if ok else 1
 
 
-class TaskBase(object):
+class TaskBase(object, metaclass=MetaBase):
     PRODCODE = 'Prodcode'
     PRODTYPE = 'Prodtype'
     PRODNAME = 'Prodname'
-    PRODGROUP = 'Prodgroup'
     VOLUME = 'Volume'
 
     DFLT_OUTCOLS = [PRODNAME, RECORDED, PRODCODE, PRODTYPE, VOLUME]
 
-    ROOT_FMT = "%(levelname)s:[%(module)s.%(name)s.%(funcName)s:%(lineno)d]: %(message)s"
+    ROOT_FMT = "%(levelname)s:%(module)s[%(name)s.%(funcName)s]:%(lineno)d: %(message)s"
 
     def __init__(self, settings, scraper, checker):
         self.scraper, self.checker = scraper, checker
@@ -216,7 +216,7 @@ class TaskBase(object):
                                   nargs='?', const=settings.COUTPATH, default=None,
                                   help='the output path of the check results')
         self.aparser.add_argument('-so', '--' + ARG_SOUTPATH,
-                                  nargs='?', const=CMEGSetting.SOUTPATH, default=None,
+                                  nargs='?', const=settings.SOUTPATH, default=None,
                                   type=str,
                                   help='the output path of the matching results')
         self.aparser.add_argument('-v', '--' + ARG_VOLLIM,
@@ -239,19 +239,17 @@ class TaskBase(object):
         self._exch_prods = None
         self._checked_prods = None
 
-        self.logger = logging.getLogger(__name__)
-
         self.outcols = self.DFLT_OUTCOLS
 
     def run_scraper(self):
-        self.logger.info('Start running scraping')
+        self.__logger.info('Start running scraping')
         self._exch_prods = self.scraper.run(**self.task_args)
-        self.logger.info('Finish running scraping')
+        self.__logger.info('Finish running scraping')
 
     def run_checker(self):
-        self.logger.info('Start running checking')
+        self.__logger.info('Start running checking')
         self._checked_prods = self.checker.run(self._exch_prods, self.outcols, **self.task_args)
-        self.logger.info('Finish running checking')
+        self.__logger.info('Finish running checking')
 
     def set_task_args(self, **kwargs):
         self.task_args = vars(self.aparser.parse_args())
@@ -269,7 +267,7 @@ class TaskBase(object):
             fh.setFormatter(logging.Formatter('%(asctime)s ' + self.ROOT_FMT, datefmt="%Y-%m-%d %H:%M:%S"))
             logging.getLogger().addHandler(fh)
 
-        sys.stderr = LogWriter(self.logger.warning)
+        sys.stderr = LogWriter(self.__logger.warning)
 
     def send_to_icinga(self, exit_status, handler_type=IcingaCheckHandler):
         exit_code, ex = exit_status
@@ -297,20 +295,18 @@ class TaskBase(object):
                 self.run_scraper()
                 self.run_checker()
             except Warning as w:
-                self.logger.warning(str(w))
+                self.__logger.warning(str(w))
             except Exception as e:
-                self.logger.error('Failed running the task', exc_info=True)
+                self.__logger.error('Failed running the task', exc_info=True)
                 exit_status = (1, e)
                 print(format_ex_str(e))
 
         if self.task_args[ARG_ICINGA]:
-            self.logger.info('Sending results to icinga')
+            self.__logger.info('Sending results to icinga')
             self.send_to_icinga(exit_status)
 
 
-class ScraperBase(object):
-    def __init__(self):
-        self.logger = logging.getLogger(__name__)
+class ScraperBase(object, metaclass=MetaBase):
 
     def scrape_args(self, kwargs):
         raise NotImplementedError('Please implement this method')
@@ -320,13 +316,13 @@ class ScraperBase(object):
 
     def run(self, **kwargs):
         args = self.scrape_args(kwargs)
-        self.logger.info('Running {} with parameters: {}'.format(self.__class__.__name__, args))
+        self.__logger.info('Running {} with parameters: {}'.format(self.__class__.__name__, args))
         scraped = self.scrape(**args)
 
         outpath = kwargs.get(ARG_SOUTPATH, None)
         if outpath:
             XlsxWriter.save_sheets(outpath, scraped)
-            self.logger.info('Scraper results output to {}'.format(outpath))
+            self.__logger.info('Scraper results output to {}'.format(outpath))
 
         return scraped
 
@@ -334,7 +330,6 @@ class ScraperBase(object):
 class CheckerBase(object, metaclass=MetaBase):
 
     def __init__(self, exch_cf):
-        self.logger = logging.getLogger(__name__)
         self._config_dict = None
         self.exch_cf = exch_cf
 
@@ -342,7 +337,7 @@ class CheckerBase(object, metaclass=MetaBase):
     def config_dict(self):
         if self._config_dict is None:
             self._config_dict = get_config_dict(self.exch_cf)
-            self.logger.info('Successfully retrieve pcaps configurations for {}'.format(self.exch_cf))
+            self.__logger.info('Successfully retrieve pcaps configurations for {}'.format(self.exch_cf))
         return self._config_dict
 
     @property
@@ -350,7 +345,7 @@ class CheckerBase(object, metaclass=MetaBase):
         raise NotImplementedError('Please implement this property')
 
     def check_args(self, kwargs):
-        raise NotImplementedError("Please implement this method")
+        return {ARG_VOLLIM: kwargs[ARG_VOLLIM]}
 
     def check(self, data, vollim, **kwargs):
         raise NotImplementedError("Please implement this method")
@@ -359,12 +354,12 @@ class CheckerBase(object, metaclass=MetaBase):
         validate_precheck(data)
 
         args = self.check_args(kwargs)
-        self.logger.info('Running {} with parameters: {}'.format(self.__class__.__name__, args))
+        self.__logger.info('Running {} with parameters: {}'.format(self.__class__.__name__, args))
         checked = self.check(data, **args)
-        postcheck(checked, self.cols_mapping, outcols, self.logger)
+        postcheck(checked, self.cols_mapping, outcols, self.__logger)
 
         outpath = kwargs.get(ARG_COUTPATH, None)
         if outpath:
             XlsxWriter.save_sheets(outpath, checked)
-            self.logger.info('Checker results output to {}'.format(outpath))
+            self.__logger.info('Checker results output to {}'.format(outpath))
         return checked
