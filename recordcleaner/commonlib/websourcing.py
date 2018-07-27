@@ -9,12 +9,15 @@ from commonlib.commonfuncs import *
 
 USER_AGENT = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.0.7; X11; Linux x86_64) ' \
              'Gecko/2009021910 Firefox/3.0.7 Chrome/23.0.1271.64 Safari/537.11'
-TABLE_TAB = 'table'
-TR_TAB = 'tr'
-TH_TAB = 'th'
-TD_TAB = 'td'
-A_TAB = 'a'
+TABLE_TAG = 'table'
+TR_TAG = 'tr'
+TH_TAG = 'th'
+TD_TAG = 'td'
+A_TAG = 'a'
 HREF_ATTR = 'href'
+
+UL_TAG = 'ul'
+LI_TAG = 'li'
 
 
 def http_post(url, data, auth=None, cert=None):
@@ -78,22 +81,22 @@ class HtmlTableParser(object):
     # returns tables whose first tr has first th of which text = title
     @staticmethod
     def get_tables_by_th(url, title=None):
-        tables = make_soup(url).find_all(TABLE_TAB)
+        tables = make_soup(url).find_all(TABLE_TAG)
         if not tables:
             raise ValueError('No tables found in the source')
         if title is None:
             return tables
-        return [tbl for tbl in tables if tbl.find(TR_TAB).find(TH_TAB, text=title)]
+        return [tbl for tbl in tables if tbl.find(TR_TAG).find(TH_TAG, text=title)]
 
     @staticmethod
     def get_tb_headers(table):
-        return [th.text for th in table.find(TR_TAB).find_all(TH_TAB)]
+        return [th.text for th in table.find(TR_TAG).find_all(TH_TAG)]
 
     @staticmethod
     def select_tds_by_index(tags, row=None, column=None):
 
         def find_tds(_tr):
-            tds = _tr.find_all(TD_TAB)
+            tds = _tr.find_all(TD_TAG)
             if column is not None and column < len(tds):
                 return tds[column]
             elif column is None:
@@ -101,7 +104,7 @@ class HtmlTableParser(object):
             else:
                 return []
 
-        trs = tags.find_all(TR_TAB) if tags.name != TR_TAB else [tags]
+        trs = tags.find_all(TR_TAG) if tags.name != TR_TAG else [tags]
         if row is not None and row < len(trs):
             tr = trs[row]
             return find_tds(tr)
@@ -113,8 +116,8 @@ class HtmlTableParser(object):
 
     @staticmethod
     def select_trs(table, **td_attrs):
-        if table.name != TABLE_TAB:
+        if table.name != TABLE_TAG:
             return []
-        trs = table.find_all(TR_TAB)
-        return [tr for tr in trs if tr.find_all(TD_TAB, **td_attrs)]
+        trs = table.find_all(TR_TAG)
+        return [tr for tr in trs if tr.find_all(TD_TAG, **td_attrs)]
 

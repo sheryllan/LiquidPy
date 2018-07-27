@@ -30,7 +30,10 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source ${DIR}/env_setup.sh ${CLEAN}
 
 source ${VENV_BIN}/activate
+
 echo -e "\nRunning ${CMEGCHECK_PY}"
 python ${CMEGCHECK_PY} ${ICINGA} ${LOGLEVEL} --coutpath --soutpath
 
+echo -e "\nRunning ${OSECHECK_PY}"
+python ${OSECHECK_PY} ${ICINGA} ${LOGLEVEL} --coutpath --soutpath
 deactivate

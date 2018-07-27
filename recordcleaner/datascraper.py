@@ -3,7 +3,6 @@ from datetime import date
 from subprocess import Popen, PIPE
 from itertools import chain
 from PyPDF2 import PdfFileReader
-from dateutil.relativedelta import relativedelta
 
 from commonlib.websourcing import *
 
@@ -12,23 +11,9 @@ TXT_SUFFIX = '.txt'
 XLSX_SUFFIX = '.xlsx'
 
 
-def last_year():
-    return (date.today() + relativedelta(years=-1)).year
-
-
-def last_month():
-    return (date.today() + relativedelta(months=-1)).month
-
-
-def this_year():
-    return date.today().year
-
-
-def this_month():
-    return date.today().month
-
-
-def fmt_date(year, month, day=1, fmt='%Y%m'):
+def fmt_date(year, month=None, day=1, fmt='%Y%m'):
+    if month is None:
+        return str(year)
     return date(int(year), int(month), int(day)).strftime(fmt)
 
 

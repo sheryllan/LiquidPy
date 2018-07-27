@@ -1,6 +1,8 @@
 import inflect
 import re
 
+from commonlib.commonfuncs import *
+
 
 class MatchHelper(object):
     vowels = ('a', 'e', 'i', 'o', 'u')
@@ -99,6 +101,20 @@ class MatchHelper(object):
             matched = MatchHelper.match_in_string(string, l, one, stemming, casesensitive, p)
             if matched:
                 return l
+        return None
+
+
+    @staticmethod
+    def find_first_in_string(string, lookups, stemming=False, casesensitive=False, engine=inflect.engine()):
+        words = MatchHelper.get_words(string)
+        for word in words:
+            match = find_first_n(lookups, lambda x: MatchHelper.match_in_string(x, word,
+                                                                                one=False,
+                                                                                stemming=stemming,
+                                                                                casesensitive=casesensitive,
+                                                                                engine=engine))
+            if match:
+                return match
         return None
 
 

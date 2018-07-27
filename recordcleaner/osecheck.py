@@ -10,14 +10,7 @@ from extrawhoosh.query import *
 from extrawhoosh.searching import *
 
 
-ARG_REPORT = 'report'
-ARG_RTIME = 'rtime'
-
 OSE = 'OSE'
-YEARLY_TIME = (last_year(),)
-ADV_YEARLY = 'ADV yearly({})'.format(*YEARLY_TIME)
-MONTHLY_TIME = (this_year(), last_month())
-ADV_MONTHLY = 'ADV monthly({})'.format(fmt_date(*MONTHLY_TIME))
 
 PRODUCT_NAME = 'Product_Name'
 PRODUCT_TYPE = 'Product_Type'
@@ -123,7 +116,7 @@ class OSEScraper(ScraperBase):
         def get_prodtype(name):
             if not any(t in name for t in PRODTYPES):
                 return 'Futures'
-            return find_first_n(name.split(), lambda x: x in PRODTYPES)
+            return MatchHelper.find_first_in_string(name, PRODTYPES, stemming=True)
 
         if not isinstance(data, pd.DataFrame):
             data = pd.DataFrame(data)
@@ -132,12 +125,19 @@ class OSEScraper(ScraperBase):
         df[PRODUCT_TYPE] = df[PRODUCT_NAME].map(get_prodtype)
         return select_mapping(df, self.OUTCOLS, False)
 
-    def scrape_args(self, kwargs):
-        report = kwargs.get(ARG_REPORT, 'monthly')
-        rtime = kwargs.get(ARG_RTIME, MONTHLY_TIME)
-        return {ARG_REPORT: report, ARG_RTIME: rtime}
+    def validate_rtime(self, rtime):
+        year = rtime[0]
+        if rtime[1:]:
+            if year > this_year() or year < this_year() - 9:
+                raise ValueError('Invalid rtime: the year must be in the last 10 years')
+            month = rtime[1]
+            if year == this_year() and month > last_month():
+                raise ValueError('Invalid rtime: the month of this year must be earlier than the this month ')
+        elif year > last_year():
+            raise ValueError('Invalid rtime: the year only must be earlier than this year')
 
-    def scrape(self, report, rtime):
+    def scrape(self, report, rtime, **kwargs):
+        self.validate_rtime(rtime)
         dl_url = self.get_report_url(report, rtime)
         self.__logger.info(('Downloading from: {}'.format(dl_url)))
         with download(dl_url, NamedTemporaryFile()) as f_pdf:
@@ -268,19 +268,9 @@ class OSEChecker(CheckerBase):
 
 
 class OSETask(TaskBase):
-    VOLTYPES = {'annual': ADV_YEARLY, 'monthly': ADV_MONTHLY}
-
     def __init__(self):
         super().__init__(OSESetting, OSEScraper(), OSEChecker())
-        self.aparser.add_argument('-rp', '--report',
-                                  nargs='?', default=OSESetting.REPORT,
-                                  type=str,
-                                  help='the type of report to evaluate')
         self.services = {OSE: OSESetting.SVC_OSE}
-
-    def run_scraper(self):
-        self.voltype = self.task_args[ARG_REPORT]
-        super().run_scraper()
 
 
 if __name__ == '__main__':

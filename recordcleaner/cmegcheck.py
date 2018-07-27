@@ -11,14 +11,13 @@ from extrawhoosh.searching import *
 from settings import CMEGSetting
 
 
-ARG_YEAR = 'year'
 ARG_CLEAN_MATCH = 'clean_match'
 
 A_PRODUCT_NAME = 'Product Name'
 A_PRODUCT_GROUP = 'Product Group'
 A_CLEARED_AS = 'Cleared As'
 A_COMMODITY = 'Commodity'
-A_ADV_YTD = 'ADV Y.T.D'
+A_ADV = 'Trading Volume'
 
 F_PRODUCT_NAME = 'P_Product_Name'
 F_PRODUCT_GROUP = 'P_Product_Group'
@@ -48,8 +47,6 @@ class CMEGScraper(ScraperBase):
     P_SUB_GROUP = 'Sub Group'
     P_EXCHANGE = 'Exchange'
 
-    YTD_PATTERN = A_ADV_YTD
-
     COL2FIELD = {P_PRODUCT_NAME: F_PRODUCT_NAME,
                  P_PRODUCT_GROUP: F_PRODUCT_GROUP,
                  P_CLEARED_AS: F_CLEARED_AS,
@@ -60,9 +57,9 @@ class CMEGScraper(ScraperBase):
 
     MUST_COLS = [A_PRODUCT_NAME, A_PRODUCT_GROUP, A_CLEARED_AS]
 
-    ADV_OUTCOLS = {CME: MUST_COLS + [A_ADV_YTD],
-                   CBOT: MUST_COLS + [A_ADV_YTD],
-                   NYMEX: MUST_COLS + [A_COMMODITY, A_ADV_YTD]}
+    ADV_OUTCOLS = {CME: MUST_COLS + [A_ADV],
+                   CBOT: MUST_COLS + [A_ADV],
+                   NYMEX: MUST_COLS + [A_COMMODITY, A_ADV]}
 
     PRODS_OUTCOLS = [F_PRODUCT_NAME, F_PRODUCT_GROUP, F_CLEARED_AS, F_CLEARING, F_GLOBEX, F_SUB_GROUP, F_EXCHANGE]
 
@@ -158,18 +155,27 @@ class CMEGScraper(ScraperBase):
             tables = [pdf_parser.parse_table_from_txt(page) for page in pdf_parser.pdftotext_bypages()]
         return pd.concat(tables, ignore_index=True)
 
-    def get_ytd_header(self, df, ytd_pattern=YTD_PATTERN, year=None):
-        year = last_year() if not year else year
-        header = list(df.columns.values)
-        return find_first_n(header, lambda x: ytd_pattern in x and str(year) in x)
+    def get_vol_col(self, df, report, rtime):
+        pattern = 'ADV Y.T.D {}'.format(fmt_date(*rtime)) \
+            if report == ANNUAL else 'ADV {}'.format(fmt_date(*rtime, fmt='%b %Y'))
+        return find_first_n(df.columns, lambda x: re.match(pattern, x))
 
     def scrape_args(self, kwargs):
-        year = kwargs.get(ARG_YEAR, last_year())
         clean_match = kwargs.get(ARG_CLEAN_MATCH, True)
+        return {**super().scrape_args(kwargs), ARG_CLEAN_MATCH: clean_match}
 
-        return {ARG_YEAR: year, ARG_CLEAN_MATCH: clean_match}
+    def validate_rtime(self, rtime):
+        year = rtime[0]
+        if year > this_year() or year < this_year() - 1:
+            raise ValueError('Invalid rtime: the year must be this or the last year')
+        if rtime[1:]:
+            month = rtime[1]
+            if month > last_month() or month < last_month() - 1:
+                raise ValueError('Invalid rtime: the month must be the last month or the month before the last')
 
-    def scrape(self, year, clean_match):
+    def scrape(self, report, rtime, **kwargs):
+        validate_precheck(rtime)
+        clean_match = kwargs[ARG_CLEAN_MATCH]
         df_prods = self.get_prods_table()
         df_prods = df_prods.rename(columns=CMEGScraper.COL2FIELD)[self.PRODS_OUTCOLS]
         self.__logger.debug('Renamed and filtered product slate dataframe columns to {}'.format(list(df_prods.columns)))
@@ -179,9 +185,9 @@ class CMEGScraper(ScraperBase):
         df_nymex = self.get_adv_table(self.URL_NYMEX_COMEX_ADV)
 
         dfs_adv = {
-            CME: rename_filter(df_cme, {self.get_ytd_header(df_cme, year=year): A_ADV_YTD}, self.ADV_OUTCOLS[CME]),
-            CBOT: rename_filter(df_cbot, {self.get_ytd_header(df_cbot, year=year): A_ADV_YTD}, self.ADV_OUTCOLS[CBOT]),
-            NYMEX: rename_filter(df_nymex, {self.get_ytd_header(df_nymex, year=year): A_ADV_YTD},
+            CME: rename_filter(df_cme, {self.get_vol_col(df_cme, report, rtime): A_ADV}, self.ADV_OUTCOLS[CME]),
+            CBOT: rename_filter(df_cbot, {self.get_vol_col(df_cbot, report, rtime): A_ADV}, self.ADV_OUTCOLS[CBOT]),
+            NYMEX: rename_filter(df_nymex, {self.get_vol_col(df_nymex, report, rtime): A_ADV},
                                  self.ADV_OUTCOLS[NYMEX])}
 
         with TemporaryDirectory() as ixfolder_cme, TemporaryDirectory() as ixfolder_cbot:
@@ -538,7 +544,7 @@ class CMEGChecker(CheckerBase):
     COLS_MAPPING = {PRODUCT_CODE: TaskBase.PRODCODE,
                     F_CLEARED_AS: TaskBase.PRODTYPE,
                     F_PRODUCT_NAME: TaskBase.PRODNAME,
-                    A_ADV_YTD: TaskBase.VOLUME}
+                    A_ADV: TaskBase.VOLUME}
 
     def __init__(self):
         super().__init__(cme)
@@ -571,7 +577,7 @@ class CMEGChecker(CheckerBase):
         return data[A_PRODUCT_NAME].astype(str) + ' ' + data[A_CLEARED_AS].astype(str)
 
     def mark_filter_prods(self, data, lower_limit, fcol):
-        df = dfgroupby_aggr(data, data.index.get_level_values(GROUP), A_ADV_YTD, sum_mapping) \
+        df = dfgroupby_aggr(data, data.index.get_level_values(GROUP), A_ADV, sum_mapping) \
             if data.index.names[0] == GROUP else data
         mark_recorded(df, self.config_dict)
         return df_lower_limit(df, fcol, lower_limit)
@@ -583,13 +589,12 @@ class CMEGChecker(CheckerBase):
         data[CBOT] = set_check_index(data[CBOT], get_prod_keys(data[CBOT], self.__prod_key), self.get_group_keys(data[CBOT]))
         data[NYMEX] = set_check_index(data[NYMEX], get_prod_keys(data[NYMEX], self.__prod_key))
 
-        return {exch: self.mark_filter_prods(data[exch], vollim, A_ADV_YTD) for exch in data}
+        return {exch: self.mark_filter_prods(data[exch], vollim, A_ADV) for exch in data}
 
 
 class CMEGTask(TaskBase):
     def __init__(self):
         super().__init__(CMEGSetting, CMEGScraper(), CMEGChecker())
-        self.voltype = A_ADV_YTD
         self.services = {CME: CMEGSetting.SVC_CME,
                          CBOT: CMEGSetting.SVC_CBOT,
                          NYMEX: CMEGSetting.SVC_NYMEX}

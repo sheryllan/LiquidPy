@@ -14,6 +14,8 @@ ARG_SOUTPATH = 'soutpath'
 ARG_VOLLIM = 'vollim'
 ARG_LOGLEVEL = 'loglevel'
 ARG_LOGFILE = 'logfile'
+ARG_REPORT = 'report'
+ARG_RTIME = 'rtime'
 
 
 class MetaBase(type):
@@ -37,6 +39,7 @@ class IcingaHelper(object):
     ICINGA_API_PCR = 'v1/actions/process-check-result'
     ICINGA_API_USER = 'icinga'
     ICINGA_API_PSW = 'icinga2002'
+    ICINGA_CA_CRT = cwd_full_path('ca.crt')
 
     TYPE = 'type'
     FILTER = 'filter'
@@ -91,7 +94,7 @@ class IcingaHelper(object):
     def post_pcr(data):
         url = IcingaHelper.get_icinga_api_url(IcingaHelper.ICINGA_API_PCR)
         auth = (IcingaHelper.ICINGA_API_USER, IcingaHelper.ICINGA_API_PSW)
-        cert = ICINGA_CA_CRT
+        cert = IcingaHelper.ICINGA_CA_CRT
         IcingaHelper.LOGGER.info('Posting data to {}, user: {}, certificate: {}'.format(url, auth, cert))
         return http_post(url, data, auth, cert)
 
@@ -223,6 +226,13 @@ class TaskBase(object, metaclass=MetaBase):
                                   nargs='?', default=settings.VOLLIM,
                                   type=int,
                                   help='the volume threshold to filter out products')
+        self.aparser.add_argument('-rp', '--report',
+                                  nargs='?', default=settings.REPORT,
+                                  type=str,
+                                  help='the type of report to evaluate')
+        self.aparser.add_argument('-rt', '--rtime',
+                                  nargs='*', default=settings.RTIME,
+                                  help='set the year(yyyy)(and month(mm) if applicable) for the report')
         self.aparser.add_argument('-ll', '--' + ARG_LOGLEVEL,
                                   type=str,
                                   nargs='?', default=settings.LOGLEVEL,
@@ -233,13 +243,17 @@ class TaskBase(object, metaclass=MetaBase):
                                   help='the path to log file')
 
         self.services = None
-        self.voltype = ''
         self.task_args = None
 
         self._exch_prods = None
         self._checked_prods = None
 
         self.outcols = self.DFLT_OUTCOLS
+
+    @property
+    def voltype(self):
+        rtime = self.task_args[ARG_RTIME]
+        return 'ADV {}({})'.format(self.task_args[ARG_REPORT], fmt_date(*rtime))
 
     def run_scraper(self):
         self.__logger.info('Start running scraping')
@@ -309,14 +323,16 @@ class TaskBase(object, metaclass=MetaBase):
 class ScraperBase(object, metaclass=MetaBase):
 
     def scrape_args(self, kwargs):
-        raise NotImplementedError('Please implement this method')
+        report = kwargs[ARG_REPORT]
+        rtime = kwargs[ARG_RTIME]
+        return {ARG_REPORT: report, ARG_RTIME: rtime}
 
-    def scrape(self, **kwargs):
-        raise NotImplementedError('Please implement this method')
+    def scrape(self, report, rtime, **kwargs):
+        raise NotImplementedError("Please implement this method")
 
     def run(self, **kwargs):
         args = self.scrape_args(kwargs)
-        self.__logger.info('Running {} with parameters: {}'.format(self.__class__.__name__, args))
+        self.__logger.info('Running scraping with parameters: {}'.format(args))
         scraped = self.scrape(**args)
 
         outpath = kwargs.get(ARG_SOUTPATH, None)
@@ -354,7 +370,7 @@ class CheckerBase(object, metaclass=MetaBase):
         validate_precheck(data)
 
         args = self.check_args(kwargs)
-        self.__logger.info('Running {} with parameters: {}'.format(self.__class__.__name__, args))
+        self.__logger.info('Running checking with parameters: {}'.format(args))
         checked = self.check(data, **args)
         postcheck(checked, self.cols_mapping, outcols, self.__logger)
 

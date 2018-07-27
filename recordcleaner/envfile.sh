@@ -16,6 +16,7 @@ export VENV_BIN=${VENV_PATH}/bin
 
 export REQUIREMENTS=${DIR}/requirements.txt
 export CMEGCHECK_PY=${DIR}/cmegcheck.py
+export OSECHECK_PY=${DIR}/osecheck.py
 
 export SHARED_FOLDER=//lcldn-fs1/shared
 export SHARED_DES=DailyProdChecks
