@@ -13,6 +13,7 @@ if [ -z "${VENV_PATH}" ]; then
 
 fi
 export VENV_BIN=${VENV_PATH}/bin
+export GOOGLE_APPLICATION_CREDENTIALS=${DIR}/Eurex-hist-b6417a4141cc.json
 
 export REQUIREMENTS=${DIR}/requirements.txt
 export CMEGCHECK_PY=${DIR}/cmegcheck.py

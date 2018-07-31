@@ -1,0 +1,12 @@
+{
+  "type": "service_account",
+  "project_id": "eurex-hist",
+  "private_key_id": "b6417a4141cc2727b8a9736b40f6844b2081fdfd",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC4NTojpdf5Noc2\na9R5djJKwwfVaQKbHuV0KHJLQWYNmMIGkHyOYfydUoszjwYn9hmvOMKQJWMKNssF\nDFI8YMWxJw4iHcGCKlFjSWyujUvHnxQ4XyZFE1oEI5fc4ixIvPJPR3m41N1T0bML\nvOSNpLO8cWBtnJ9HFAvp43aipo6aQccBqnGMORrkUY6DCbYTPd+yPw2F6fyJSuEA\n0gyUxkY5Gcf4DjKzMnkUInwXXmQUKa3q159MQlb5B3qygRYU7cco9w5bLLQu3zyn\nNK6tmx4qFFS24Q6hgoDTk4+gnmIpFFq3d727sShdZFdFMNCGCNLUWFqYkueoCg/j\nhFK3xSTDAgMBAAECggEAUwuAAfku5EXOcFzthbKhGq5RNkdoqtkjdZoUaNP7d67B\n7iauWJxZP+2qHtzgWBytWJ7crBKG02B/Z2+2FU1FYseqKfxDNHTyizHbYtgFbWHM\nwls3DBYc01fei3CVqVcxYEdnW0nv2+1ibCzE1wyFETQF1nSxI+CoPFHVNp+jE2xE\npEZ4GXy5VlTmr+xSBiHcSrZ82iFKr9Jd+r3sXFOElFZ/rEttlgR8IfgbflrXoDxe\n9xRYIWLUBAkyO1XpK4kTqKslxFac8G5aUH2joUC/MrFsyRHVT2jn6wlCPBhxQ7Ts\nGuvo9UsIPKR/Gr+7AStfyYLOZ9QFm0MLb9L5qoxCaQKBgQD/24IIp6gVffW6tfSB\ncWNXLf6bUYpat1IGp4ubd1tFBjxMu1cnrmXXQSwX6MlQqCg7Gf6q/CRLUW58HWVa\nJY3q/aK9dO4/ubdP5IjC5zOqY3l43EofXMH8zsNU5jO6cUywquLKP45HjIu4ocRy\nOUz4/YE6yzU8ZKrVsf3B98y4ewKBgQC4T4ACjAQKdrywU05dzo0OGAP0IRf0rcZ2\nGSzfKW/U6SwLEkQo/XW2PP9u5Ejnz/F157lDAdiWKw4dq7emNYMj/yZ1i+P6CzPi\nWwjfsXMoltg1bbaoI4ReFe7gyndc7Zb/Lz6UPelXM/0lwr4x1XiOxAmOqQktO+xm\n/HtRoMhmWQKBgFUFipZ5sB9ENi4PXOrO1SYZQKw4UnOGy5kuf/Pvm8K6KbuN3Y5w\nI6N+IrrnPk6xMn1BTCFhnGXy73YLBq0IIbrfAf9XJfzDKClCVjf+QGr0l18URQVa\n+5OY2cwSm0nvcH6cqrRunkckayG1j+QtKmjrRNBWyqABC8vrU9nrEHqVAoGBALSL\ne/QCwDqX0YJQOKX/nYE+2TCd8l+GkrBBPQlmB9xihPhbblVQ46we2IECMsCRnBBJ\na9tNxaJkjrFV8tJn/QyX9k6TOEFKFAsZ7fliVFJgYW8FCDZwhEu95IBjFMX9Hzre\nRsjkVN1NWh9RQwqB+FSxiEMtJoYe+xZvIUX24BgRAoGAN257S/8XpY8iktSzVfre\nGNSfGyG/zSaR59wSqd9FU4RcQTGSf4IJSfENckD1m0kmTBPZ6xyr1EfM/iNuCcBj\nIw66T0BRcamQNkUNbKBADNJLOsBSOKTJ0If4Uh5itAddxdi+6gaN0Vb4Nuao71lT\nH/7u82UqRhJgxxlIgwSvqsk=\n-----END PRIVATE KEY-----\n",
+  "client_email": "admin-658@eurex-hist.iam.gserviceaccount.com",
+  "client_id": "103469500195144750159",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://accounts.google.com/o/oauth2/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/admin-658%40eurex-hist.iam.gserviceaccount.com"
+}
