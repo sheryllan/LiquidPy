@@ -232,6 +232,7 @@ class TaskBase(object, metaclass=MetaBase):
                                   help='the type of report to evaluate')
         self.aparser.add_argument('-rt', '--rtime',
                                   nargs='*', default=settings.RTIME,
+                                  type=int,
                                   help='set the year(yyyy)(and month(mm) if applicable) for the report')
         self.aparser.add_argument('-ll', '--' + ARG_LOGLEVEL,
                                   type=str,

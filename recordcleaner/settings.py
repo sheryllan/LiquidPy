@@ -83,6 +83,6 @@ class EUREXSetting(SettingBase):
     COUTPATH = format_coutpath(EXCH)
     SOUTPATH = format_soutpath(EXCH)
     VOLLIM = 1000
-    SVC_OSE = 'eurex_check'
+    SVC_EUREX = 'eurex_check'
 
 

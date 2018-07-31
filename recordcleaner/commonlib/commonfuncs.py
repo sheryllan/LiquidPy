@@ -60,7 +60,7 @@ def to_iter(x, excl_types=(str,), ittype=list):
 def find_first_n(arry, condition, n=1):
     result = list()
     for a in arry:
-        if n == 0:
+        if n <= 0:
             break
         if condition(a):
             result.append(a)

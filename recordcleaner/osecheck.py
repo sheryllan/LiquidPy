@@ -275,4 +275,4 @@ class OSETask(TaskBase):
 
 if __name__ == '__main__':
     task = OSETask()
-    results = task.run()
+    task.run()

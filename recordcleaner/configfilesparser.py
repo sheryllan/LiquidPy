@@ -45,6 +45,7 @@ CO_DESCRIPTION = 'description'
 
 CF_OUTCOLS_MAPPING = {CF_TYPE: CO_TYPE,
                       CF_TYPECODE: CO_TYPE,
+                      CF_COMMODITY: CO_PRODCODE,
                       CF_COMMODITY_CODE: CO_PRODCODE,
                       CF_COMMODITY_NAME: CO_PRODCODE,
                       CF_NAME: CO_PRODCODE,

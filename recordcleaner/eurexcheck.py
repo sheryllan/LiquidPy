@@ -1,21 +1,16 @@
 from tempfile import NamedTemporaryFile
+from datetime import datetime
 
 from baseclasses import *
 
 
-ARG_REPORT = 'report'
-ARG_RTIME = 'rtime'
-
-YEARLY_TIME = (last_year(),)
-ADV_YEARLY = 'ADV yearly({})'.format(*YEARLY_TIME)
-MONTHLY_TIME = (this_year(), last_month())
-ADV_MONTHLY = 'ADV monthly({})'.format(fmt_date(*MONTHLY_TIME))
-
 EUREX = 'EUREX'
+
 PRODUCT_GROUP = 'Product_Group'
 PRODUCT_NAME = 'Product_Name'
 PRODUCT_TYPE = 'Product_Type'
 PRODUCT_CODE = 'Product_Code'
+TRADING_VOLUME = 'Trading_Volume'
 
 PRODTYPES = {'Futures', 'Options'}
 
@@ -27,6 +22,8 @@ class EUREXScraper(ScraperBase):
 
     TRADED_CONTRACTS = 'Traded Contracts'
     AVDAILY_MONTH = 'Daily average for month'
+
+    OUTCOLS = [PRODUCT_NAME, PRODUCT_CODE, PRODUCT_GROUP, PRODUCT_TYPE, TRADING_VOLUME]
 
     def __init__(self):
         super().__init__()
@@ -42,6 +39,12 @@ class EUREXScraper(ScraperBase):
         return self.URL_EUREX + link
 
     def __parse_data_rows(self, df, outcols):
+
+        def get_prodtype(name):
+            if not any(t in name for t in PRODTYPES):
+                return 'Futures'
+            return MatchHelper.find_first_in_string(name, PRODTYPES, stemming=True)
+
         known_cols = [c for c in df.columns if not re.match('^unnamed', c, flags=re.IGNORECASE)]
         unknown_cols = [c for c in df.columns if re.match('^unnamed', c, flags=re.IGNORECASE)]
         prod_group = None
@@ -57,7 +60,7 @@ class EUREXScraper(ScraperBase):
                 name_code = find_first_n(row[unknown_cols], pd.notnull, n=2)
                 if len(name_code) != 2:
                     raise ValueError('Missing not null column value(s) for product name/code, found: {}'.format(name_code))
-                group_type = [prod_group, MatchHelper.find_first_in_string(prod_group, PRODTYPES, stemming=True)]
+                group_type = [prod_group, get_prodtype(prod_group)]
                 row_extra = pd.Series(name_code + group_type, [PRODUCT_NAME, PRODUCT_CODE, PRODUCT_GROUP, PRODUCT_TYPE])
                 yield pd.concat([row_extra, row[known_cols]])[outcols]
 
@@ -76,21 +79,34 @@ class EUREXScraper(ScraperBase):
             start = 1
             for i, curr_col in enumerate(df.columns[start:]):
                 if curr_col == self.AVDAILY_MONTH and prev_col == self.TRADED_CONTRACTS:
-                    df.columns.values[start + i] = ADV_MONTHLY
+                    df.columns.values[start + i] = TRADING_VOLUME
                     break
                 prev_col = curr_col
 
         set_headers()
         rename_adv_col()
+        return pd.DataFrame(self.__parse_data_rows(df, self.OUTCOLS))
 
-        outcols = [PRODUCT_NAME, PRODUCT_CODE, PRODUCT_GROUP, PRODUCT_TYPE, ADV_MONTHLY]
-        return pd.DataFrame(self.__parse_data_rows(df, outcols))
+    def validate_report_rtime(self, report, rtime):
+        if report != MONTHYLY:
+            raise ValueError('Invalid report: only {} report is available'.format(MONTHYLY))
+        if len(rtime) < 2:
+            raise ValueError('Invalid rtime: month must be provided for rtime')
 
-    def scrape_args(self, kwargs):
-        rtime = kwargs.get(ARG_RTIME, MONTHLY_TIME)
-        return {ARG_RTIME: rtime}
+        if rtime[0] != this_year():
+            raise ValueError('Invalid rtime: year must be this year')
+
+        soup = make_soup(self.URL_MONTHLY)
+
+        pattern = r'\b\d{{2}}.?(\w+).?{}\b'.format(this_year())
+        dates = soup.find_all(text=re.compile(pattern, re.IGNORECASE))
+        months = {datetime.strptime(d, '%d %b %Y').month for d in dates}
+
+        if rtime[1] not in months:
+            raise ValueError('Invalid rtime: month not available')
 
     def scrape(self, report, rtime, **kwargs):
+        self.validate_report_rtime(report, rtime)
         with NamedTemporaryFile() as xls_file:
             fn = download(self.find_report_url(*rtime), xls_file).name
             df = pd.read_excel(pd.ExcelFile(fn, on_demand=True), sheet_name=1)
@@ -101,16 +117,34 @@ class EUREXChecker(CheckerBase):
     COLS_MAPPING = {PRODUCT_NAME: TaskBase.PRODNAME,
                     PRODUCT_TYPE: TaskBase.PRODTYPE,
                     PRODUCT_CODE: TaskBase.PRODCODE,
-                    ADV_MONTHLY: TaskBase.VOLUME}
+                    TRADING_VOLUME: TaskBase.VOLUME}
+
+    def __init__(self):
+        super().__init__(eurex)
 
 
     @property
     def cols_mapping(self):
-        pass
+        return self.COLS_MAPPING
+
+    def mark_recorded(self, df):
+        prod_keys = df.apply(lambda x: (x[PRODUCT_CODE], x[PRODUCT_TYPE]), axis=1)
+        df = set_check_index(df, prod_keys, drop=False)
+        return mark_recorded(df, self.config_dict)
 
     def check(self, data, vollim, **kwargs):
-        pass
+        for exch in data:
+            df = df_lower_limit(data[exch], TRADING_VOLUME, vollim)
+            data[exch] = self.mark_recorded(df)
+        return data
 
 
-scp = EUREXScraper()
-scp.scrape()
+class EUREXTask(TaskBase):
+    def __init__(self):
+        super().__init__(EUREXSetting, EUREXScraper(), EUREXChecker())
+        self.services = {EUREX: EUREXSetting.SVC_EUREX}
+
+
+if __name__ == '__main__':
+    task = EUREXTask()
+    task.run()

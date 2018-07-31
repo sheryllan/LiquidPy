@@ -17,6 +17,10 @@ class ProductKey(namedtuple_with_defaults(namedtuple('ProductKey', [CO_PRODCODE,
     FD_PRODCODE = CO_PRODCODE
     FD_TYPE = CO_TYPE
 
+    def __init__(self, *args, **kwargs):
+        if any(p is None for p in self):
+            raise ValueError('Error field value {}: fields of ProductKey must not be None'.format(self))
+
     def __eq__(self, other):
         this_tuple = tuple(map(str, self))
         other_tuple = tuple(map(str, other))
@@ -87,16 +91,16 @@ def count_unique(data, col=RECORDED):
     return {key: val for key, val in zip(uniques, counts)}
 
 
-def set_check_index(data, prod_keys, group_keys=None, inplace=False, duplicates=False):
+def set_check_index(data, prod_keys, group_keys=None, duplicates=False, drop=True):
     if group_keys is None:
         names = [PRODUCTKEY]
-        indices = [to_iter(prod_keys)]
+        indices = [prod_keys]
     else:
         names = [GROUP, PRODUCTKEY]
-        indices = [to_iter(group_keys), to_iter(prod_keys)]
+        indices = [group_keys, prod_keys]
 
     mindex = pd.MultiIndex.from_arrays(indices, names=names)
-    data_set = data.set_index(mindex, inplace=inplace)
+    data_set = data.set_index(mindex, drop=drop)
     if not duplicates:
         data_set = data_set[~data_set.index.duplicated(keep='first')]
 
@@ -113,11 +117,11 @@ def validate_precheck(data):
 def postcheck(data, cols_mapping, outcols, logger=None):
     for exch in data:
         if cols_mapping:
-            logger.debug('Renaming data columns: {}'.format(list(cols_mapping.keys())))
+            logger.debug('Renaming {} data columns: {}'.format(exch, list(cols_mapping.keys())))
         df = data[exch]
         df = rename_filter(df, cols_mapping, outcols)
         if logger is not None:
-            logger.debug('Output data columns: {}'.format(list(df.columns)))
+            logger.debug('Output {} data columns: {}'.format(exch, list(df.columns)))
         data[exch] = df
 
 

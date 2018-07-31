@@ -158,7 +158,10 @@ class CMEGScraper(ScraperBase):
     def get_vol_col(self, df, report, rtime):
         pattern = 'ADV Y.T.D {}'.format(fmt_date(*rtime)) \
             if report == ANNUAL else 'ADV {}'.format(fmt_date(*rtime, fmt='%b %Y'))
-        return find_first_n(df.columns, lambda x: re.match(pattern, x))
+        vol_col = find_first_n(df.columns, lambda x: re.match(pattern, x, re.IGNORECASE))
+        if not vol_col:
+            raise ValueError('No matched volume column found with pattern: {}'.format(pattern))
+        return vol_col
 
     def scrape_args(self, kwargs):
         clean_match = kwargs.get(ARG_CLEAN_MATCH, True)
@@ -167,14 +170,16 @@ class CMEGScraper(ScraperBase):
     def validate_rtime(self, rtime):
         year = rtime[0]
         if year > this_year() or year < this_year() - 1:
-            raise ValueError('Invalid rtime: the year must be this or the last year')
+            raise ValueError('Invalid rtime: year must be this or the last year')
         if rtime[1:]:
             month = rtime[1]
             if month > last_month() or month < last_month() - 1:
-                raise ValueError('Invalid rtime: the month must be the last month or the month before the last')
+                raise ValueError('Invalid rtime: month must be last month or the month before last')
+            if year == last_year() and month < last_month():
+                raise ValueError('Invalid rtime: month must be last month for last year')
 
     def scrape(self, report, rtime, **kwargs):
-        validate_precheck(rtime)
+        self.validate_rtime(rtime)
         clean_match = kwargs[ARG_CLEAN_MATCH]
         df_prods = self.get_prods_table()
         df_prods = df_prods.rename(columns=CMEGScraper.COL2FIELD)[self.PRODS_OUTCOLS]
