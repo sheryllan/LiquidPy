@@ -6,17 +6,33 @@ from sortedcontainers import SortedDict
 from argparse import ArgumentTypeError
 import pandas as pd
 import traceback
+from datetime import date
+from dateutil.relativedelta import relativedelta
+
+
+def last_n_year(n=1):
+    return (date.today() + relativedelta(years=-n)).year
+
+
+def last_n_month(n=1):
+    return (date.today() + relativedelta(months=-n)).month
+
+
+def fmt_date(year, month=None, day=1, fmt='%Y%m'):
+    if month is None:
+        return str(year)
+    return date(int(year), int(month), int(day)).strftime(fmt)
 
 
 def nontypes_iterable(arg, excl_types=(str,)):
     return isinstance(arg, Iterable) and not isinstance(arg, excl_types)
 
 
-def flatten_iter(items, level=None, types=(str,)):
-    if nontypes_iterable(items, types):
+def flatten_iter(items, level=None, excl_types=(str,)):
+    if nontypes_iterable(items, excl_types):
         level = None if level is None else level + 1
         for sublist in items:
-            yield from flatten_iter(sublist, level, types)
+            yield from flatten_iter(sublist, level, excl_types)
     else:
         level_item = items if level is None else (level - 1, items)
         yield level_item

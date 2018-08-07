@@ -1,7 +1,6 @@
 import os
 from dotenv import load_dotenv
-from datetime import date
-from dateutil.relativedelta import relativedelta
+from commonlib.commonfuncs import *
 
 if os.getenv('DIR') is None:
     os.environ.setdefault('DIR', os.getcwd())
@@ -16,32 +15,11 @@ envfile = cwd_full_path('envfile.sh')
 load_dotenv(dotenv_path=envfile)
 
 OUTDIR = os.getenv('OUTDIR')
-
-
-def last_year():
-    return (date.today() + relativedelta(years=-1)).year
-
-
-def last_month():
-    return (date.today() + relativedelta(months=-1)).month
-
-
-def this_year():
-    return date.today().year
-
-
-def this_month():
-    return date.today().month
-
-
-def format_coutpath(exch):
-    filename = '{}_checked.xlsx'.format(exch)
-    return os.path.join(OUTDIR, filename)
-
-
-def format_soutpath(exch):
-    filename = '{}_all.xlsx'.format(exch)
-    return os.path.join(OUTDIR, filename)
+PHANTOMJS = os.getenv('PHANTOMJS')
+FIREFOX = os.getenv('FIREFOX')
+GECKODRIVER=os.getenv('GECKODRIVER')
+CHROME = os.getenv('CHROME')
+CHROMEDRIVER = os.getenv('CHROMEDRIVER')
 
 
 ANNUAL = 'annual'
@@ -49,21 +27,30 @@ MONTHYLY = 'monthly'
 
 
 class SettingBase(object):
-    DFLT_RTIMES = {ANNUAL: (last_year()), MONTHYLY: (this_year(), last_month())}
-
-    COUTPATH = None
-    SOUTPATH = None
+    EXCH = None
     VOLLIM = 0
-    REPORT = 'monthly'
-    RTIME = DFLT_RTIMES[REPORT]
+    REPORT = MONTHYLY
     LOGLEVEL = 'DEBUG'
     LOGFILE = None
+    DFLT_RTIME = {ANNUAL: (last_n_year(),), MONTHYLY: (last_n_year(0), last_n_month())}
+
+    @classmethod
+    def rtime(cls):
+        return cls.DFLT_RTIME[cls.REPORT]
+
+    @classmethod
+    def coutpath(cls):
+        filename = '{}_{}_checked.xlsx'.format(cls.EXCH, fmt_date(*cls.rtime()))
+        return os.path.join(OUTDIR, filename)
+
+    @classmethod
+    def soutpath(cls):
+        filename = '{}_{}_all.xlsx'.format(cls.EXCH, fmt_date(*cls.rtime()))
+        return os.path.join(OUTDIR, filename)
 
 
 class CMEGSetting(SettingBase):
     EXCH = 'CMEG'
-    COUTPATH = format_coutpath(EXCH)
-    SOUTPATH = format_soutpath(EXCH)
     VOLLIM = 1000
     SVC_CME = 'cme_check'
     SVC_CBOT = 'cbot_check'
@@ -72,16 +59,14 @@ class CMEGSetting(SettingBase):
 
 class OSESetting(SettingBase):
     EXCH = 'OSE'
-    COUTPATH = format_coutpath(EXCH)
-    SOUTPATH = format_soutpath(EXCH)
     VOLLIM = 1000
     SVC_OSE = 'ose_check'
+    DFLT_RTIME = {ANNUAL: (last_n_year(),),
+                  MONTHYLY: (last_n_year(0), last_n_month(2) if date.today().day <= 5 else last_n_month())}
 
 
 class EUREXSetting(SettingBase):
     EXCH = 'EUREX'
-    COUTPATH = format_coutpath(EXCH)
-    SOUTPATH = format_soutpath(EXCH)
     VOLLIM = 1000
     SVC_EUREX = 'eurex_check'
 

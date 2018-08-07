@@ -168,15 +168,16 @@ class CMEGScraper(ScraperBase):
         return {**super().scrape_args(kwargs), ARG_CLEAN_MATCH: clean_match}
 
     def validate_rtime(self, rtime):
+        super().validate_rtime(rtime)
         year = rtime[0]
-        if year > this_year() or year < this_year() - 1:
-            raise ValueError('Invalid rtime: year must be this or the last year')
+        if year not in [last_n_year(0), last_n_year()]:
+            raise ValueError('Invalid rtime: year must be 0/-1 year)')
         if rtime[1:]:
             month = rtime[1]
-            if month > last_month() or month < last_month() - 1:
-                raise ValueError('Invalid rtime: month must be last month or the month before last')
-            if year == last_year() and month < last_month():
-                raise ValueError('Invalid rtime: month must be last month for last year')
+            if year == last_n_year(0) and month not in [last_n_month(), last_n_month(2)]:
+                raise ValueError('Invalid rtime: month of 0 year must be -1/-2 month')
+            if year == last_n_year() and month != last_n_month():
+                raise ValueError('Invalid rtime: month of -1 year must be -1 month')
 
     def scrape(self, report, rtime, **kwargs):
         self.validate_rtime(rtime)

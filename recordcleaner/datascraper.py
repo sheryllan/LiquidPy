@@ -11,11 +11,6 @@ TXT_SUFFIX = '.txt'
 XLSX_SUFFIX = '.xlsx'
 
 
-def fmt_date(year, month=None, day=1, fmt='%Y%m'):
-    if month is None:
-        return str(year)
-    return date(int(year), int(month), int(day)).strftime(fmt)
-
 
 def first_nonna_index(df):
     return pd.notna(df).all(1).nonzero()[0][0]

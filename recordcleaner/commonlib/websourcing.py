@@ -7,8 +7,11 @@ from requests.auth import HTTPBasicAuth
 
 from commonlib.commonfuncs import *
 
+# USER_AGENT = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.0.7; X11; Linux x86_64) ' \
+#              'Gecko/2009021910 Firefox/3.0.7 Chrome/23.0.1271.64 Safari/537.11'
 USER_AGENT = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.0.7; X11; Linux x86_64) ' \
-             'Gecko/2009021910 Firefox/3.0.7 Chrome/23.0.1271.64 Safari/537.11'
+             'Gecko/2009021910 Firefox/3.0.7 Chrome/68.0.3440.84 Safari/537.11'
+
 TABLE_TAG = 'table'
 TR_TAG = 'tr'
 TH_TAG = 'th'

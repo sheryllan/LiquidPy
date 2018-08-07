@@ -36,4 +36,7 @@ python ${CMEGCHECK_PY} ${ICINGA} ${LOGLEVEL} --coutpath --soutpath
 
 echo -e "\nRunning ${OSECHECK_PY}"
 python ${OSECHECK_PY} ${ICINGA} ${LOGLEVEL} --coutpath --soutpath
+
+echo -e "\nRunning ${EUREXCHECK_PY}"
+python ${EUREXCHECK_PY} ${ICINGA} ${LOGLEVEL} --coutpath --soutpath
 deactivate

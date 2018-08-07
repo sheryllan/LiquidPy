@@ -216,22 +216,22 @@ class TaskBase(object, metaclass=MetaBase):
                                   help='set it to enable results transfer to icinga')
         self.aparser.add_argument('-co', '--' + ARG_COUTPATH,
                                   type=str,
-                                  nargs='?', const=settings.COUTPATH, default=None,
+                                  nargs='?', const=settings.coutpath(),
                                   help='the output path of the check results')
         self.aparser.add_argument('-so', '--' + ARG_SOUTPATH,
-                                  nargs='?', const=settings.SOUTPATH, default=None,
+                                  nargs='?', const=settings.soutpath(),
                                   type=str,
                                   help='the output path of the matching results')
         self.aparser.add_argument('-v', '--' + ARG_VOLLIM,
                                   nargs='?', default=settings.VOLLIM,
                                   type=int,
                                   help='the volume threshold to filter out products')
-        self.aparser.add_argument('-rp', '--report',
+        self.aparser.add_argument('-rp', '--' + ARG_REPORT,
                                   nargs='?', default=settings.REPORT,
                                   type=str,
                                   help='the type of report to evaluate')
-        self.aparser.add_argument('-rt', '--rtime',
-                                  nargs='*', default=settings.RTIME,
+        self.aparser.add_argument('-rt', '--' + ARG_RTIME,
+                                  nargs='*', default=settings.rtime(),
                                   type=int,
                                   help='set the year(yyyy)(and month(mm) if applicable) for the report')
         self.aparser.add_argument('-ll', '--' + ARG_LOGLEVEL,
@@ -322,6 +322,12 @@ class TaskBase(object, metaclass=MetaBase):
 
 
 class ScraperBase(object, metaclass=MetaBase):
+
+    def validate_rtime(self, rtime):
+        if rtime[0] < 1970 or rtime[0] > last_n_year(0):
+            raise ValueError('Invalid rtime: the year is out of range (< 1970 or > {})'.format(last_n_year(0)))
+        if rtime[1:] and rtime[1] < 0 or rtime[1] > 12:
+            raise ValueError('Invalid rtime: the month is out of range (< 0 or > 12)')
 
     def scrape_args(self, kwargs):
         report = kwargs[ARG_REPORT]

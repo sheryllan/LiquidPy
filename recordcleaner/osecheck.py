@@ -37,7 +37,7 @@ class OSEScraper(ScraperBase):
     def __init__(self):
         super().__init__()
 
-    def find_annual_report_url(self, year=last_year()):
+    def find_annual_report_url(self, year):
         year_str = str(year)
         table = HtmlTableParser.get_tables_by_th(self.URL_ANNUAL_VOLUME, self.TABLE_TITLE)[0]
         headers = HtmlTableParser.get_tb_headers(table)
@@ -50,7 +50,7 @@ class OSEScraper(ScraperBase):
         file_url = find_link(tds, pattern)
         return self.URL_OSE + file_url
 
-    def find_monthly_report_url(self, year=this_year(), month=last_month()):
+    def find_monthly_report_url(self, year, month):
         year_str = str(year)
         table = HtmlTableParser.get_tables_by_th(self.URL_MONTHLY_VOLUME)[0]
         tr = HtmlTableParser.select_trs(table, text=year_str)[0]
@@ -126,15 +126,18 @@ class OSEScraper(ScraperBase):
         return select_mapping(df, self.OUTCOLS, False)
 
     def validate_rtime(self, rtime):
+        super().validate_rtime(rtime)
         year = rtime[0]
-        if rtime[1:]:
-            if year > this_year() or year < this_year() - 9:
-                raise ValueError('Invalid rtime: the year must be in the last 10 years')
+        if not rtime[1:]:
+            if year not in [last_n_year(i) for i in range(1, 10)]:
+                raise ValueError('Invalid rtime: the year must range from -9 to -1 year')
+        elif year not in [last_n_year(i) for i in range(0, 10)]:
+            raise ValueError('Invalid rtime: the monthly report year must range from -9 to 0 year')
+        else:
             month = rtime[1]
-            if year == this_year() and month > last_month():
-                raise ValueError('Invalid rtime: the month of this year must be earlier than the this month ')
-        elif year > last_year():
-            raise ValueError('Invalid rtime: the year only must be earlier than this year')
+            valid_month = OSESetting.DFLT_RTIME[MONTHYLY][1]
+            if year == last_n_year(0) and month not in range(1, valid_month + 1):
+                raise ValueError('Invalid rtime: the month of 0 year must range from 1 to 0/-1 month')
 
     def scrape(self, report, rtime, **kwargs):
         self.validate_rtime(rtime)

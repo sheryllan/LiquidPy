@@ -28,7 +28,7 @@ class EUREXScraper(ScraperBase):
     def __init__(self):
         super().__init__()
 
-    def find_report_url(self, year=this_year(), month=last_month()):
+    def find_report_url(self, year, month):
         soup = make_soup(self.URL_MONTHLY)
         pattern = r'^(?=.*{}.*\.xls).*$'.format(fmt_date(year, month))
 
@@ -88,17 +88,18 @@ class EUREXScraper(ScraperBase):
         return pd.DataFrame(self.__parse_data_rows(df, self.OUTCOLS))
 
     def validate_report_rtime(self, report, rtime):
+        super().validate_rtime(rtime)
         if report != MONTHYLY:
             raise ValueError('Invalid report: only {} report is available'.format(MONTHYLY))
         if len(rtime) < 2:
-            raise ValueError('Invalid rtime: month must be provided for rtime')
+            raise ValueError('Invalid rtime: both year and month must be provided')
 
-        if rtime[0] != this_year():
+        if rtime[0] != last_n_year(0):
             raise ValueError('Invalid rtime: year must be this year')
 
         soup = make_soup(self.URL_MONTHLY)
 
-        pattern = r'\b\d{{2}}.?(\w+).?{}\b'.format(this_year())
+        pattern = r'\b\d{{2}}.?(\w+).?{}\b'.format(last_n_year(0))
         dates = soup.find_all(text=re.compile(pattern, re.IGNORECASE))
         months = {datetime.strptime(d, '%d %b %Y').month for d in dates}
 
