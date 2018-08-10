@@ -10,12 +10,16 @@ from datetime import date
 from dateutil.relativedelta import relativedelta
 
 
-def last_n_year(n=1):
-    return (date.today() + relativedelta(years=-n)).year
+def last_n_year(n=1, d=date.today()):
+    return (d + relativedelta(years=-n)).year
 
 
-def last_n_month(n=1):
-    return (date.today() + relativedelta(months=-n)).month
+def last_n_month(n=1, d=date.today()):
+    return (d + relativedelta(months=-n)).month
+
+
+def last_n_week(n=1, d=date.today()):
+    return d + relativedelta(weeks=-n)
 
 
 def fmt_date(year, month=None, day=1, fmt='%Y%m'):

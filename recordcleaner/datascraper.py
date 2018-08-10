@@ -13,6 +13,14 @@ XLSX_SUFFIX = '.xlsx'
 
 
 def first_nonna_index(df):
+    print(df.columns)
+    print(df.index)
+    print(df.head(10))
+    a = pd.notna(df)
+    print(a)
+    b = a.all(1)
+    print(b)
+    c = b.nonzero()
     return pd.notna(df).all(1).nonzero()[0][0]
 
 
@@ -29,8 +37,11 @@ def set_df_col(df):
     return df
 
 
-def clean_df(df, nonna_subset):
-    df.dropna(subset=nonna_subset, how='all', inplace=True)
+def clean_df(df, nonna_subset=None):
+    if nonna_subset is None:
+        df.dropna(how='all', inplace=True)
+    else:
+        df.dropna(subset=nonna_subset, how='all', inplace=True)
     df.reset_index(drop=True, inplace=True)
     return df
 

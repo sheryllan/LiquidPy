@@ -88,7 +88,7 @@ class EUREXScraper(ScraperBase):
         return pd.DataFrame(self.__parse_data_rows(df, self.OUTCOLS))
 
     def validate_report_rtime(self, report, rtime):
-        super().validate_rtime(rtime)
+        self.validate_rtime(rtime)
         if report != MONTHYLY:
             raise ValueError('Invalid report: only {} report is available'.format(MONTHYLY))
         if len(rtime) < 2:

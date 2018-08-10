@@ -36,10 +36,10 @@ def http_post(url, data, auth=None, cert=None):
     return response
 
 
-def download(url, fh):
+def download(url, fh, decode_unicode=False):
     logger = logging.getLogger(__name__)
     response = requests.get(url, stream=True, headers={'User-Agent': USER_AGENT})
-    for chunk in response.iter_content(1024):
+    for chunk in response.iter_content(1024, decode_unicode):
         if chunk:
             fh.write(chunk)
         fh.flush()
