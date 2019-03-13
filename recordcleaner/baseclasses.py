@@ -195,7 +195,7 @@ class IcingaCheckHandler(object):
 
     def exit_code(self):
         ok = all(x for x in self.groups.values())
-        return 0 if ok else 1
+        return 0 if ok else 2
 
 
 class TaskBase(object, metaclass=MetaBase):
@@ -313,7 +313,7 @@ class TaskBase(object, metaclass=MetaBase):
                 self.__logger.warning(str(w))
             except Exception as e:
                 self.__logger.error('Failed running the task', exc_info=True)
-                exit_status = (1, e)
+                exit_status = (2, e)
                 print(format_ex_str(e))
 
         if self.task_args[ARG_ICINGA]:
