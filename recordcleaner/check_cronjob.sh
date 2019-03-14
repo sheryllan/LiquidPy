@@ -3,7 +3,19 @@
 logit() {
     while read
     do
-        echo "$( date +'%Y-%m-%d %T' ) $REPLY"  >> ${LOG_FILE}
+        echo "$( date +'%Y-%m-%d %T' ) $REPLY" >> ${LOG_FILE}
+    done
+}
+
+found() {
+    for f in "$@"; do
+        ! [ -f "${f}" ] || echo ${f}
+    done
+}
+
+not_found() {
+    for f in "$@"; do
+        [ -f "${f}" ] || echo ${f}
     done
 }
 
@@ -17,23 +29,22 @@ fi
 
 LOG_FILE="${LOG_PATH}/check_cron_$( date +"%Y%m%d" ).log"
 exec 3>&1 1>> >(logit) 2>&1
-
+echo "Logging to ${LOG_FILE}"
 source check.sh --icinga --loglevel INFO
 
-smbclient ${SHARED_FOLDER} ${PASSWD} -W ${DOMAIN} -U ${USER} -c "prompt OFF; lcd ${OUTDIR}; cd ${SHARED_DES}; mput *.xlsx"
+smbclient ${SHARED_FOLDER} ${PASSWD} -W ${DOMAIN} -U ${USER} -c "prompt OFF; lcd ${OUTDIR}; cd ${SHARED_DES}; mput *$( report_time )*.xlsx"
 echo "Results copied to shared folder: ${SHARED_FOLDER}/${SHARED_DES}"
 
-ATTS=""
 echo "Sending email with attachments:"
-for fp in ${OUTDIR}/*.xlsx; do
-	echo ${fp}
-	ATTS="${ATTS} -a ${fp}"
+for fp in $( found "${CHECK_OUTFILES[@]}" ); do
+    echo ${fp}
+    ATTACHMENTS+="-a ${fp} "
 done
 
-TODAY="$(date +'%d/%m/%Y')"
-TITLE=" -s \"Daily Check Results - ${TODAY}\""
-RECIPIENT=" slan@liquidcapital.com"
-MAILCMD="mail${TITLE}${ATTS}${RECIPIENT}"
-MAILINFO="echo Check result sent" 
+TITLE="-s \"$( date -d $( report_time )'01' +'%b %Y' ) Monthly Check Results\""
+RECIPIENT="slan@liquidcapital.com,alpha@liquidcapital.com,jzhou@liquidcapital.com,jsu@liquidcapital.com"
 
-eval "${MAILINFO} | ${MAILCMD}"
+MAILCMD="mail ${TITLE} ${ATTACHMENTS} ${RECIPIENT}"
+MAILINFO=$( echo "Missing files:"; not_found "${CHECK_OUTFILES[@]}" )
+
+eval "echo '${MAILINFO}' | ${MAILCMD}"

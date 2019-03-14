@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [ -z "${DIR}" ]; then
-	DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+	export DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 fi
 
 ENVFILE=${DIR}/envfile.sh

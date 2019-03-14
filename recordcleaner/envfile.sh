@@ -5,7 +5,7 @@ if [ -z "${DIR}" ]; then
 fi
 
 if [ -z "${OUTDIR}" ]; then
-    export OUTDIR=${DIR}/results
+    export OUTDIR="$( dirname ${DIR} )/results"
 fi
 
 if [ -z "${VENV_PATH}" ]; then

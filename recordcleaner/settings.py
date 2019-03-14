@@ -15,11 +15,11 @@ envfile = cwd_full_path('envfile.sh')
 load_dotenv(dotenv_path=envfile)
 
 OUTDIR = os.getenv('OUTDIR')
-PHANTOMJS = os.getenv('PHANTOMJS')
-FIREFOX = os.getenv('FIREFOX')
-GECKODRIVER=os.getenv('GECKODRIVER')
-CHROME = os.getenv('CHROME')
-CHROMEDRIVER = os.getenv('CHROMEDRIVER')
+# PHANTOMJS = os.getenv('PHANTOMJS')
+# FIREFOX = os.getenv('FIREFOX')
+# GECKODRIVER=os.getenv('GECKODRIVER')
+# CHROME = os.getenv('CHROME')
+# CHROMEDRIVER = os.getenv('CHROMEDRIVER')
 
 
 ANNUAL = 'annual'

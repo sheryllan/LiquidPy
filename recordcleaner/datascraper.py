@@ -13,14 +13,6 @@ XLSX_SUFFIX = '.xlsx'
 
 
 def first_nonna_index(df):
-    print(df.columns)
-    print(df.index)
-    print(df.head(10))
-    a = pd.notna(df)
-    print(a)
-    b = a.all(1)
-    print(b)
-    c = b.nonzero()
     return pd.notna(df).all(1).nonzero()[0][0]
 
 
