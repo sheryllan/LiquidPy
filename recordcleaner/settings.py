@@ -1,29 +1,18 @@
 import os
-from dotenv import load_dotenv
 from commonlib.commonfuncs import *
 
 if os.getenv('DIR') is None:
     os.environ.setdefault('DIR', os.getcwd())
-    DIR = os.getenv('DIR')
+DIR = os.getenv('DIR')
+
+OUTDIR = os.getenv('OUTDIR', os.path.join(DIR, 'results'))
+
+ANNUAL = 'annual'
+MONTHYLY = 'monthly'
 
 
 def cwd_full_path(filename):
     return os.path.join(DIR, filename)
-
-
-envfile = cwd_full_path('envfile.sh')
-load_dotenv(dotenv_path=envfile)
-
-OUTDIR = os.getenv('OUTDIR')
-# PHANTOMJS = os.getenv('PHANTOMJS')
-# FIREFOX = os.getenv('FIREFOX')
-# GECKODRIVER=os.getenv('GECKODRIVER')
-# CHROME = os.getenv('CHROME')
-# CHROMEDRIVER = os.getenv('CHROMEDRIVER')
-
-
-ANNUAL = 'annual'
-MONTHYLY = 'monthly'
 
 
 class SettingBase(object):
@@ -69,5 +58,3 @@ class EUREXSetting(SettingBase):
     EXCH = 'EUREX'
     VOLLIM = 1000
     SVC_EUREX = 'eurex_check'
-
-

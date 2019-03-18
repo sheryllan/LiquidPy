@@ -4,22 +4,19 @@ if [ -z "${DIR}" ]; then
 	export DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 fi
 
-ENVFILE=${DIR}/envfile.sh
-echo "Sourcing all the environment variables from ${ENVFILE}"
-source ${ENVFILE}
+export VENV_PATH=${DIR}/venv
 
-if [ -z "${VENV_PATH}" ]; then
-	echo "ERROR: VENV_PATH variable unset"
-	exit 1
-fi
 
-(
 while [[ $# -gt 0 ]]
 do
 	key="$1"
 case $key in
 	--clean)
 		CLEAN=true
+		shift
+	;;
+	--keep)
+		KEEP=true
 		shift
 	;;
 esac
@@ -33,7 +30,10 @@ if [ "${CLEAN}" = true ] || ! [ -d ${VENV_PATH} ]; then
 	scl enable rh-python36 "virtualenv ${VENV_PATH}"
 	echo "Virutal environment ${VENV_PATH} created"
 fi
-)
+
+
+VENV_BIN=${VENV_PATH}/bin
+REQUIREMENTS=${DIR}/requirements.txt
 
 source ${VENV_BIN}/activate
 echo "Virtual environment ${VENV_PATH} activated"
@@ -44,4 +44,6 @@ pip install -r ${REQUIREMENTS}
 echo "Packages installed in ${VENV_PATH}:"
 pip freeze
 
-deactivate
+if [ "${KEEP}" != true ]; then
+    deactivate
+fi

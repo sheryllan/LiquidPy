@@ -1,5 +1,34 @@
 #!/bin/bash
 
+
+report_time() {
+    fmt=${1:-1}
+    if [ "${fmt}" = 1 ]; then
+        echo $( date -d "$(date +%Y-%m-15) -1 month" +%Y%m )
+    elif [ "${fmt}" = 0 ]; then
+        echo $( date -d "$(date +%Y-%m-15) -1 month" )
+    else
+        echo $( date -d "$(date +%Y-%m-15) -1 month" +"${fmt}" )
+    fi
+}
+
+
+check_outpath() {
+    echo "${OUTDIR}/$1_$( report_time )_checked.xlsx"
+}
+
+match_outpath() {
+    echo "${OUTDIR}/$1_$( report_time )_all.xlsx"
+}
+
+python_sript() {
+    echo "${DIR}/${1,,}check.py"
+}
+
+EXCHANGES=(CMEG EUREX OSE)
+RTIME="$(report_time "%Y %m")"
+
+
 while [ $# -gt 0 ]
 do
 	key="$1"
@@ -22,41 +51,31 @@ case $key in
 	    shift
 	    shift
 	;;
+	--exch)
+	    EXCHANGES=($2)
+	    shift
+	    shift
+	;;
+	--rtime)
+	    RTIME=($2)
+	    shift
+	    shift
 
 esac
 done
 
-report_time() {
-    echo $( date -d "$(date +%Y-%m-15) -1 month" +%Y%m )
-}
-
-check_outpath() {
-    echo "${OUTDIR}/$1_$( report_time )_checked.xlsx"
-}
-
-match_outpath() {
-    echo "${OUTDIR}/$1_$( report_time )_all.xlsx"
-}
-
-
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-source ${DIR}/env_setup.sh ${CLEAN}
+source ${DIR}/env_setup.sh ${CLEAN} --keep
 
-source ${VENV_BIN}/activate
-
-echo -e "\nRunning ${CMEGCHECK_PY}"
-CMEG_OUTFILES=($( check_outpath CMEG ) $( match_outpath CMEG ))
-python ${CMEGCHECK_PY} ${ICINGA} ${LOGLEVEL} --coutpath ${CMEG_OUTFILES[0]} --soutpath ${CMEG_OUTFILES[1]}
-
-echo -e "\nRunning ${OSECHECK_PY}"
-OSE_OUTFILES=($( check_outpath OSE ) $( match_outpath OSE ))
-python ${OSECHECK_PY} ${ICINGA} ${LOGLEVEL} --coutpath ${OSE_OUTFILES[0]} --soutpath ${OSE_OUTFILES[1]}
-
-echo -e "\nRunning ${EUREXCHECK_PY}"
-EUREX_OUTFILES=($( check_outpath EUREX ) $( match_outpath EUREX ))
-python ${EUREXCHECK_PY} ${ICINGA} ${LOGLEVEL} --coutpath ${EUREX_OUTFILES[0]} --soutpath ${EUREX_OUTFILES[1]}
+export CHECK_OUTFILES=()
+export MATCH_OUTFILES=()
+for exch in ${EXCHANGES[@]}; do
+    echo -e "\nRunning $( python_sript ${exch} )"
+    coutpath="$( check_outpath ${exch^^} )"
+    soutpath="$( match_outpath ${exch^^} )"
+    CHECK_OUTFILES+=("${coutpath}")
+    MATCH_OUTFILES+=("${soutpath}")
+#    python "$( python_sript ${exch} )" ${ICINGA} ${LOGLEVEL} --coutpath "${coutpath}" --soutpath "${soutpath}" --rtime ${RTIME}
+done
 
 deactivate
-
-export CHECK_OUTFILES=(${CMEG_OUTFILES[0]} ${OSE_OUTFILES[0]} ${EUREX_OUTFILES[0]})
-export MATCH_OUTFILES=(${CMEG_OUTFILES[1]} ${OSE_OUTFILES[1]} ${EUREX_OUTFILES[1]})

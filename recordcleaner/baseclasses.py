@@ -265,9 +265,16 @@ class TaskBase(object, metaclass=MetaBase):
         self.__logger.info('Start running checking')
         self._checked_prods = self.checker.run(self._exch_prods, self.outcols, **self.task_args)
         self.__logger.info('Finish running checking')
+        
+    def get_rtime(self, value):
+        if value is None:
+            return self.aparser.get_default(ARG_RTIME)
+        return list(map(int, to_iter(value, ittype=iter)))
 
     def set_task_args(self, **kwargs):
         self.task_args = vars(self.aparser.parse_args())
+        if ARG_RTIME in kwargs:
+            kwargs[ARG_RTIME] = self.get_rtime(kwargs[ARG_RTIME])
         self.task_args.update(**kwargs)
 
     def set_logger(self):
