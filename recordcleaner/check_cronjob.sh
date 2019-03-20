@@ -37,6 +37,10 @@ while [ $# -gt 0 ]
 do
 	key="$1"
 case $key in
+    --clean)
+    CLEAN=--clean
+    shift
+	;;
     --env)
     ENV=$2
     shift
@@ -51,7 +55,7 @@ elif [ "${ENV}" = dev ]; then
     RECIPIENT="slan@liquidcapital.com"
 fi
 
-source check.sh --icinga --loglevel INFO --outdir "${OUTDIR}"
+source check.sh ${CLEAN} --icinga --loglevel INFO --outdir "${OUTDIR}"
 
 
 SHARED_FOLDER=//lcldn-fs1/shared
