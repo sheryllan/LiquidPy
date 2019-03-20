@@ -45,8 +45,13 @@ class EUREXScraper(ScraperBase):
                 return 'Futures'
             return MatchHelper.find_first_in_string(name, PRODTYPES, stemming=True)
 
-        known_cols = [c for c in df.columns if not re.match('^unnamed', c, flags=re.IGNORECASE)]
-        unknown_cols = [c for c in df.columns if re.match('^unnamed', c, flags=re.IGNORECASE)]
+        # known_cols = [c for c in df.columns if not re.match('^unnamed', c, flags=re.IGNORECASE)]
+        # unknown_cols = [c for c in df.columns if re.match('^unnamed', c, flags=re.IGNORECASE)]
+        known_cols = list(df.columns[df.columns.notna()])
+        # columns = [i if pd.isna(df.columns[i]) else df.columns[i] for i in range(len(df.columns))]
+        # df.columns = columns
+        # unkown_cols = [c for c in df.columns if isinstance(c, int)]
+
         prod_group = None
         for i, row in df.iterrows():
             if pd.notnull(row.iloc[0]) and 'sum' in str(row.iloc[0]).lower():
@@ -57,7 +62,7 @@ class EUREXScraper(ScraperBase):
             elif 'sum' in str(find_first_n(row, pd.notnull)).lower():
                 continue
             else:
-                name_code = find_first_n(row[unknown_cols], pd.notnull, n=2)
+                name_code = find_first_n(row[row.index.isna()], pd.notna, n=2)
                 if len(name_code) != 2:
                     raise ValueError('Missing not null column value(s) for product name/code, found: {}'.format(name_code))
                 group_type = [prod_group, get_prodtype(prod_group)]
@@ -65,14 +70,6 @@ class EUREXScraper(ScraperBase):
                 yield pd.concat([row_extra, row[known_cols]])[outcols]
 
     def get_table(self, df, min_colnum=10):
-        def set_headers():
-            for i, row in df.iterrows():
-                indices = pd.notna(row).nonzero()[0]
-                if len(indices) >= min_colnum:
-                    df.rename(columns={row.index[j]: row.iloc[j] for j in indices}, inplace=True)
-                    df.drop(df.index[df.index <= i], inplace=True)
-                    df.reset_index(drop=True, inplace=True)
-                    break
 
         def rename_adv_col():
             prev_col = df.columns[0]
@@ -83,7 +80,8 @@ class EUREXScraper(ScraperBase):
                     break
                 prev_col = curr_col
 
-        set_headers()
+        df = set_first_valid_header(df, df[df.notna().sum(axis=1) >= min_colnum])
+        df.reset_index(drop=True, inplace=True)
         rename_adv_col()
         return pd.DataFrame(self.__parse_data_rows(df, self.OUTCOLS))
 
@@ -110,7 +108,7 @@ class EUREXScraper(ScraperBase):
         self.validate_report_rtime(report, rtime)
         with NamedTemporaryFile() as xls_file:
             fn = download(self.find_report_url(*rtime), xls_file).name
-            df = pd.read_excel(pd.ExcelFile(fn, on_demand=True), sheet_name=1)
+            df = pd.read_excel(fn, sheet_name=1)
             return {EUREX: self.get_table(df)}
 
 

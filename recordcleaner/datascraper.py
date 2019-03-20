@@ -1,7 +1,7 @@
 import math
-from datetime import date
-from subprocess import Popen, PIPE
 from itertools import chain
+from subprocess import Popen, PIPE
+
 from PyPDF2 import PdfFileReader
 
 from commonlib.websourcing import *
@@ -12,20 +12,19 @@ XLSX_SUFFIX = '.xlsx'
 
 
 
-def first_nonna_index(df):
-    return pd.notna(df).all(1).nonzero()[0][0]
+# def first_nonna_index(df):
+#     return pd.notna(df).all(1).nonzero()[0][0]
 
 
-def filter_df(df, filterfunc):
-    cols = filterfunc(df.columns)
-    return df[cols]
+# def filter_df(df, filterfunc):
+#     cols = filterfunc(df.columns)
+#     return df[cols]
 
 
-def set_df_col(df):
-    header_index = first_nonna_index(df)
-    if header_index != 0:
-        df.columns = df.iloc[header_index]
-        df.drop(header_index, inplace=True)
+def set_first_valid_header(df, valid_df=None):
+    header_index = df.first_valid_index() if valid_df is None else valid_df.first_valid_index()
+    df.columns = df.iloc[header_index]
+    df.drop(df.index[:header_index + 1], inplace=True)
     return df
 
 

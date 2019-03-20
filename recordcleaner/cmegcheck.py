@@ -87,7 +87,7 @@ class CMEGScraper(ScraperBase):
                         asset = title
                     else:
                         instrument = title
-                        result[('{} {}'.format(asset, instrument))] = (asset, instrument)
+                        result[('{} {}'.format(asset, instrument))] = (str(asset), str(instrument))
                     prev_level = level
                 return result
 
@@ -114,7 +114,7 @@ class CMEGScraper(ScraperBase):
             return None
 
         def parse_table_from_txt(self, lines, alignment=tp.RIGHT):
-            lines = iter(lines)
+            lines = map(str, lines)
             match_headers = lambda x: tp.match_tabular_header(x, min_splits=3)
             header_dict = self.parse_adv_headers(lines, match_headers)
             if not header_dict:
@@ -142,10 +142,10 @@ class CMEGScraper(ScraperBase):
 
     def get_prods_table(self):
         with NamedTemporaryFile() as prods_file:
-            xls = pd.ExcelFile(download(self.URL_PRODSLATE, prods_file).name, on_demand=True)
-            df_prods = pd.read_excel(xls)
+            xls = download(self.URL_PRODSLATE, prods_file).name
+            df_prods = pd.read_excel(xls, header=None)
             nonna_subset = [A_PRODUCT_NAME, A_PRODUCT_GROUP, A_CLEARED_AS]
-            return clean_df(set_df_col(df_prods), nonna_subset)
+            return clean_df(set_first_valid_header(df_prods), nonna_subset)
 
     def get_adv_table(self, url):
         self.__logger.info(('Downloading from: {}'.format(url)))

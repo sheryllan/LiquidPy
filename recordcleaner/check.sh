@@ -75,7 +75,7 @@ for exch in ${EXCHANGES[@]}; do
     soutpath="$( match_outpath ${exch^^} )"
     CHECK_OUTFILES+=("${coutpath}")
     MATCH_OUTFILES+=("${soutpath}")
-#    python "$( python_sript ${exch} )" ${ICINGA} ${LOGLEVEL} --coutpath "${coutpath}" --soutpath "${soutpath}" --rtime ${RTIME}
+    python "$( python_sript ${exch} )" ${ICINGA} ${LOGLEVEL} --coutpath "${coutpath}" --soutpath "${soutpath}" --rtime ${RTIME}
 done
 
 deactivate
