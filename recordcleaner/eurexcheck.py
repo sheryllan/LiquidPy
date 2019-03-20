@@ -45,13 +45,7 @@ class EUREXScraper(ScraperBase):
                 return 'Futures'
             return MatchHelper.find_first_in_string(name, PRODTYPES, stemming=True)
 
-        # known_cols = [c for c in df.columns if not re.match('^unnamed', c, flags=re.IGNORECASE)]
-        # unknown_cols = [c for c in df.columns if re.match('^unnamed', c, flags=re.IGNORECASE)]
         known_cols = list(df.columns[df.columns.notna()])
-        # columns = [i if pd.isna(df.columns[i]) else df.columns[i] for i in range(len(df.columns))]
-        # df.columns = columns
-        # unkown_cols = [c for c in df.columns if isinstance(c, int)]
-
         prod_group = None
         for i, row in df.iterrows():
             if pd.notnull(row.iloc[0]) and 'sum' in str(row.iloc[0]).lower():

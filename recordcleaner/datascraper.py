@@ -11,16 +11,6 @@ TXT_SUFFIX = '.txt'
 XLSX_SUFFIX = '.xlsx'
 
 
-
-# def first_nonna_index(df):
-#     return pd.notna(df).all(1).nonzero()[0][0]
-
-
-# def filter_df(df, filterfunc):
-#     cols = filterfunc(df.columns)
-#     return df[cols]
-
-
 def set_first_valid_header(df, valid_df=None):
     header_index = df.first_valid_index() if valid_df is None else valid_df.first_valid_index()
     df.columns = df.iloc[header_index]
